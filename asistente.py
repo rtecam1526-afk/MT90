@@ -42,7 +42,7 @@ def login():
                 session["agente_key"] = key
                 sid = get_sid()
                 _agentes[sid] = key
-                return redirect(url_for("index"))
+                return redirect(url_for("crm"))
         return render_template("login.html", error="Email o contraseña incorrectos.")
     if session.get("loggeado"):
         return redirect(url_for("index"))
@@ -79,6 +79,17 @@ def cargar_radar_hoy() -> str:
         return f"\n\n[RADAR DE HOY — {nombre}]\n{texto[:3000]}"
     except Exception:
         return ""
+
+
+@app.route("/crm")
+@login_required
+def crm():
+    agente_key = session.get("agente_key", "gabriela")
+    crm_path = os.path.join(os.path.dirname(__file__), "crm", f"{agente_key}.html")
+    if os.path.exists(crm_path):
+        with open(crm_path, encoding="utf-8") as f:
+            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    return redirect(url_for("index"))
 
 
 @app.route("/")
