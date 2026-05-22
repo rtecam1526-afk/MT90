@@ -85,7 +85,7 @@ def cargar_radar_hoy() -> str:
 @login_required
 def crm():
     agente_key = session.get("agente_key", "gabriela")
-    crm_path = os.path.join(os.path.dirname(__file__), "crm", f"{agente_key}.html")
+    crm_path = os.path.join(os.path.dirname(__file__), f"{agente_key}.html")
     if os.path.exists(crm_path):
         with open(crm_path, encoding="utf-8") as f:
             return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
