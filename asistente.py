@@ -790,17 +790,24 @@ def get_contactos():
 def crear_contacto():
     agente_key = session.get("agente_key", "")
     data = request.get_json()
+    if not data:
+        return {"error": "No data"}, 400
     data["agente"] = agente_key
-    r = _req.post(
-        f"{SUPABASE_URL}/rest/v1/contactos",
-        headers=_supa_hdrs(),
-        json=data,
-        timeout=10,
-    )
-    if not r.ok:
-        return {"error": r.text}, 500
-    result = r.json()
-    return result[0] if result else {}
+    hdrs = {**_supa_hdrs(), "Prefer": "return=minimal"}
+    try:
+        r = _req.post(
+            f"{SUPABASE_URL}/rest/v1/contactos",
+            headers=hdrs,
+            json=data,
+            timeout=10,
+        )
+        if not r.ok:
+            print(f"[SUPA POST error] {r.status_code} {r.text}")
+            return {"error": r.text}, 500
+        return {"ok": True}
+    except Exception as e:
+        print(f"[POST /contactos] {e}")
+        return {"error": str(e)}, 500
 
 
 @app.route("/contactos/<int:cid>", methods=["PUT"])
