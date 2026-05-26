@@ -8,8 +8,20 @@ import os, json, glob, uuid, re, time
 from functools import wraps
 from flask import Flask, request, Response, render_template, session, redirect, url_for
 import anthropic
+import requests as _req
 import config_ia as cfg
 import acm_scraper
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+
+def _supa_hdrs():
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=representation",
+    }
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mt90_traccion_secret_2024")
@@ -105,14 +117,121 @@ def upload_radar():
     return {"ok": True}
 
 
+_SUPA_INJECT = r"""
+<script>
+(function(){
+  function fmtFecha(d){var m=d.getMonth()+1,day=d.getDate(),y=d.getFullYear();return day+'/'+m+'/'+y;}
+  function fromSupa(c){
+    var nombre=c.nombre||c.cliente||'';
+    var fuc=c.fecha_ultimo_contacto||'';
+    var dias=parseDias(fuc);
+    var pl=prioFromDias(dias);
+    var etapa=c.etapa?normEtapa(c.etapa):computeEtapa({etapa:'',prioridad:pl[0],dias_desde_contacto:dias});
+    var tel=c.telefono||'';
+    var waUrl=c.whatsapp_link||buildWaUrl(tel,'');
+    return {
+      id:c.id,nombre:nombre,nombre_corto:nombre.split(' ')[0],
+      telefono:tel,whatsapp_link:waUrl,
+      antecedente:c.antecedente||'',necesidad:c.necesidad||'',
+      profesion:c.profesion||'',grupo_familiar:c.grupo_familiar||'',
+      religion:c.religion||'',proxima_accion:c.proxima_accion||'',
+      observaciones:c.observaciones||'',referido:'',
+      fecha_ultimo_contacto:fuc,fecha_proxima:c.fecha_proxima_accion||'',
+      fecha_nacimiento:c.fecha_cumpleanos||'',
+      logros:(c.logros||'Sin Avance').trim()||'Sin Avance',
+      etapa:etapa,tipo:normTipo(c.tipo||''),
+      alerta:c.alerta||(dias===null?'SIN FECHA':dias>30?'ATRASADO':''),
+      dias_desde_contacto:dias,prioridad:pl[0],prioridad_color:pl[1],scripts:[],
+    };
+  }
+  function cargarDesdeSupabase(){
+    setSyncState('loading','Conectando...');
+    fetch('/contactos',{credentials:'same-origin'})
+      .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .then(function(rows){
+        DATA=rows.map(fromSupa);
+        setSyncState('ok','Supabase ● '+new Date().toLocaleTimeString('es-AR')+' — '+DATA.length+' contactos');
+        actualizarUI();
+        setTimeout(mostrarBriefing,400);
+      })
+      .catch(function(err){setSyncState('error','Error Supabase: '+err.message);});
+  }
+  var _guardarOrig=window.guardarResultado;
+  window.guardarResultado=function(resultado){
+    var idx=selectedResultIdx;
+    _guardarOrig(resultado);
+    if(idx>=0&&DATA[idx]&&DATA[idx].id){
+      fetch('/contactos/'+DATA[idx].id,{
+        method:'PUT',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({fecha_ultimo_contacto:fmtFecha(new Date()),logros:resultado})
+      });
+    }
+  };
+  var btnN=document.createElement('button');
+  btnN.className='btn-topbar';
+  btnN.innerHTML='+ Contacto';
+  btnN.style.cssText='background:rgba(134,188,37,.18);border-color:rgba(134,188,37,.4);color:#c8e87a;font-weight:600';
+  btnN.onclick=function(){document.getElementById('mtnOv').classList.remove('hidden');};
+  var acts=document.querySelector('.topbar-actions');
+  if(acts)acts.insertBefore(btnN,acts.firstChild);
+  document.body.insertAdjacentHTML('beforeend',[
+    '<div id="mtnOv" class="resultado-overlay hidden" onclick="if(event.target===this)this.classList.add(\'hidden\')">',
+    '<div class="resultado-modal" style="max-width:460px;padding:26px">',
+    '<div class="res-titulo" style="margin-bottom:14px">Nuevo Contacto</div>',
+    '<div style="display:grid;gap:9px">',
+    '<input id="mtnNom" placeholder="Nombre *" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
+    '<input id="mtnTel" placeholder="Teléfono (sin +54)" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
+    '<input id="mtnAnte" placeholder="Antecedente" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
+    '<input id="mtnNec" placeholder="Necesidad" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
+    '<input id="mtnFuc" placeholder="Fecha últ. contacto dd/mm/aaaa" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
+    '</div>',
+    '<div style="display:flex;gap:8px;margin-top:14px">',
+    '<button onclick="guardarNuevoContacto()" style="flex:1;background:#86bc25;color:#051c2c;border:none;padding:11px;border-radius:6px;font-weight:700;cursor:pointer">Guardar</button>',
+    '<button onclick="document.getElementById(\'mtnOv\').classList.add(\'hidden\')" style="flex:1;background:#1e293b;color:#94a3b8;border:1px solid #334155;padding:11px;border-radius:6px;cursor:pointer">Cancelar</button>',
+    '</div></div></div>'
+  ].join(''));
+  window.guardarNuevoContacto=function(){
+    var nom=document.getElementById('mtnNom').value.trim();
+    if(!nom){alert('El nombre es obligatorio');return;}
+    var tel=document.getElementById('mtnTel').value.trim();
+    fetch('/contactos',{
+      method:'POST',credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        nombre:nom,cliente:nom,telefono:tel,
+        whatsapp_link:tel?'https://wa.me/54'+tel.replace(/\D/g,''):'',
+        antecedente:document.getElementById('mtnAnte').value.trim(),
+        necesidad:document.getElementById('mtnNec').value.trim(),
+        fecha_ultimo_contacto:document.getElementById('mtnFuc').value.trim(),
+      })
+    }).then(function(r){
+      if(!r.ok)throw new Error('Error al guardar');
+      document.getElementById('mtnOv').classList.add('hidden');
+      ['mtnNom','mtnTel','mtnAnte','mtnNec','mtnFuc'].forEach(function(id){document.getElementById(id).value='';});
+      cargarDesdeSupabase();
+    }).catch(function(err){alert('Error: '+err.message);});
+  };
+  window.sincronizar=cargarDesdeSupabase;
+  window.cargarTodo=cargarDesdeSupabase;
+  cargarDesdeSupabase();
+})();
+</script>
+"""
+
 @app.route("/crm")
 @login_required
 def crm():
     agente_key = session.get("agente_key", "gabriela")
-    crm_path = os.path.join(os.path.dirname(__file__), f"{agente_key}.html")
-    if os.path.exists(crm_path):
-        with open(crm_path, encoding="utf-8") as f:
-            return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+    _here = os.path.dirname(__file__)
+    for candidate in [
+        os.path.join(_here, f"{agente_key}.html"),
+        os.path.join(_here, "crm", f"{agente_key}.html"),
+    ]:
+        if os.path.exists(candidate):
+            with open(candidate, encoding="utf-8") as f:
+                content = f.read()
+            return content + _SUPA_INJECT, 200, {"Content-Type": "text/html; charset=utf-8"}
     return redirect(url_for("index"))
 
 
@@ -649,6 +768,74 @@ def enviar_acm():
         return {"ok": True}
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+@app.route("/contactos", methods=["GET"])
+@login_required
+def get_contactos():
+    agente_key = session.get("agente_key", "")
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "select": "*", "order": "nombre.asc"},
+        timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return r.json()
+
+
+@app.route("/contactos", methods=["POST"])
+@login_required
+def crear_contacto():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json()
+    data["agente"] = agente_key
+    r = _req.post(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers=_supa_hdrs(),
+        json=data,
+        timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    result = r.json()
+    return result[0] if result else {}
+
+
+@app.route("/contactos/<int:cid>", methods=["PUT"])
+@login_required
+def actualizar_contacto(cid):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json()
+    data.pop("id", None)
+    data.pop("agente", None)
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers=_supa_hdrs(),
+        params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"},
+        json=data,
+        timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True}
+
+
+@app.route("/contactos/<int:cid>", methods=["DELETE"])
+@login_required
+def eliminar_contacto(cid):
+    agente_key = session.get("agente_key", "")
+    hdrs = {**_supa_hdrs(), "Prefer": ""}
+    r = _req.delete(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers=hdrs,
+        params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"},
+        timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True}
 
 
 if __name__ == "__main__":
