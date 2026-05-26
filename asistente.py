@@ -185,6 +185,13 @@ _SUPA_INJECT = r"""
     '<input id="mtnAnte" placeholder="Antecedente" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
     '<input id="mtnNec" placeholder="Necesidad" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
     '<input id="mtnFuc" placeholder="Fecha últ. contacto dd/mm/aaaa" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
+    '<select id="mtnEtapa" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
+    '<option value="">Etapa (opcional)</option>',
+    '<option value="Caliente">Caliente</option>',
+    '<option value="Media">Media</option>',
+    '<option value="Tibio">Tibio</option>',
+    '<option value="Fria">Fría</option>',
+    '</select>',
     '</div>',
     '<div style="display:flex;gap:8px;margin-top:14px">',
     '<button onclick="guardarNuevoContacto()" style="flex:1;background:#86bc25;color:#051c2c;border:none;padding:11px;border-radius:6px;font-weight:700;cursor:pointer">Guardar</button>',
@@ -204,11 +211,12 @@ _SUPA_INJECT = r"""
         antecedente:document.getElementById('mtnAnte').value.trim(),
         necesidad:document.getElementById('mtnNec').value.trim(),
         fecha_ultimo_contacto:document.getElementById('mtnFuc').value.trim(),
+        etapa:document.getElementById('mtnEtapa').value||null,
       })
     }).then(function(r){
       if(!r.ok)throw new Error('Error al guardar');
       document.getElementById('mtnOv').classList.add('hidden');
-      ['mtnNom','mtnTel','mtnAnte','mtnNec','mtnFuc'].forEach(function(id){document.getElementById(id).value='';});
+      ['mtnNom','mtnTel','mtnAnte','mtnNec','mtnFuc','mtnEtapa'].forEach(function(id){document.getElementById(id).value='';});
       cargarDesdeSupabase();
     }).catch(function(err){alert('Error: '+err.message);});
   };
