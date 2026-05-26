@@ -20,6 +20,7 @@ client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY, max_retries=3)
 _historiales = {}   # session_id -> list of messages
 _agentes     = {}   # session_id -> agente_key
 _ultimo_acm  = {}   # session_id -> {barrio, tipo, m2, ambientes, contenido, agente_nombre}
+_radar_cache = {}   # agente_key -> {contenido, nombre}
 
 
 def login_required(f):
@@ -61,7 +62,12 @@ def get_sid():
     return session["sid"]
 
 
-def cargar_radar_hoy() -> str:
+def cargar_radar_hoy(agente_key: str = "") -> str:
+    # Primero buscar en cache (subido desde el radar local)
+    if agente_key and agente_key in _radar_cache:
+        cache = _radar_cache[agente_key]
+        return f"\n\n[RADAR DE HOY — {cache['nombre']}]\n{cache['contenido'][:3000]}"
+    # Fallback: archivos locales (cuando corre en la misma máquina)
     radar_dir = os.path.join(os.path.dirname(__file__), "..", "radar_captacion")
     archivos = []
     for patron in ["radar_facebook_email.html", "radar_email.html", "radar_*.html"]:
@@ -79,6 +85,24 @@ def cargar_radar_hoy() -> str:
         return f"\n\n[RADAR DE HOY — {nombre}]\n{texto[:3000]}"
     except Exception:
         return ""
+
+
+@app.route("/upload_radar", methods=["POST"])
+def upload_radar():
+    data    = request.get_json()
+    token   = data.get("token", "")
+    if token != app.secret_key:
+        return {"error": "No autorizado"}, 401
+    agente   = data.get("agente", "")
+    html     = data.get("html", "")
+    nombre   = data.get("nombre", "radar.html")
+    if not agente or not html:
+        return {"error": "Faltan datos"}, 400
+    texto = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL)
+    texto = re.sub(r'<[^>]+>', ' ', texto)
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    _radar_cache[agente] = {"contenido": texto, "nombre": nombre}
+    return {"ok": True}
 
 
 @app.route("/crm")
@@ -140,7 +164,7 @@ def chat():
     system += f"\nBarrios que trabaja: {', '.join(agente_info['barrios'])}"
 
     if con_radar:
-        radar_ctx = cargar_radar_hoy()
+        radar_ctx = cargar_radar_hoy(agente_key)
         system += radar_ctx if radar_ctx else \
             "\n\n[No se encontró radar del día. Podés pegar los datos directamente en el chat.]"
 
@@ -337,7 +361,7 @@ def radar_resumen():
     agente_key  = _agentes.get(sid, "gabriela")
     agente_info = cfg.AGENTES.get(agente_key, cfg.AGENTES["gabriela"])
 
-    radar_ctx = cargar_radar_hoy()
+    radar_ctx = cargar_radar_hoy(agente_key)
 
     if not radar_ctx:
         def sin_radar():
