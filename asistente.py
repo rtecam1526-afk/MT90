@@ -770,17 +770,6 @@ def enviar_acm():
         return {"error": str(e)}, 500
 
 
-@app.route("/test_supa")
-def test_supa():
-    r = _req.get(
-        f"{SUPABASE_URL}/rest/v1/contactos",
-        headers=_supa_hdrs(),
-        params={"select": "agente,nombre", "limit": "5"},
-        timeout=10,
-    )
-    return {"status": r.status_code, "data": r.text[:500]}
-
-
 @app.route("/contactos", methods=["GET"])
 @login_required
 def get_contactos():
