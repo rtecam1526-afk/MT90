@@ -210,21 +210,21 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
 /* ── Main ── */
 .main-content,.view-container,main,.main { background:#f6f6fa !important; }
 
-/* ── Aurora greeting header ── */
-#aurora-greet { flex-shrink:0; }
+/* ── Aurora greeting header (compacto) ── */
+#aurora-greet { flex-shrink:0; padding:10px 20px 8px !important; }
 
-/* ── Stats Row → Aurora KPI cards ── */
+/* ── Stats Row → Aurora KPI cards (inline compacto) ── */
 .stats-row {
-  display:flex !important; flex-wrap:wrap !important; gap:10px !important;
-  padding:14px 20px !important;
+  display:flex !important; flex-wrap:nowrap !important; gap:8px !important;
+  padding:10px 20px !important;
   background:#f6f6fa !important; border-bottom:1px solid #ececf3 !important;
 }
 .stat-pill {
   background:#ffffff !important;
   border:1px solid #ececf3 !important;
-  border-radius:10px !important; padding:14px 18px !important;
-  min-width:108px !important; flex:0 0 auto !important;
-  flex-direction:column !important; align-items:flex-start !important;
+  border-radius:8px !important; padding:10px 16px !important;
+  min-width:0 !important; flex:1 1 0 !important;
+  flex-direction:row !important; align-items:center !important; gap:10px !important;
   box-shadow:0 1px 3px rgba(26,24,48,.05) !important;
   overflow:visible !important; transition:box-shadow .15s !important;
 }
@@ -235,9 +235,9 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
 .stat-pill.sp-amber { border-left:3px solid #f59e0b !important; }
 .stat-pill.sp-green { border-left:3px solid #5b5ee0 !important; }
 .stat-pill .num {
-  font-family:"Inter",sans-serif !important; font-size:1.75rem !important;
+  font-family:"Inter",sans-serif !important; font-size:1.45rem !important;
   font-weight:700 !important; line-height:1 !important; letter-spacing:-.03em !important;
-  color:#1a1830 !important;
+  color:#1a1830 !important; flex-shrink:0 !important;
 }
 .stat-pill.sp-red   .num { color:#ef4444 !important; }
 .stat-pill.sp-amber .num { color:#f59e0b !important; }
@@ -245,18 +245,18 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
 .stat-pill .lbl {
   font-family:"Inter",sans-serif !important; font-size:.71rem !important;
   font-weight:500 !important; text-transform:none !important; letter-spacing:0 !important;
-  color:#76748a !important; margin-top:5px !important;
+  color:#76748a !important; margin-top:0 !important;
 }
 
-/* ── Llamar hoy section ── */
-.hoy-section { background:#ffffff !important; border-bottom:1px solid #ececf3 !important; padding:14px 20px 12px !important; flex-shrink:0 !important; }
-.hoy-title { font-family:"Inter",sans-serif !important; font-size:.7rem !important; font-weight:600 !important; text-transform:uppercase !important; letter-spacing:.1em !important; color:#5b5ee0 !important; margin-bottom:12px !important; }
+/* ── Llamar hoy section (compacto) ── */
+.hoy-section { background:#ffffff !important; border-bottom:1px solid #ececf3 !important; padding:10px 20px 8px !important; flex-shrink:0 !important; }
+.hoy-title { font-family:"Inter",sans-serif !important; font-size:.68rem !important; font-weight:600 !important; text-transform:uppercase !important; letter-spacing:.1em !important; color:#5b5ee0 !important; margin-bottom:8px !important; }
 .hoy-title::after { display:none !important; }
-.hoy-cards { gap:10px !important; }
+.hoy-cards { gap:8px !important; }
 .hoy-card {
   background:#f6f6fa !important; border:1px solid #ececf3 !important;
-  border-radius:10px !important; padding:12px !important;
-  width:186px !important; flex-shrink:0 !important; transition:all .15s !important;
+  border-radius:10px !important; padding:10px !important;
+  width:170px !important; flex-shrink:0 !important; transition:all .15s !important;
 }
 .hoy-card:hover { border-color:#d8d6f4 !important; background:#ffffff !important; box-shadow:0 2px 8px rgba(91,94,224,.1) !important; }
 .hoy-card.selected { border-color:#5b5ee0 !important; background:#f4f3fb !important; }
@@ -274,11 +274,8 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
 .btn-cont-sm:hover:not(:disabled) { background:#5b5ee0 !important; }
 .btn-cont-sm.done { background:#ecebfb !important; color:#5b5ee0 !important; cursor:default !important; }
 
-/* ── Sin historial ── */
-.sinh-section { background:#f6f6fa !important; border-bottom:1px solid #ececf3 !important; padding:10px 20px !important; }
-.sinh-title { font-family:"Inter",sans-serif !important; font-size:.68rem !important; font-weight:600 !important; text-transform:uppercase !important; letter-spacing:.1em !important; color:#76748a !important; margin-bottom:8px !important; }
-.sinh-chip { font-family:"Inter",sans-serif !important; font-size:.76rem !important; background:#ffffff !important; border:1px solid #ececf3 !important; border-radius:999px !important; padding:3px 12px !important; color:#4a4861 !important; }
-.sinh-chip:hover { border-color:#5b5ee0 !important; color:#3a3ad0 !important; }
+/* ── Sin historial — oculto por defecto (demasiados chips) ── */
+.sinh-section { display:none !important; }
 
 /* ── Filter bar ── */
 .filter-bar { background:#f6f6fa !important; border-bottom:1px solid #ececf3 !important; padding:8px 20px !important; }
