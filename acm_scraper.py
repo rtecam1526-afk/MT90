@@ -3,10 +3,11 @@ MT90 Tracción — ACM Scraper
 Obtiene comparables de Zonaprop para generar el ACM
 """
 
-import cloudscraper, json, re, time, math, urllib.parse, urllib.request
+import cloudscraper, json, re, time, math, urllib.parse, urllib.request, os
 from typing import Optional
 
 BASE = "https://www.zonaprop.com.ar"
+_SCRAPER_KEY = os.environ.get("SCRAPER_API_KEY", "").strip()
 
 TIPO_URL = {
     "departamento": "departamentos",
@@ -24,9 +25,13 @@ def _crear_session():
     return s
 
 def _fetch(session, url):
+    if _SCRAPER_KEY:
+        target = f"http://api.scraperapi.com?api_key={_SCRAPER_KEY}&url={urllib.parse.quote(url, safe='')}&country_code=ar"
+    else:
+        target = url
     for i in range(3):
         try:
-            r = session.get(url, timeout=20)
+            r = session.get(target, timeout=40)
             print(f"[ACM] GET {url} → HTTP {r.status_code} ({len(r.text)} bytes)")
             if r.status_code == 200:
                 return r.text
