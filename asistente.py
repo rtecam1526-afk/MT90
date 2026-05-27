@@ -323,9 +323,13 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
 .vt-btn { font-family:"Inter",sans-serif !important; font-size:.72rem !important; text-transform:none !important; letter-spacing:0 !important; color:#76748a !important; background:#ffffff !important; }
 .vt-btn.active { background:#5b5ee0 !important; color:#ffffff !important; border-right-color:#5b5ee0 !important; }
 
+/* ── Sidebar más angosta para ganar espacio al kanban ── */
+.sidebar { width:190px !important; min-width:190px !important; }
+
 /* ── Kanban column headers → Aurora ── */
 .kanban-section { background:#f6f6fa !important; }
-.kanban-wrap { padding:14px 16px !important; gap:12px !important; }
+.kanban-wrap { padding:10px 12px !important; gap:8px !important; }
+.kanban-col { width:210px !important; }
 .kanban-col { border-radius:8px !important; overflow:hidden !important; }
 .col-header {
   background:#ffffff !important;
