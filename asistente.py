@@ -352,10 +352,11 @@ def acm():
     sid  = get_sid()
     data = request.get_json()
 
-    barrio     = (data.get("barrio") or "").strip()
-    tipo       = (data.get("tipo")   or "departamento").strip()
+    barrio     = (data.get("barrio")    or "").strip()
+    tipo       = (data.get("tipo")      or "departamento").strip()
     m2         = data.get("m2")
     ambientes  = data.get("ambientes")
+    direccion  = (data.get("direccion") or "").strip() or None
 
     if not barrio:
         return {"error": "Barrio requerido"}, 400
@@ -370,11 +371,16 @@ def acm():
     agente_info = cfg.AGENTES.get(agente_key, cfg.AGENTES["gabriela"])
 
     def generar():
-        yield f"data: {json.dumps({'texto': f'🔍 Buscando comparables en **{barrio.title()}** ({tipo})...'})}\n\n"
+        if direccion:
+            msg_busq = f'🔍 Buscando comparables cerca de **{direccion}** en {barrio.title()} ({tipo})...'
+        else:
+            msg_busq = f'🔍 Buscando comparables en **{barrio.title()}** ({tipo})...'
+        yield f"data: {json.dumps({'texto': msg_busq})}\n\n"
 
         try:
             comparables = acm_scraper.buscar_comparables(
-                barrio, tipo, m2_int, amb_int, paginas=2
+                barrio, tipo, m2_int, amb_int, paginas=2,
+                direccion=direccion, radio_km=1.0
             )
         except Exception as e:
             yield f"data: {json.dumps({'error': f'Error al buscar comparables: {e}'})}\n\n"
@@ -388,11 +394,15 @@ def acm():
         yield f"data: {json.dumps({'texto': f'\\n\\n📊 {len(comparables)} comparables encontrados. Generando ACM...\\n\\n'})}\n\n"
 
         from datetime import datetime
-        datos_texto = acm_scraper.formatear_para_claude(barrio, tipo, m2_int, amb_int, comparables)
+        datos_texto = acm_scraper.formatear_para_claude(
+            barrio, tipo, m2_int, amb_int, comparables,
+            direccion=direccion, radio_km=1.0 if direccion else None
+        )
         prompt_acm  = ACM_PROMPT.format(datos=datos_texto, fecha_hoy=datetime.now().strftime("%d/%m/%Y"))
 
         history = _historiales.get(sid, [])
-        history.append({"role": "user", "content": f"[ACM solicitado] Barrio: {barrio.title()}, Tipo: {tipo}, m²: {m2_int or 'n/d'}, Ambientes: {amb_int or 'n/d'}"})
+        dir_txt = f", Dirección: {direccion}" if direccion else ""
+        history.append({"role": "user", "content": f"[ACM solicitado] Barrio: {barrio.title()}, Tipo: {tipo}, m²: {m2_int or 'n/d'}, Ambientes: {amb_int or 'n/d'}{dir_txt}"})
 
         respuesta_completa = ""
         try:

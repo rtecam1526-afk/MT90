@@ -105,7 +105,7 @@
       transition: max-height .25s ease, padding .25s ease;
       flex-shrink: 0;
     }
-    #acm-panel.open { max-height: 220px; }
+    #acm-panel.open { max-height: 280px; }
     .acm-inner {
       padding: 16px 24px;
       max-width: 860px;
@@ -127,7 +127,8 @@
     }
     .acm-field input:focus, .acm-field select:focus { border-color: #1877f2; }
     .acm-field input[type="number"] { width: 80px; }
-    #acm-barrio { width: 140px; }
+    #acm-barrio { width: 130px; }
+    #acm-direccion { width: 220px; }
     #acm-submit {
       background: #059669; color: white;
       border: none; border-radius: 8px;
@@ -243,6 +244,10 @@
       <div class="acm-field">
         <label>Barrio</label>
         <input id="acm-barrio" type="text" placeholder="ej: palermo" />
+      </div>
+      <div class="acm-field">
+        <label>Dirección (opcional)</label>
+        <input id="acm-direccion" type="text" placeholder="ej: Av. Santa Fe 3200" />
       </div>
       <div class="acm-field">
         <label>Tipo</label>
@@ -485,6 +490,7 @@
 
   async function generarACM() {
     const barrio    = document.getElementById("acm-barrio").value.trim();
+    const direccion = document.getElementById("acm-direccion").value.trim();
     const tipo      = document.getElementById("acm-tipo").value;
     const m2        = document.getElementById("acm-m2").value;
     const ambientes = document.getElementById("acm-ambientes").value;
@@ -503,10 +509,10 @@
     document.getElementById("acm-btn").classList.remove("activo");
 
     // Mostrar solicitud como mensaje del usuario
-    const resumen = `ACM solicitado: ${barrio.charAt(0).toUpperCase()+barrio.slice(1)} · ${tipo}${m2 ? ` · ${m2} m²` : ""}${ambientes ? ` · ${ambientes} amb` : ""}`;
+    const resumen = `ACM solicitado: ${barrio.charAt(0).toUpperCase()+barrio.slice(1)}${direccion ? ` · ${direccion}` : ""} · ${tipo}${m2 ? ` · ${m2} m²` : ""}${ambientes ? ` · ${ambientes} amb` : ""}`;
     agregarMensaje("user", resumen, null);
 
-    await streamRespuesta("/acm", {barrio, tipo, m2: m2||null, ambientes: ambientes||null});
+    await streamRespuesta("/acm", {barrio, tipo, m2: m2||null, ambientes: ambientes||null, direccion: direccion||null});
 
     enviando = false;
     document.getElementById("acm-submit").disabled = false;
