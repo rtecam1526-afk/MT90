@@ -248,29 +248,36 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
   color:#76748a !important; margin-top:0 !important;
 }
 
-/* ── Llamar hoy section (compacto) ── */
-.hoy-section { background:#ffffff !important; border-bottom:1px solid #ececf3 !important; padding:10px 20px 8px !important; flex-shrink:0 !important; }
-.hoy-title { font-family:"Inter",sans-serif !important; font-size:.68rem !important; font-weight:600 !important; text-transform:uppercase !important; letter-spacing:.1em !important; color:#5b5ee0 !important; margin-bottom:8px !important; }
+/* ── Llamar hoy — fila horizontal compacta ── */
+.hoy-section { background:#ffffff !important; border-bottom:1px solid #ececf3 !important; padding:8px 20px !important; flex-shrink:0 !important; }
+.hoy-title { font-family:"Inter",sans-serif !important; font-size:.68rem !important; font-weight:600 !important; text-transform:uppercase !important; letter-spacing:.1em !important; color:#5b5ee0 !important; margin-bottom:7px !important; }
 .hoy-title::after { display:none !important; }
-.hoy-cards { gap:8px !important; }
+.hoy-cards { gap:6px !important; flex-wrap:nowrap !important; align-items:stretch !important; }
+/* Cada card es horizontal: avatar · nombre · días · WA · Contacte */
 .hoy-card {
+  display:flex !important; flex-direction:row !important;
+  align-items:center !important; gap:8px !important;
   background:#f6f6fa !important; border:1px solid #ececf3 !important;
-  border-radius:10px !important; padding:10px !important;
-  width:170px !important; flex-shrink:0 !important; transition:all .15s !important;
+  border-radius:8px !important; padding:7px 12px !important;
+  width:auto !important; flex-shrink:0 !important;
+  cursor:pointer !important; transition:all .12s !important;
+  white-space:nowrap !important;
 }
-.hoy-card:hover { border-color:#d8d6f4 !important; background:#ffffff !important; box-shadow:0 2px 8px rgba(91,94,224,.1) !important; }
+.hoy-card:hover { border-color:#d8d6f4 !important; background:#ffffff !important; box-shadow:0 1px 6px rgba(91,94,224,.09) !important; }
 .hoy-card.selected { border-color:#5b5ee0 !important; background:#f4f3fb !important; }
-.hoy-card-name { font-family:"Inter",sans-serif !important; font-size:.88rem !important; font-weight:600 !important; color:#1a1830 !important; margin-bottom:2px !important; letter-spacing:-.01em !important; }
-.hoy-card-info { font-family:"Inter",sans-serif !important; font-size:.72rem !important; letter-spacing:0 !important; text-transform:none !important; color:#76748a !important; margin-bottom:8px !important; }
-.hoy-card-dias { font-family:"Inter",sans-serif !important; font-size:.68rem !important; font-weight:600 !important; letter-spacing:0 !important; text-transform:none !important; padding:2px 8px !important; border-radius:999px !important; margin-bottom:8px !important; }
+/* Avatar inline */
+.av-c { margin-bottom:0 !important; flex-shrink:0 !important; }
+.hoy-card-name { font-family:"Inter",sans-serif !important; font-size:.84rem !important; font-weight:600 !important; color:#1a1830 !important; margin-bottom:0 !important; white-space:nowrap !important; }
+.hoy-card-info { display:none !important; }
+.hoy-card-dias { font-family:"Inter",sans-serif !important; font-size:.66rem !important; font-weight:600 !important; letter-spacing:0 !important; text-transform:none !important; padding:2px 7px !important; border-radius:999px !important; margin-bottom:0 !important; white-space:nowrap !important; }
 .hoy-card-dias.r { border-color:rgba(239,68,68,.35) !important; color:#dc2626 !important; background:rgba(239,68,68,.06) !important; }
 .hoy-card-dias.o { border-color:rgba(245,158,11,.4) !important; color:#b45309 !important; background:rgba(245,158,11,.06) !important; }
 .hoy-card-dias.y { border-color:rgba(245,158,11,.35) !important; color:#b45309 !important; background:rgba(245,158,11,.05) !important; }
 .hoy-card-dias.g { border-color:rgba(91,94,224,.3) !important; color:#3a3ad0 !important; background:rgba(91,94,224,.06) !important; }
-.hoy-card-actions { display:flex !important; gap:6px !important; }
-.btn-wa-sm { background:#dcfce7 !important; border:1px solid #bbf7d0 !important; color:#15803d !important; padding:4px 10px !important; font-family:"Inter",sans-serif !important; font-size:.68rem !important; font-weight:600 !important; text-transform:none !important; letter-spacing:0 !important; border-radius:6px !important; }
+.hoy-card-actions { display:flex !important; gap:4px !important; margin:0 !important; flex-shrink:0 !important; }
+.btn-wa-sm { background:#dcfce7 !important; border:1px solid #bbf7d0 !important; color:#15803d !important; padding:3px 8px !important; font-family:"Inter",sans-serif !important; font-size:.66rem !important; font-weight:600 !important; text-transform:none !important; letter-spacing:0 !important; border-radius:5px !important; white-space:nowrap !important; }
 .btn-wa-sm:hover { background:#bbf7d0 !important; }
-.btn-cont-sm { flex:1 !important; background:#1a1830 !important; border:none !important; color:#fff !important; padding:5px 10px !important; border-radius:6px !important; font-family:"Inter",sans-serif !important; font-size:.72rem !important; font-weight:600 !important; text-transform:none !important; letter-spacing:0 !important; cursor:pointer !important; }
+.btn-cont-sm { flex:0 0 auto !important; background:#1a1830 !important; border:none !important; color:#fff !important; padding:3px 10px !important; border-radius:5px !important; font-family:"Inter",sans-serif !important; font-size:.7rem !important; font-weight:600 !important; text-transform:none !important; letter-spacing:0 !important; cursor:pointer !important; white-space:nowrap !important; }
 .btn-cont-sm:hover:not(:disabled) { background:#5b5ee0 !important; }
 .btn-cont-sm.done { background:#ecebfb !important; color:#5b5ee0 !important; cursor:default !important; }
 
@@ -385,7 +392,7 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
         var nm=ne.textContent.trim();
         var av=document.createElement('div');
         av.className='av-c';
-        av.style.cssText=AV_STYLE.replace('{S}','34').replace('{C}',avBg(nm)).replace('{F}','.72rem')+';margin-bottom:8px';
+        av.style.cssText=AV_STYLE.replace('{S}','26').replace('{C}',avBg(nm)).replace('{F}','.66rem');
         av.textContent=avIni(nm);
         card.insertBefore(av,card.firstChild);
       });
@@ -421,9 +428,9 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
     var greet=agName?'Buenos días, <span style="color:#5b5ee0">'+agName+'</span>':'Bienvenida';
     var div=document.createElement('div');
     div.id='aurora-greet';
-    div.style.cssText='padding:14px 20px 12px;background:#ffffff;border-bottom:1px solid #ececf3;flex-shrink:0';
-    div.innerHTML='<div style="font-family:Inter,sans-serif;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#76748a">'+fecha+'</div>'
-      +'<div style="font-family:Inter,sans-serif;font-size:1.05rem;font-weight:700;color:#1a1830;margin-top:2px">'+greet+'</div>';
+    div.style.cssText='padding:8px 20px;background:#ffffff;border-bottom:1px solid #ececf3;flex-shrink:0;display:flex;align-items:center;gap:16px';
+    div.innerHTML='<div style="font-family:Inter,sans-serif;font-size:.66rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:#8b89a4">'+fecha+'</div>'
+      +'<div style="font-family:Inter,sans-serif;font-size:.95rem;font-weight:700;color:#1a1830">'+greet+'</div>';
     var main=document.querySelector('main.main')||document.querySelector('.main');
     if(main&&!document.getElementById('aurora-greet'))main.insertBefore(div,main.firstChild);
   })();
