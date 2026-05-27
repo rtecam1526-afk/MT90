@@ -855,7 +855,7 @@ def radar_resumen():
 
     if not radar_ctx:
         def sin_radar():
-            yield f"data: {json.dumps({'texto': '⚠️ No encontré ningún archivo de radar generado hoy. Corré primero el radar desde la carpeta radar_captacion.'})}\n\n"
+            yield f"data: {json.dumps({'texto': '⚠️ No encontré el radar de Facebook de hoy. Corré primero correr_facebook_gabriela.bat (o la de tu agente).'})}\n\n"
             yield f"data: {json.dumps({'fin': True})}\n\n"
         return Response(sin_radar(), mimetype="text/event-stream",
                         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
