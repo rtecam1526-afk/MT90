@@ -4,7 +4,7 @@ MT90 Tracción — Agente IA
 Asistente de captación para agentes Remax
 """
 
-import os, json, glob, uuid, re, time
+import os, json, glob, uuid, re, time, datetime
 from functools import wraps
 from flask import Flask, request, Response, render_template, session, redirect, url_for
 import anthropic
@@ -74,12 +74,34 @@ def get_sid():
     return session["sid"]
 
 
+_RADAR_DIR = os.path.join(os.path.dirname(__file__), "_radar_disk")
+os.makedirs(_RADAR_DIR, exist_ok=True)
+
+
+def _radar_disk_path(agente_key: str) -> str:
+    return os.path.join(_RADAR_DIR, f"{agente_key}.json")
+
+
 def cargar_radar_hoy(agente_key: str = "") -> str:
-    # Primero buscar en cache (subido desde el radar local)
+    hoy = datetime.date.today().isoformat()
+    # 1. Memoria (más rápido)
     if agente_key and agente_key in _radar_cache:
         cache = _radar_cache[agente_key]
-        return f"\n\n[RADAR DE HOY — {cache['nombre']}]\n{cache['contenido'][:3000]}"
-    # Fallback: archivos locales (cuando corre en la misma máquina)
+        if cache.get("fecha") == hoy:
+            return f"\n\n[RADAR DE HOY — {cache['nombre']}]\n{cache['contenido'][:3000]}"
+    # 2. Disco (sobrevive sleep de Render)
+    if agente_key:
+        path = _radar_disk_path(agente_key)
+        if os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+                if data.get("fecha") == hoy:
+                    _radar_cache[agente_key] = data
+                    return f"\n\n[RADAR DE HOY — {data['nombre']}]\n{data['contenido'][:3000]}"
+            except Exception:
+                pass
+    # 3. Fallback: archivos locales (solo cuando corre en la misma máquina)
     radar_dir = os.path.join(os.path.dirname(__file__), "..", "radar_captacion")
     archivos = []
     for patron in ["radar_facebook_email.html", "radar_email.html", "radar_*.html"]:
@@ -113,8 +135,16 @@ def upload_radar():
     texto = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL)
     texto = re.sub(r'<[^>]+>', ' ', texto)
     texto = re.sub(r'\s+', ' ', texto).strip()
-    _radar_cache[agente] = {"contenido": texto, "nombre": nombre}
-    return {"ok": True}
+    hoy = datetime.date.today().isoformat()
+    entry = {"contenido": texto, "nombre": nombre, "fecha": hoy}
+    _radar_cache[agente] = entry
+    # Persistir en disco para sobrevivir sleep de Render
+    try:
+        with open(_radar_disk_path(agente), "w", encoding="utf-8") as f:
+            json.dump(entry, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"[RADAR] No se pudo guardar en disco: {e}")
+    return {"ok": True, "agente": agente, "fecha": hoy, "chars": len(texto)}
 
 
 _SUPA_INJECT = r"""
