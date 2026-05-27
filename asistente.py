@@ -331,15 +331,21 @@ ACM_PROMPT = """Generá un ACM (Análisis Comparativo de Mercado) profesional en
 
 IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el informe como fecha del relevamiento. No uses ninguna otra fecha.
 
+CONTEXTO CLAVE — leé esto antes de analizar:
+Los precios de Zonaprop son PRECIOS DE PUBLICACIÓN (lo que el vendedor pide), NO precios de cierre (lo que realmente se pagó). En el mercado actual de CABA, la brecha entre precio pedido y precio de cierre es típicamente del 8 al 15%. Una propiedad publicada a USD 200.000 generalmente se cierra entre USD 170.000 y USD 184.000. Tené esto en cuenta al recomendar el precio: el precio de publicación puede ser mayor, pero el precio real de venta será menor.
+
 Los datos de comparables activos en Zonaprop son los siguientes:
 
 {datos}
 
 El ACM debe tener esta estructura:
 1. **Relevamiento al {fecha_hoy}** — indicá esta fecha exacta al inicio
-2. **Resumen del Mercado** — precio promedio, rango, precio por m², cantidad de competidores activos
-3. **Comparables Destacados** — 4 a 6 propiedades similares con precio, superficie y link
-4. **Precio Recomendado de Publicación** — rango sugerido con justificación breve
+2. **Resumen del Mercado** — precio promedio de publicación, rango, precio por m², cantidad de competidores activos. Aclará que son precios pedidos.
+3. **Comparables Destacados** — 4 a 6 propiedades similares con precio de publicación, superficie y link
+4. **Precio Recomendado** — diferenciá claramente:
+   - *Precio de publicación sugerido*: el precio a publicar (puede estar en la media o levemente por encima)
+   - *Precio de cierre estimado*: el rango realista de lo que se va a cobrar (aplicá 8-12% de descuento sobre publicación)
+   Justificá brevemente con los datos del mercado.
 5. **Argumento para el Propietario** — 3-4 líneas concretas de por qué trabajar con un agente profesional maximiza el precio final y reduce el tiempo de venta
 
 Tono: profesional, basado en datos, convincente. Usá números concretos. Formato listo para mostrar en pantalla o imprimir.
