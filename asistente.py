@@ -171,31 +171,47 @@ _SUPA_INJECT = r"""
   var btnN=document.createElement('button');
   btnN.className='btn-topbar';
   btnN.innerHTML='+ Contacto';
-  btnN.style.cssText='background:rgba(134,188,37,.18);border-color:rgba(134,188,37,.4);color:#c8e87a;font-weight:600';
+  btnN.style.cssText='background:#ecebfb;border-color:#d8d6f4;color:#3a3ad0;font-weight:600;font-family:Inter,system-ui,sans-serif';
+  btnN.onmouseover=function(){this.style.background='#dbd9f7';};
+  btnN.onmouseout=function(){this.style.background='#ecebfb';};
   btnN.onclick=function(){document.getElementById('mtnOv').classList.remove('hidden');};
   var acts=document.querySelector('.topbar-actions');
   if(acts)acts.insertBefore(btnN,acts.firstChild);
   document.body.insertAdjacentHTML('beforeend',[
+    '<style>',
+    '#mtnOv{font-family:Inter,system-ui,sans-serif}',
+    '#mtnOv .mtn-card{background:#fff;border-radius:14px;padding:28px;width:440px;box-shadow:0 8px 32px rgba(26,24,48,.12);border:1px solid #ececf3}',
+    '#mtnOv .mtn-kicker{font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#5b5ee0;font-family:\'JetBrains Mono\',monospace;margin-bottom:4px}',
+    '#mtnOv h3{font-size:1.1rem;font-weight:700;color:#1a1830;margin-bottom:18px}',
+    '#mtnOv .mtn-grid{display:grid;gap:10px}',
+    '#mtnOv .mtn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}',
+    '#mtnOv .mtn-field{display:flex;flex-direction:column;gap:4px}',
+    '#mtnOv .mtn-field label{font-size:.71rem;font-weight:500;color:#76748a}',
+    '#mtnOv input,#mtnOv select{padding:9px 10px;border:1px solid #ececf3;background:#f6f6fa;color:#1a1830;border-radius:8px;font-size:.84rem;font-family:inherit;outline:none}',
+    '#mtnOv input:focus,#mtnOv select:focus{border-color:#5b5ee0;box-shadow:0 0 0 3px #ecebfb}',
+    '#mtnOv .mtn-foot{display:flex;gap:8px;margin-top:18px}',
+    '#mtnOv .mtn-save{flex:1;background:#1a1830;color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;font-size:.86rem;cursor:pointer;font-family:inherit}',
+    '#mtnOv .mtn-save:hover{background:#5b5ee0}',
+    '#mtnOv .mtn-cancel{flex:0 0 auto;background:transparent;color:#76748a;border:1px solid #ececf3;padding:11px 18px;border-radius:8px;font-size:.84rem;cursor:pointer;font-family:inherit}',
+    '#mtnOv .mtn-cancel:hover{background:#f6f6fa}',
+    '</style>',
     '<div id="mtnOv" class="resultado-overlay hidden" onclick="if(event.target===this)this.classList.add(\'hidden\')">',
-    '<div class="resultado-modal" style="max-width:460px;padding:26px">',
-    '<div class="res-titulo" style="margin-bottom:14px">Nuevo Contacto</div>',
-    '<div style="display:grid;gap:9px">',
-    '<input id="mtnNom" placeholder="Nombre *" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
-    '<input id="mtnTel" placeholder="Teléfono (sin +54)" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
-    '<input id="mtnAnte" placeholder="Antecedente" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
-    '<input id="mtnNec" placeholder="Necesidad" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
-    '<input id="mtnFuc" placeholder="Fecha últ. contacto dd/mm/aaaa" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
-    '<select id="mtnEtapa" style="padding:10px;border:1px solid #334155;background:#1e293b;color:white;border-radius:6px;font-size:.88rem">',
-    '<option value="">Etapa (opcional)</option>',
-    '<option value="Caliente">Caliente</option>',
-    '<option value="Media">Media</option>',
-    '<option value="Tibio">Tibio</option>',
-    '<option value="Fria">Fría</option>',
-    '</select>',
+    '<div class="mtn-card">',
+    '<div class="mtn-kicker">CRM · MT90 Tracción</div>',
+    '<h3>Nuevo contacto</h3>',
+    '<div class="mtn-grid">',
+    '<div class="mtn-field"><label>Nombre *</label><input id="mtnNom" placeholder="Cómo lo vas a buscar"></div>',
+    '<div class="mtn-row">',
+    '<div class="mtn-field"><label>Teléfono <span style="color:#8b89a4;font-weight:400">sin +54</span></label><input id="mtnTel" placeholder="11 5926 7961"></div>',
+    '<div class="mtn-field"><label>Etapa</label><select id="mtnEtapa"><option value="">— opcional —</option><option value="Caliente">Caliente</option><option value="Media">Media</option><option value="Tibio">Tibio</option><option value="Fria">Fría</option></select></div>',
     '</div>',
-    '<div style="display:flex;gap:8px;margin-top:14px">',
-    '<button onclick="guardarNuevoContacto()" style="flex:1;background:#86bc25;color:#051c2c;border:none;padding:11px;border-radius:6px;font-weight:700;cursor:pointer">Guardar</button>',
-    '<button onclick="document.getElementById(\'mtnOv\').classList.add(\'hidden\')" style="flex:1;background:#1e293b;color:#94a3b8;border:1px solid #334155;padding:11px;border-radius:6px;cursor:pointer">Cancelar</button>',
+    '<div class="mtn-field"><label>Antecedente</label><input id="mtnAnte" placeholder="Cómo lo conociste · referido, radar, open house…"></div>',
+    '<div class="mtn-field"><label>Necesidad</label><input id="mtnNec" placeholder="Qué busca o qué tiene · venta, alquiler, ACM…"></div>',
+    '<div class="mtn-field"><label>Fecha último contacto <span style="color:#8b89a4;font-weight:400">dd/mm/aaaa</span></label><input id="mtnFuc" placeholder="27 / 05 / 2026"></div>',
+    '</div>',
+    '<div class="mtn-foot">',
+    '<button class="mtn-save" onclick="guardarNuevoContacto()">Guardar contacto</button>',
+    '<button class="mtn-cancel" onclick="document.getElementById(\'mtnOv\').classList.add(\'hidden\')">Cancelar</button>',
     '</div></div></div>'
   ].join(''));
   window.guardarNuevoContacto=function(){
@@ -737,15 +753,20 @@ def enviar_acm():
     if not email_dest:
         return {"error": "Email requerido"}, 400
 
-    # Reutilizar las credenciales Gmail del config del radar
-    import importlib, sys
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "radar_captacion"))
-    try:
-        radar_cfg = importlib.import_module("config")
-        gmail_user = radar_cfg.GMAIL_USUARIO
-        gmail_pass = radar_cfg.GMAIL_PASSWORD
-    except Exception:
-        return {"error": "No se pudo cargar config de email"}, 500
+    # Credenciales Gmail desde env vars o config local
+    gmail_user = os.environ.get("GMAIL_USER", "").strip()
+    gmail_pass = os.environ.get("GMAIL_PASS", "").strip()
+    if not gmail_user or not gmail_pass:
+        try:
+            import importlib, sys
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "radar_captacion"))
+            radar_cfg = importlib.import_module("config")
+            gmail_user = radar_cfg.GMAIL_USUARIO
+            gmail_pass = radar_cfg.GMAIL_PASSWORD
+        except Exception:
+            pass
+    if not gmail_user or not gmail_pass:
+        return {"error": "Email no configurado. Contactá al administrador."}, 500
 
     fecha    = datetime.now().strftime("%d/%m/%Y")
     subtitulo = " · ".join(filter(None, [
