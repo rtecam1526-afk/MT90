@@ -571,6 +571,30 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
     }).catch(function(err){alert('Error: '+err.message);});
   };
 
+  /* ── Botón eliminar contacto en panel de detalle ── */
+  (function(){
+    var btn=document.createElement('button');
+    btn.id='dEliminarBtn';
+    btn.textContent='Eliminar contacto';
+    btn.style.cssText='width:100%;margin-top:10px;padding:8px;background:transparent;border:1px solid #fecaca;color:#dc2626;border-radius:7px;font-family:Inter,sans-serif;font-size:.76rem;font-weight:600;cursor:pointer;transition:all .15s';
+    btn.onmouseover=function(){this.style.background='#fef2f2';};
+    btn.onmouseout=function(){this.style.background='transparent';};
+    btn.onclick=function(){
+      var c=DATA[selectedIdx];
+      if(!c||!c.id)return;
+      if(!confirm('¿Eliminar a '+c.nombre+'? Esta acción no se puede deshacer.'))return;
+      fetch('/contactos/'+c.id,{method:'DELETE',credentials:'same-origin'})
+        .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+        .then(function(){
+          cerrarDetalle();
+          cargarDesdeSupabase();
+        })
+        .catch(function(e){alert('Error al eliminar: '+e.message);});
+    };
+    var contBtn=document.getElementById('dContBtn');
+    if(contBtn&&contBtn.parentNode)contBtn.parentNode.insertBefore(btn,contBtn.nextSibling);
+  })();
+
   window.sincronizar=cargarDesdeSupabase;
   window.cargarTodo=cargarDesdeSupabase;
   cargarDesdeSupabase();
