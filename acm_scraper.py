@@ -1,15 +1,15 @@
 """
 MT90 Tracción — ACM Scraper
-Obtiene comparables de Zonaprop para generar el ACM
+Obtiene comparables de Zonaprop, MercadoLibre y Argenprop
 """
 
 import cloudscraper, json, re, time, math, urllib.parse, urllib.request, os
 from typing import Optional
 
-BASE = "https://www.zonaprop.com.ar"
+BASE_ZP      = "https://www.zonaprop.com.ar"
 _SCRAPER_KEY = os.environ.get("SCRAPER_API_KEY", "").strip()
 
-TIPO_URL = {
+TIPO_URL_ZP = {
     "departamento": "departamentos",
     "casa":         "casas",
     "ph":           "ph",
@@ -17,12 +17,30 @@ TIPO_URL = {
     "oficina":      "oficinas",
 }
 
+TIPO_URL_AP = {
+    "departamento": "departamento",
+    "casa":         "casa",
+    "ph":           "ph",
+    "local":        "local-comercial",
+    "oficina":      "oficina",
+}
+
+ML_CAT = {
+    "departamento": "MLA1459",
+    "casa":         "MLA1440",
+    "ph":           "MLA1459",
+    "local":        "MLA1500",
+    "oficina":      "MLA1471",
+}
+
+
 def _crear_session():
     s = cloudscraper.create_scraper(
         browser={"browser": "chrome", "platform": "windows", "mobile": False}
     )
     s.headers.update({"Accept-Language": "es-AR,es;q=0.9"})
     return s
+
 
 def _fetch(session, url):
     if _SCRAPER_KEY:
@@ -41,7 +59,8 @@ def _fetch(session, url):
             time.sleep(4)
     return None
 
-def _extraer_state(html):
+
+def _extraer_state_zp(html):
     m = re.search(r'window\.__PRELOADED_STATE__\s*=\s*(\{)', html)
     if not m:
         return None
@@ -61,6 +80,7 @@ def _extraer_state(html):
         i += 1
     return None
 
+
 def _distancia_km(lat1, lng1, lat2, lng2):
     R = 6371
     dlat = math.radians(lat2 - lat1)
@@ -69,8 +89,8 @@ def _distancia_km(lat1, lng1, lat2, lng2):
          math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlng/2)**2)
     return R * 2 * math.asin(math.sqrt(a))
 
+
 def _geocodificar(direccion: str, barrio: str = "") -> Optional[tuple]:
-    """Geocodifica con Nominatim (OSM). Retorna (lat, lng) o None."""
     query = f"{direccion}, {barrio}, Buenos Aires, Argentina" if barrio else f"{direccion}, Buenos Aires, Argentina"
     try:
         q = urllib.parse.quote(query)
@@ -88,11 +108,10 @@ def _geocodificar(direccion: str, barrio: str = "") -> Optional[tuple]:
         print(f"[ACM] Error geocodificando '{query}': {e}")
     return None
 
-def _extraer_datos_posting(p):
-    """Extrae m2, ambientes, coordenadas y dirección de un posting."""
+
+def _extraer_datos_posting_zp(p):
     m2 = None
     ambientes = None
-
     for attr in (p.get("attributes") or []):
         attr_id = (attr.get("id") or "").upper()
         values  = attr.get("values") or []
@@ -117,7 +136,6 @@ def _extraer_datos_posting(p):
         if mo:
             ambientes = int(mo.group(1))
 
-    # Coordenadas del posting
     lat = lng = None
     geo = p.get("geo") or {}
     if isinstance(geo, dict):
@@ -131,12 +149,11 @@ def _extraer_datos_posting(p):
         except Exception:
             lat = lng = None
 
-    # Dirección textual del posting
     addr_str = ""
     addr = p.get("postingAddress") or p.get("address") or {}
     if isinstance(addr, dict):
-        street = addr.get("street") or addr.get("name") or addr.get("streetName") or ""
-        num    = str(addr.get("number") or addr.get("streetNumber") or "").strip()
+        street   = addr.get("street") or addr.get("name") or addr.get("streetName") or ""
+        num      = str(addr.get("number") or addr.get("streetNumber") or "").strip()
         barrio_p = addr.get("neighborhood") or addr.get("barrio") or ""
         parts = []
         if street:
@@ -148,57 +165,38 @@ def _extraer_datos_posting(p):
     return m2, ambientes, lat, lng, addr_str
 
 
-def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
-                       ambientes_target: Optional[int] = None, paginas: int = 2,
-                       direccion: Optional[str] = None, radio_km: float = 1.0) -> list:
-    """
-    Busca comparables en Zonaprop para barrio+tipo.
-    Si se provee 'direccion', geocodifica y filtra por radio (default 1 km).
-    Filtra también por m² y ambientes si se especifican.
-    Retorna lista de dicts: titulo, precio, precio_usd, m2, ambientes, tipo_pub,
-                            url, addr, distancia_km, rebaja
-    """
-    barrio_url = barrio.strip().lower().replace(" ", "-")
-    tipo_url   = TIPO_URL.get(tipo.lower(), tipo.lower() + "s")
-    session    = _crear_session()
-    todos      = []
+# ── Zonaprop ──────────────────────────────────────────────────────────────────
 
-    # Geocodificar dirección objetivo si se provee
-    target_lat = target_lng = None
-    if direccion:
-        coords = _geocodificar(direccion, barrio)
-        if coords:
-            target_lat, target_lng = coords
-        else:
-            print(f"[ACM] No se pudo geocodificar '{direccion}', se usa barrio completo")
+def _buscar_zonaprop(barrio: str, tipo: str, session, paginas: int = 2) -> list:
+    barrio_url = barrio.strip().lower().replace(" ", "-")
+    tipo_url   = TIPO_URL_ZP.get(tipo.lower(), tipo.lower() + "s")
+    resultados = []
 
     for pag in range(1, paginas + 1):
         if pag == 1:
-            url = f"{BASE}/{tipo_url}-venta-{barrio_url}.html"
+            url = f"{BASE_ZP}/{tipo_url}-venta-{barrio_url}.html"
         else:
-            url = f"{BASE}/{tipo_url}-venta-{barrio_url}-pagina-{pag}.html"
+            url = f"{BASE_ZP}/{tipo_url}-venta-{barrio_url}-pagina-{pag}.html"
 
         html = _fetch(session, url)
         if not html:
-            print(f"[ACM] Sin respuesta: {url}")
             continue
 
-        state = _extraer_state(html)
+        state = _extraer_state_zp(html)
         if not state:
-            print(f"[ACM] Sin PRELOADED_STATE en: {url}")
-            print(f"[ACM] Primeros 300 chars: {html[:300]}")
+            print(f"[ACM-ZP] Sin PRELOADED_STATE en: {url}")
             continue
 
         postings = state.get("listStore", {}).get("listPostings", [])
-        print(f"[ACM] Página {pag}: {len(postings)} postings encontrados")
+        print(f"[ACM-ZP] Página {pag}: {len(postings)} postings")
 
         for p in postings:
             try:
                 titulo = (p.get("generatedTitle") or p.get("title") or "").strip()
                 slug   = p.get("url") or ""
-                url_p  = f"{BASE}{slug}" if slug.startswith("/") else slug
+                url_p  = f"{BASE_ZP}{slug}" if slug.startswith("/") else slug
 
-                ops       = p.get("priceOperationTypes") or []
+                ops        = p.get("priceOperationTypes") or []
                 precio_usd = None
                 precio_str = "Consultar"
                 if ops:
@@ -215,12 +213,7 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
                             except Exception:
                                 pass
 
-                m2, ambientes, p_lat, p_lng, addr_str = _extraer_datos_posting(p)
-
-                # Calcular distancia al objetivo
-                distancia = None
-                if target_lat and target_lng and p_lat and p_lng:
-                    distancia = _distancia_km(target_lat, target_lng, p_lat, p_lng)
+                m2, ambientes, p_lat, p_lng, addr_str = _extraer_datos_posting_zp(p)
 
                 pub      = p.get("publisher") or {}
                 pub_type = str(pub.get("publisherTypeId") or "")
@@ -232,7 +225,7 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
                     if pct:
                         rebaja = f"bajó {pct}%"
 
-                todos.append({
+                resultados.append({
                     "titulo":       titulo,
                     "precio":       precio_str,
                     "precio_usd":   precio_usd,
@@ -242,59 +235,313 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
                     "rebaja":       rebaja,
                     "url":          url_p,
                     "addr":         addr_str,
-                    "distancia_km": distancia,
+                    "distancia_km": None,
+                    "lat":          p_lat,
+                    "lng":          p_lng,
+                    "fuente":       "Zonaprop",
                 })
             except Exception:
                 continue
 
         time.sleep(1.5)
 
-    comparables = todos
+    print(f"[ACM-ZP] {len(resultados)} listings encontrados")
+    return resultados
 
-    # Filtrar por radio si tenemos coordenadas objetivo Y coordenadas de postings
-    if target_lat and target_lng and todos:
-        con_dist = [c for c in todos if c["distancia_km"] is not None]
+
+# ── MercadoLibre ──────────────────────────────────────────────────────────────
+
+def _buscar_ml(barrio: str, tipo: str, m2_target=None, ambientes_target=None) -> list:
+    """Busca comparables en MercadoLibre Inmuebles vía su API pública."""
+    categoria = ML_CAT.get(tipo.lower(), "MLA1459")
+    query     = urllib.parse.quote(f"{tipo} venta {barrio} Buenos Aires")
+    url = (
+        f"https://api.mercadolibre.com/sites/MLA/search"
+        f"?category={categoria}&q={query}&limit=50"
+    )
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "MT90-ACM/1.0"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception as e:
+        print(f"[ACM-ML] Error: {e}")
+        return []
+
+    resultados = []
+    for item in data.get("results", []):
+        try:
+            moneda = item.get("currency_id", "")
+            monto  = item.get("price")
+            precio_usd = None
+            precio_str = "Consultar"
+            if monto:
+                if moneda == "USD":
+                    precio_usd = float(monto)
+                    precio_str = f"USD {monto:,.0f}"
+                else:
+                    precio_str = f"{moneda} {monto:,.0f}"
+
+            m2        = None
+            ambientes = None
+            for attr in item.get("attributes", []):
+                attr_id = attr.get("id", "").upper()
+                val     = attr.get("value_name") or ""
+                if "TOTAL_AREA" in attr_id or "COVERED_AREA" in attr_id:
+                    mo = re.search(r'(\d+)', str(val))
+                    if mo:
+                        m2 = int(mo.group(1))
+                elif "ROOMS" in attr_id:
+                    mo = re.search(r'(\d+)', str(val))
+                    if mo:
+                        ambientes = int(mo.group(1))
+
+            titulo = item.get("title", "")
+            if not m2:
+                mo = re.search(r'(\d+)\s*m[²2]', titulo, re.IGNORECASE)
+                if mo:
+                    m2 = int(mo.group(1))
+            if not ambientes:
+                mo = re.search(r'(\d+)\s*amb', titulo, re.IGNORECASE)
+                if mo:
+                    ambientes = int(mo.group(1))
+
+            location = item.get("location") or {}
+            addr_str = (location.get("address_line") or
+                        (location.get("neighborhood") or {}).get("name") or
+                        barrio.title())
+
+            resultados.append({
+                "titulo":       titulo,
+                "precio":       precio_str,
+                "precio_usd":   precio_usd,
+                "m2":           m2,
+                "ambientes":    ambientes,
+                "tipo_pub":     "ml",
+                "rebaja":       None,
+                "url":          item.get("permalink", ""),
+                "addr":         addr_str,
+                "distancia_km": None,
+                "lat":          None,
+                "lng":          None,
+                "fuente":       "MercadoLibre",
+            })
+        except Exception:
+            continue
+
+    print(f"[ACM-ML] {len(resultados)} listings encontrados")
+    return resultados
+
+
+# ── Argenprop ─────────────────────────────────────────────────────────────────
+
+def _buscar_argenprop(barrio: str, tipo: str, session, paginas: int = 1) -> list:
+    """Busca comparables en Argenprop extrayendo __NEXT_DATA__."""
+    tipo_ap    = TIPO_URL_AP.get(tipo.lower(), tipo.lower())
+    barrio_url = barrio.strip().lower().replace(" ", "-")
+    resultados = []
+
+    for pag in range(1, paginas + 1):
+        if pag == 1:
+            url = f"https://www.argenprop.com/{tipo_ap}-venta-en-{barrio_url}"
+        else:
+            url = f"https://www.argenprop.com/{tipo_ap}-venta-en-{barrio_url}--pagina-{pag}"
+
+        html = _fetch(session, url)
+        if not html:
+            continue
+
+        m = re.search(r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>', html, re.DOTALL)
+        if not m:
+            print(f"[ACM-AP] Sin __NEXT_DATA__ en {url}")
+            continue
+
+        try:
+            nd = json.loads(m.group(1))
+        except Exception:
+            print(f"[ACM-AP] JSON inválido en {url}")
+            continue
+
+        # Buscar listings dentro de la estructura de Next.js (varía por versión)
+        listings = []
+        try:
+            props = nd.get("props", {}).get("pageProps", {})
+            for key in ["listings", "data", "initialData", "searchResults", "results"]:
+                candidate = props.get(key)
+                if isinstance(candidate, list) and candidate:
+                    listings = candidate
+                    break
+                if isinstance(candidate, dict):
+                    for subkey in ["listings", "results", "items"]:
+                        sub = candidate.get(subkey)
+                        if isinstance(sub, list) and sub:
+                            listings = sub
+                            break
+                if listings:
+                    break
+        except Exception:
+            pass
+
+        if not listings:
+            print(f"[ACM-AP] No se encontraron listings en página {pag}")
+            continue
+
+        for item in listings:
+            try:
+                posting = item.get("posting") or item.get("data") or item
+
+                precio_usd = None
+                precio_str = "Consultar"
+                price_data = (posting.get("price") or posting.get("prices") or
+                              posting.get("operationTypes") or {})
+
+                if isinstance(price_data, dict):
+                    monto  = price_data.get("amount") or price_data.get("value")
+                    moneda = str(price_data.get("currency") or price_data.get("currencyCode") or "")
+                    if monto and "USD" in moneda.upper():
+                        precio_usd = float(str(monto).replace(",", ""))
+                        precio_str = f"USD {precio_usd:,.0f}"
+                elif isinstance(price_data, list) and price_data:
+                    p0     = price_data[0]
+                    moneda = str(p0.get("currency") or p0.get("currencyCode") or "")
+                    monto  = (p0.get("prices") or [{}])[0].get("amount") if p0.get("prices") else p0.get("amount")
+                    if monto and "USD" in moneda.upper():
+                        precio_usd = float(str(monto).replace(",", ""))
+                        precio_str = f"USD {precio_usd:,.0f}"
+
+                titulo = posting.get("title") or posting.get("generatedTitle") or ""
+                url_p  = posting.get("url") or posting.get("postingUrl") or posting.get("link") or ""
+                if url_p and not url_p.startswith("http"):
+                    url_p = "https://www.argenprop.com" + url_p
+
+                m2        = None
+                ambientes = None
+                for attr in (posting.get("attributes") or posting.get("features") or []):
+                    attr_id = str(attr.get("id") or attr.get("key") or attr.get("attributeId") or "").upper()
+                    val     = str(attr.get("value") or attr.get("valueName") or
+                                  (attr.get("values") or [{}])[0].get("name") or "")
+                    if any(x in attr_id for x in ["SURFACE", "M2", "AREA", "TOTALAREA"]):
+                        mo = re.search(r'(\d+)', val)
+                        if mo:
+                            m2 = int(mo.group(1))
+                    elif any(x in attr_id for x in ["ROOM", "AMBIENT", "AMBIENTES"]):
+                        mo = re.search(r'(\d+)', val)
+                        if mo:
+                            ambientes = int(mo.group(1))
+
+                if not m2:
+                    mo = re.search(r'(\d+)\s*m[²2]', titulo, re.IGNORECASE)
+                    if mo:
+                        m2 = int(mo.group(1))
+                if not ambientes:
+                    mo = re.search(r'(\d+)\s*amb', titulo, re.IGNORECASE)
+                    if mo:
+                        ambientes = int(mo.group(1))
+
+                if not titulo and not precio_usd:
+                    continue
+
+                resultados.append({
+                    "titulo":       titulo,
+                    "precio":       precio_str,
+                    "precio_usd":   precio_usd,
+                    "m2":           m2,
+                    "ambientes":    ambientes,
+                    "tipo_pub":     "inmobiliaria",
+                    "rebaja":       None,
+                    "url":          url_p,
+                    "addr":         barrio.title(),
+                    "distancia_km": None,
+                    "lat":          None,
+                    "lng":          None,
+                    "fuente":       "Argenprop",
+                })
+            except Exception:
+                continue
+
+        time.sleep(1.5)
+
+    print(f"[ACM-AP] {len(resultados)} listings encontrados")
+    return resultados
+
+
+# ── Agregador principal ───────────────────────────────────────────────────────
+
+def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
+                       ambientes_target: Optional[int] = None, paginas: int = 2,
+                       direccion: Optional[str] = None, radio_km: float = 1.0) -> list:
+    """
+    Busca comparables en Zonaprop + MercadoLibre + Argenprop.
+    Retorna lista unificada con campo 'fuente' por cada comparable.
+    """
+    session = _crear_session()
+
+    # Geocodificar dirección objetivo si se provee
+    target_lat = target_lng = None
+    if direccion:
+        coords = _geocodificar(direccion, barrio)
+        if coords:
+            target_lat, target_lng = coords
+        else:
+            print(f"[ACM] No se pudo geocodificar '{direccion}', se usa barrio completo")
+
+    # Scrapers en secuencia (Zonaprop + ML + Argenprop)
+    todos_zp = _buscar_zonaprop(barrio, tipo, session, paginas)
+    todos_ml = _buscar_ml(barrio, tipo, m2_target, ambientes_target)
+    todos_ap = _buscar_argenprop(barrio, tipo, session, paginas=1)
+
+    # Calcular distancias para comparables de Zonaprop que tienen coordenadas
+    if target_lat and target_lng:
+        for c in todos_zp:
+            if c.get("lat") and c.get("lng"):
+                c["distancia_km"] = _distancia_km(target_lat, target_lng, c["lat"], c["lng"])
+
+    # Unificar
+    todos = todos_zp + todos_ml + todos_ap
+
+    # Filtrar por radio si tenemos coordenadas (solo para los que tienen distancia)
+    if target_lat and target_lng:
+        con_dist = [c for c in todos if c.get("distancia_km") is not None]
         if con_dist:
             en_radio = [c for c in con_dist if c["distancia_km"] <= radio_km]
+            sin_dist = [c for c in todos if c.get("distancia_km") is None]
             if len(en_radio) >= 3:
-                comparables = en_radio
-                print(f"[ACM] Filtro radio {radio_km}km: {len(comparables)} comparables")
+                todos = en_radio + sin_dist[:10]
+                print(f"[ACM] Filtro radio {radio_km}km: {len(en_radio)} ZP + {len(sin_dist[:10])} sin coords")
             else:
-                # Ampliar radio automáticamente hasta tener suficientes
                 en_radio2 = [c for c in con_dist if c["distancia_km"] <= radio_km * 2]
+                sin_dist  = [c for c in todos if c.get("distancia_km") is None]
                 if len(en_radio2) >= 3:
-                    comparables = en_radio2
-                    print(f"[ACM] Radio ampliado a {radio_km*2:.1f}km: {len(comparables)} comparables")
+                    todos = en_radio2 + sin_dist[:10]
                 else:
-                    print(f"[ACM] Pocos postings con coordenadas ({len(con_dist)}), usando todos")
-        else:
-            print(f"[ACM] Postings sin coordenadas — filtro por radio no disponible")
+                    print(f"[ACM] Radio amplio insuficiente, usando todos")
 
     # Filtrar por m² (±30% o mínimo ±25m²)
-    if m2_target and comparables:
+    if m2_target and todos:
         margen    = max(25, int(m2_target * 0.30))
-        filtrados = [c for c in comparables if c["m2"] and abs(c["m2"] - m2_target) <= margen]
-        if len(filtrados) >= 3:
-            comparables = filtrados
+        filtrados = [c for c in todos if c["m2"] and abs(c["m2"] - m2_target) <= margen]
+        if len(filtrados) >= 6:
+            todos = filtrados
 
     # Filtrar por ambientes si hay suficientes
-    if ambientes_target and len(comparables) > 6:
-        amb_filtrados = [c for c in comparables if c["ambientes"] == ambientes_target]
-        if len(amb_filtrados) >= 3:
-            comparables = amb_filtrados
+    if ambientes_target and len(todos) > 8:
+        amb_filtrados = [c for c in todos if c["ambientes"] == ambientes_target]
+        if len(amb_filtrados) >= 4:
+            todos = amb_filtrados
 
-    # Ordenar por distancia cuando está disponible
-    if target_lat and target_lng:
-        comparables.sort(key=lambda c: c["distancia_km"] if c["distancia_km"] is not None else 9999)
+    # Ordenar: primero por distancia (los que tienen), luego el resto
+    con_dist = [c for c in todos if c.get("distancia_km") is not None]
+    sin_dist = [c for c in todos if c.get("distancia_km") is None]
+    con_dist.sort(key=lambda c: c["distancia_km"])
+    todos = con_dist + sin_dist
 
-    return comparables[:30]
+    return todos[:40]
 
 
 def formatear_para_claude(barrio, tipo, m2_target, ambientes_target, comparables,
                           direccion=None, radio_km=None) -> str:
-    """Arma el texto de comparables para pasarle a Claude."""
+    """Arma el texto de comparables multi-fuente para pasarle a Claude."""
     if not comparables:
-        return "No se encontraron comparables en Zonaprop para ese barrio/tipo."
+        return "No se encontraron comparables en ningún portal para ese barrio/tipo."
 
     lineas = [f"Barrio: {barrio.title()}", f"Tipo: {tipo.title()}"]
     if direccion:
@@ -306,32 +553,50 @@ def formatear_para_claude(barrio, tipo, m2_target, ambientes_target, comparables
     if ambientes_target:
         lineas.append(f"Ambientes objetivo: {ambientes_target}")
 
+    # Resumen general
     precios_usd = [c["precio_usd"] for c in comparables if c["precio_usd"]]
     m2s         = [c["m2"]         for c in comparables if c["m2"]]
     precio_m2s  = [c["precio_usd"] / c["m2"] for c in comparables
                    if c["precio_usd"] and c["m2"] and c["m2"] > 0]
 
-    lineas.append(f"\nTotal comparables encontrados: {len(comparables)}")
-
+    lineas.append(f"\nTOTAL COMPARABLES (todas las fuentes): {len(comparables)}")
     if precios_usd:
         lineas.append(f"Rango de precios: USD {min(precios_usd):,.0f} – USD {max(precios_usd):,.0f}")
-        lineas.append(f"Precio promedio: USD {sum(precios_usd)/len(precios_usd):,.0f}")
+        lineas.append(f"Precio promedio publicado: USD {sum(precios_usd)/len(precios_usd):,.0f}")
     if precio_m2s:
         lineas.append(f"Precio/m² promedio: USD {sum(precio_m2s)/len(precio_m2s):,.0f}/m²")
         lineas.append(f"Rango precio/m²: USD {min(precio_m2s):,.0f} – USD {max(precio_m2s):,.0f}/m²")
     if m2s:
-        lineas.append(f"Superficie promedio (comparables): {sum(m2s)/len(m2s):.0f} m²")
+        lineas.append(f"Superficie promedio comparables: {sum(m2s)/len(m2s):.0f} m²")
 
-    particulares = sum(1 for c in comparables if c["tipo_pub"] == "particular")
-    lineas.append(f"Publicados por dueño directo: {particulares} de {len(comparables)}")
+    # Resumen por fuente
+    fuentes = {}
+    for c in comparables:
+        f = c.get("fuente", "Desconocido")
+        fuentes.setdefault(f, []).append(c)
 
+    lineas.append("\nRESUMEN POR PORTAL:")
+    for fuente, items in fuentes.items():
+        p_usd = [c["precio_usd"] for c in items if c["precio_usd"]]
+        pm2   = [c["precio_usd"] / c["m2"] for c in items if c["precio_usd"] and c["m2"] and c["m2"] > 0]
+        if p_usd:
+            lineas.append(
+                f"  {fuente}: {len(items)} propiedades | "
+                f"promedio USD {sum(p_usd)/len(p_usd):,.0f} | "
+                + (f"USD {sum(pm2)/len(pm2):,.0f}/m²" if pm2 else "m² s/d")
+            )
+        else:
+            lineas.append(f"  {fuente}: {len(items)} propiedades (sin precios USD)")
+
+    # Listado completo
     lineas.append("\nLISTADO DE COMPARABLES:")
     for i, c in enumerate(comparables, 1):
-        m2_txt   = f"{c['m2']} m²" if c["m2"] else "m² s/d"
-        amb_txt  = f"{c['ambientes']} amb" if c["ambientes"] else ""
-        dist_txt = f"{c['distancia_km']:.2f}km del objetivo" if c.get("distancia_km") is not None else ""
-        extras   = " | ".join(filter(None, [m2_txt, amb_txt, dist_txt, c.get("rebaja"), c["tipo_pub"]]))
-        lineas.append(f"{i}. {c['titulo']}")
+        fuente_tag = f"[{c.get('fuente','?')}]"
+        m2_txt     = f"{c['m2']} m²" if c["m2"] else "m² s/d"
+        amb_txt    = f"{c['ambientes']} amb" if c["ambientes"] else ""
+        dist_txt   = f"{c['distancia_km']:.2f}km" if c.get("distancia_km") is not None else ""
+        extras     = " | ".join(filter(None, [m2_txt, amb_txt, dist_txt, c.get("rebaja"), c.get("tipo_pub")]))
+        lineas.append(f"{i}. {fuente_tag} {c['titulo']}")
         if c.get("addr"):
             lineas.append(f"   Dirección: {c['addr']}")
         lineas.append(f"   Precio: {c['precio']}  |  {extras}")

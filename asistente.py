@@ -961,27 +961,34 @@ def chat():
 
 ACM_PROMPT = """Generá un ACM (Análisis Comparativo de Mercado) profesional en español para presentar a un propietario en una reunión de captación.
 
-IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el informe como fecha del relevamiento. No uses ninguna otra fecha.
+IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el informe como fecha del relevamiento.
 
-CONTEXTO CLAVE — leé esto antes de analizar:
-Los precios de Zonaprop son PRECIOS DE PUBLICACIÓN (lo que el vendedor pide), NO precios de cierre (lo que realmente se pagó). En el mercado actual de CABA, la brecha entre precio pedido y precio de cierre es típicamente del 8 al 15%. Una propiedad publicada a USD 200.000 generalmente se cierra entre USD 170.000 y USD 184.000. Tené esto en cuenta al recomendar el precio: el precio de publicación puede ser mayor, pero el precio real de venta será menor.
+CONTEXTO CRÍTICO — leé esto antes de analizar:
+Los datos provienen de múltiples portales: Zonaprop, MercadoLibre y Argenprop. TODOS son PRECIOS DE PUBLICACIÓN (lo que el vendedor pide), NO precios de cierre. En el mercado actual de CABA:
+- La brecha entre precio pedido y precio de cierre es del 10 al 18%.
+- Zonaprop tiende a tener los precios de publicación más altos.
+- MercadoLibre y Argenprop suelen reflejar mejor el precio al que realmente se negocia.
+- El precio promedio de los tres portales combinados es el indicador más representativo del mercado real.
+- Si el promedio entre portales difiere más del 10%, mencionalo como señal de mercado disperso.
 
-Los datos de comparables activos en Zonaprop son los siguientes:
+REGLA FUNDAMENTAL: El precio que recomendés para publicar NO puede estar por encima del promedio de publicación del mercado. Si lo pusieran más alto, la propiedad no recibiría visitas y quedaría estancada.
+
+Los datos de comparables activos son los siguientes:
 
 {datos}
 
 El ACM debe tener esta estructura:
 1. **Relevamiento al {fecha_hoy}** — indicá esta fecha exacta al inicio
-2. **Resumen del Mercado** — precio promedio de publicación, rango, precio por m², cantidad de competidores activos. Aclará que son precios pedidos.
-3. **Comparables Destacados** — 4 a 6 propiedades similares con precio de publicación, superficie y link
-4. **Precio Recomendado** — diferenciá claramente:
-   - *Precio de publicación sugerido*: el precio a publicar (puede estar en la media o levemente por encima)
-   - *Precio de cierre estimado*: el rango realista de lo que se va a cobrar (aplicá 8-12% de descuento sobre publicación)
-   Justificá brevemente con los datos del mercado.
-5. **Argumento para el Propietario** — 3-4 líneas concretas de por qué trabajar con un agente profesional maximiza el precio final y reduce el tiempo de venta
+2. **Resumen del Mercado** — mostrá el precio promedio por portal (Zonaprop, MercadoLibre, Argenprop), el promedio unificado, y el rango de precio/m². Indicá cuántos comparables activos hay en total. Aclarás que son precios pedidos, no de cierre.
+3. **Comparables Destacados** — 5 a 8 propiedades similares de distintos portales, con precio, superficie, portal de origen y link
+4. **Precio Recomendado** — dos valores claros y diferenciados:
+   - *Precio de publicación sugerido*: calculado sobre el promedio multi-portal, NO sobre el máximo de Zonaprop. Debe ser competitivo para generar consultas.
+   - *Precio de cierre estimado*: el rango realista de lo que el propietario va a cobrar (restá 10-15% al precio de publicación)
+   Justificá con números concretos del mercado relevado.
+5. **Argumento para el Propietario** — 3-4 líneas sobre por qué publicar al precio correcto desde el inicio genera más consultas, más competencia entre compradores y mejor precio final
 
-Tono: profesional, basado en datos, convincente. Usá números concretos. Formato listo para mostrar en pantalla o imprimir.
-Si faltan datos de m² o ambientes en algunos comparables, hacé el análisis con los disponibles y mencionalo brevemente.
+Tono: profesional, basado en datos, sin prometer valores que el mercado no convalida. Usá números concretos. Formato listo para mostrar en reunión.
+Si faltan datos de m² en algunos comparables, hacé el análisis con los disponibles y mencionalo brevemente.
 """
 
 @app.route("/acm", methods=["POST"])
