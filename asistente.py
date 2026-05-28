@@ -976,10 +976,21 @@ La realidad del mercado CABA hoy:
 
 ═══ REGLAS PARA EL PRECIO RECOMENDADO ═══
 
-1. Calculá el precio/m² de los comparables. Descartá el 25% más caro (son los que llevan meses sin venderse).
-2. El precio de publicación sugerido debe estar entre el percentil 25 y la mediana (percentil 50) del mercado. NUNCA por encima de la mediana.
-3. El precio de cierre estimado = precio de publicación menos 5 a 8%.
-4. Si el precio/m² que surge es menor al que el propietario espera, explicalo con los datos — es mejor decirlo ahora que perder la captación en 3 meses.
+REALIDAD DEL MERCADO: En Zonaprop conviven dos tipos de propiedades muy distintas:
+- Las que se VENDEN: están publicadas al precio de mercado real, generan consultas en las primeras 2 semanas
+- Las que QUEDAN ESTANCADAS: están publicadas un 20-35% por encima del mercado, llevan meses o años sin visitas
+
+El promedio de Zonaprop mezcla ambos grupos y siempre da un número inflado. El precio que le vas a sugerir al propietario tiene que ser el precio de las que SE VENDEN, no el promedio general.
+
+CÓMO CALCULAR:
+1. De los comparables recibidos, filtrá los más similares en m² y ambientes a la propiedad objetivo (idealmente 6-10).
+2. Ordenalos por precio de menor a mayor.
+3. Separalos en dos grupos: la mitad más barata y la mitad más cara.
+   - La mitad más cara = propiedades sobrevaluadas que llevan meses sin venderse. NO las uses para calcular.
+   - La mitad más barata = el mercado activo real, las propiedades con las que va a competir en el buscador.
+4. El precio de publicación sugerido = promedio de precio/m² de la mitad más barata × m² de la propiedad objetivo.
+5. El precio de cierre estimado = precio de publicación menos 5 a 8%.
+6. En el informe, mencioná cuáles son las propiedades "estancadas" (más caras) y cuáles son la competencia real (más baratas), para que el propietario vea la diferencia con sus propios ojos.
 
 Los datos de comparables activos en Zonaprop son los siguientes:
 
