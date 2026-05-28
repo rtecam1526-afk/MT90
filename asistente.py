@@ -434,7 +434,7 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
     };
   }
 
-  /* ── Patch renderKanban: add avatar dots to card names ── */
+  /* ── Patch renderKanban: add avatar dots + merge Media/Tibio for Gabriela ── */
   if(typeof window.renderKanban==='function'){
     var _rk=window.renderKanban;
     window.renderKanban=function(arr){
@@ -449,6 +449,28 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
         av.textContent=avIni(nm);
         top.insertBefore(av,ne);
       });
+      /* Merge Media + Tibio columns for Gabriela */
+      if(window._AGENTE_KEY==='gabriela'){
+        var mediaCol=null,tibioCol=null;
+        document.querySelectorAll('.kanban-col').forEach(function(col){
+          var t=col.querySelector('.col-title');
+          if(!t)return;
+          var txt=t.textContent.trim();
+          if(txt==='Media')mediaCol=col;
+          if(txt==='Tibio')tibioCol=col;
+        });
+        if(mediaCol&&tibioCol){
+          var tc=tibioCol.querySelector('.col-cards');
+          var mc=mediaCol.querySelector('.col-cards');
+          if(tc&&mc){while(tc.firstChild)mc.appendChild(tc.firstChild);}
+          var mT=mediaCol.querySelector('.col-title');
+          if(mT)mT.textContent='Media / Tibio';
+          var mCnt=mediaCol.querySelector('.col-count');
+          var tCnt=tibioCol.querySelector('.col-count');
+          if(mCnt&&tCnt)mCnt.textContent=(parseInt(mCnt.textContent)||0)+(parseInt(tCnt.textContent)||0);
+          tibioCol.style.display='none';
+        }
+      }
     };
   }
 
@@ -600,7 +622,8 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
      MODO REVISIÓN — recorre todos los contactos uno a uno
      ════════════════════════════════════════════════════ */
   (function(){
-    var STAGE_ORD={Caliente:0,Media:1,Tibio:2,Fria:3,'Sin Etapa':4,'':4};
+    var _tib=(window._AGENTE_KEY==='gabriela')?1:2;
+    var STAGE_ORD={Caliente:0,Media:1,Tibio:_tib,Fria:3,'Sin Etapa':4,'':4};
     var rvList=[],rvIdx=0;
 
     function buildRevList(){
@@ -847,7 +870,8 @@ def crm():
         if os.path.exists(candidate):
             with open(candidate, encoding="utf-8") as f:
                 content = f.read()
-            return content + _SUPA_INJECT, 200, {"Content-Type": "text/html; charset=utf-8"}
+            agente_js = f'<script>window._AGENTE_KEY="{agente_key}";</script>'
+            return content + agente_js + _SUPA_INJECT, 200, {"Content-Type": "text/html; charset=utf-8"}
     return redirect(url_for("index"))
 
 
