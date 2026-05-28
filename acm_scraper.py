@@ -257,10 +257,19 @@ def _buscar_ml(barrio: str, tipo: str, m2_target=None, ambientes_target=None) ->
         f"https://api.mercadolibre.com/sites/MLA/search"
         f"?category={categoria}&q={query}&limit=50"
     )
+    if _SCRAPER_KEY:
+        fetch_url = f"http://api.scraperapi.com?api_key={_SCRAPER_KEY}&url={urllib.parse.quote(url, safe='')}"
+    else:
+        fetch_url = url
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "MT90-ACM/1.0"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode())
+        session = _crear_session()
+        r = session.get(fetch_url, timeout=15,
+                        headers={"Accept": "application/json",
+                                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
+        if r.status_code != 200:
+            print(f"[ACM-ML] HTTP {r.status_code}")
+            return []
+        data = r.json()
     except Exception as e:
         print(f"[ACM-ML] Error: {e}")
         return []
@@ -333,7 +342,11 @@ def _buscar_ml(barrio: str, tipo: str, m2_target=None, ambientes_target=None) ->
 # ── Argenprop ─────────────────────────────────────────────────────────────────
 
 def _buscar_argenprop(barrio: str, tipo: str, session, paginas: int = 1) -> list:
-    """Busca comparables en Argenprop extrayendo __NEXT_DATA__."""
+    """
+    Busca comparables en Argenprop.
+    Intenta primero JSON embebido (__NEXT_DATA__ / __PRELOADED_STATE__),
+    luego extracción directa del HTML renderizado.
+    """
     tipo_ap    = TIPO_URL_AP.get(tipo.lower(), tipo.lower())
     barrio_url = barrio.strip().lower().replace(" ", "-")
     resultados = []
@@ -348,114 +361,130 @@ def _buscar_argenprop(barrio: str, tipo: str, session, paginas: int = 1) -> list
         if not html:
             continue
 
-        m = re.search(r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>', html, re.DOTALL)
-        if not m:
-            print(f"[ACM-AP] Sin __NEXT_DATA__ en {url}")
-            continue
+        extraidos = []
 
-        try:
-            nd = json.loads(m.group(1))
-        except Exception:
-            print(f"[ACM-AP] JSON inválido en {url}")
-            continue
-
-        # Buscar listings dentro de la estructura de Next.js (varía por versión)
-        listings = []
-        try:
-            props = nd.get("props", {}).get("pageProps", {})
-            for key in ["listings", "data", "initialData", "searchResults", "results"]:
-                candidate = props.get(key)
-                if isinstance(candidate, list) and candidate:
-                    listings = candidate
-                    break
-                if isinstance(candidate, dict):
-                    for subkey in ["listings", "results", "items"]:
-                        sub = candidate.get(subkey)
-                        if isinstance(sub, list) and sub:
-                            listings = sub
-                            break
-                if listings:
-                    break
-        except Exception:
-            pass
-
-        if not listings:
-            print(f"[ACM-AP] No se encontraron listings en página {pag}")
-            continue
-
-        for item in listings:
+        # Intento 1: cualquier bloque JSON grande embebido en <script>
+        for pat in [
+            r'window\.__PRELOADED_STATE__\s*=\s*(\{.*?\});?\s*</script>',
+            r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});?\s*</script>',
+            r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>',
+        ]:
+            m_json = re.search(pat, html, re.DOTALL)
+            if not m_json:
+                continue
             try:
-                posting = item.get("posting") or item.get("data") or item
+                blob = json.loads(m_json.group(1))
+                # Buscar recursivamente arrays con campo 'price' o 'precio'
+                def _find_listings(obj, depth=0):
+                    if depth > 6:
+                        return []
+                    if isinstance(obj, list) and len(obj) > 2:
+                        sample = obj[0] if obj else {}
+                        if isinstance(sample, dict) and any(
+                            k in sample for k in ["price","precio","priceOperationTypes","operationTypes"]
+                        ):
+                            return obj
+                    if isinstance(obj, dict):
+                        for v in obj.values():
+                            r = _find_listings(v, depth+1)
+                            if r:
+                                return r
+                    return []
 
-                precio_usd = None
-                precio_str = "Consultar"
-                price_data = (posting.get("price") or posting.get("prices") or
-                              posting.get("operationTypes") or {})
-
-                if isinstance(price_data, dict):
-                    monto  = price_data.get("amount") or price_data.get("value")
-                    moneda = str(price_data.get("currency") or price_data.get("currencyCode") or "")
-                    if monto and "USD" in moneda.upper():
-                        precio_usd = float(str(monto).replace(",", ""))
-                        precio_str = f"USD {precio_usd:,.0f}"
-                elif isinstance(price_data, list) and price_data:
-                    p0     = price_data[0]
-                    moneda = str(p0.get("currency") or p0.get("currencyCode") or "")
-                    monto  = (p0.get("prices") or [{}])[0].get("amount") if p0.get("prices") else p0.get("amount")
-                    if monto and "USD" in moneda.upper():
-                        precio_usd = float(str(monto).replace(",", ""))
-                        precio_str = f"USD {precio_usd:,.0f}"
-
-                titulo = posting.get("title") or posting.get("generatedTitle") or ""
-                url_p  = posting.get("url") or posting.get("postingUrl") or posting.get("link") or ""
-                if url_p and not url_p.startswith("http"):
-                    url_p = "https://www.argenprop.com" + url_p
-
-                m2        = None
-                ambientes = None
-                for attr in (posting.get("attributes") or posting.get("features") or []):
-                    attr_id = str(attr.get("id") or attr.get("key") or attr.get("attributeId") or "").upper()
-                    val     = str(attr.get("value") or attr.get("valueName") or
-                                  (attr.get("values") or [{}])[0].get("name") or "")
-                    if any(x in attr_id for x in ["SURFACE", "M2", "AREA", "TOTALAREA"]):
-                        mo = re.search(r'(\d+)', val)
-                        if mo:
-                            m2 = int(mo.group(1))
-                    elif any(x in attr_id for x in ["ROOM", "AMBIENT", "AMBIENTES"]):
-                        mo = re.search(r'(\d+)', val)
-                        if mo:
-                            ambientes = int(mo.group(1))
-
-                if not m2:
-                    mo = re.search(r'(\d+)\s*m[²2]', titulo, re.IGNORECASE)
-                    if mo:
-                        m2 = int(mo.group(1))
-                if not ambientes:
-                    mo = re.search(r'(\d+)\s*amb', titulo, re.IGNORECASE)
-                    if mo:
-                        ambientes = int(mo.group(1))
-
-                if not titulo and not precio_usd:
-                    continue
-
-                resultados.append({
-                    "titulo":       titulo,
-                    "precio":       precio_str,
-                    "precio_usd":   precio_usd,
-                    "m2":           m2,
-                    "ambientes":    ambientes,
-                    "tipo_pub":     "inmobiliaria",
-                    "rebaja":       None,
-                    "url":          url_p,
-                    "addr":         barrio.title(),
-                    "distancia_km": None,
-                    "lat":          None,
-                    "lng":          None,
-                    "fuente":       "Argenprop",
-                })
+                found = _find_listings(blob)
+                if found:
+                    for item in found:
+                        try:
+                            precio_usd = None
+                            precio_str = "Consultar"
+                            for pk in ["price","precio","priceOperationTypes","operationTypes"]:
+                                pd = item.get(pk)
+                                if not pd:
+                                    continue
+                                if isinstance(pd, (int,float)):
+                                    precio_usd = float(pd)
+                                    precio_str = f"USD {precio_usd:,.0f}"
+                                    break
+                                if isinstance(pd, dict):
+                                    amt = pd.get("amount") or pd.get("value")
+                                    cur = str(pd.get("currency") or pd.get("currencyCode") or "")
+                                    if amt and "USD" in cur.upper():
+                                        precio_usd = float(str(amt).replace(",",""))
+                                        precio_str = f"USD {precio_usd:,.0f}"
+                                        break
+                                if isinstance(pd, list) and pd:
+                                    p0  = pd[0]
+                                    sub = (p0.get("prices") or [{}])[0] if isinstance(p0,dict) else {}
+                                    amt = sub.get("amount") or (p0.get("amount") if isinstance(p0,dict) else None)
+                                    cur = str((p0.get("currency") or "") if isinstance(p0,dict) else "")
+                                    if amt and "USD" in cur.upper():
+                                        precio_usd = float(str(amt).replace(",",""))
+                                        precio_str = f"USD {precio_usd:,.0f}"
+                                        break
+                            titulo = str(item.get("title") or item.get("generatedTitle") or "")
+                            url_p  = str(item.get("url") or item.get("postingUrl") or item.get("link") or "")
+                            if url_p and not url_p.startswith("http"):
+                                url_p = "https://www.argenprop.com" + url_p
+                            m2 = ambientes = None
+                            for attr in (item.get("attributes") or item.get("features") or []):
+                                aid = str(attr.get("id") or attr.get("key") or "").upper()
+                                val = str(attr.get("value") or attr.get("valueName") or "")
+                                if any(x in aid for x in ["SURFACE","M2","AREA"]):
+                                    mo = re.search(r'(\d+)', val)
+                                    if mo: m2 = int(mo.group(1))
+                                elif any(x in aid for x in ["ROOM","AMBIENT"]):
+                                    mo = re.search(r'(\d+)', val)
+                                    if mo: ambientes = int(mo.group(1))
+                            if not m2:
+                                mo = re.search(r'(\d+)\s*m[²2]', titulo, re.IGNORECASE)
+                                if mo: m2 = int(mo.group(1))
+                            if precio_usd or titulo:
+                                extraidos.append({
+                                    "titulo": titulo, "precio": precio_str,
+                                    "precio_usd": precio_usd, "m2": m2,
+                                    "ambientes": ambientes, "tipo_pub": "inmobiliaria",
+                                    "rebaja": None, "url": url_p, "addr": barrio.title(),
+                                    "distancia_km": None, "lat": None, "lng": None,
+                                    "fuente": "Argenprop",
+                                })
+                        except Exception:
+                            continue
+                    if extraidos:
+                        break
             except Exception:
                 continue
 
+        # Intento 2: parseo directo del HTML (cards de propiedades)
+        if not extraidos:
+            # Buscar precios USD y m² en el texto del HTML
+            precios = re.findall(r'USD\s*([\d\.,]+)', html)
+            m2s     = re.findall(r'(\d{2,4})\s*m[²2]\s*(?:cub|tot|cubie)', html, re.IGNORECASE)
+            urls_ap = re.findall(r'href=["\'](/[^"\']+(?:departamento|casa|ph)[^"\']*)["\']', html)
+            print(f"[ACM-AP] Parseo HTML directo: {len(precios)} precios, {len(m2s)} m², {len(urls_ap)} URLs")
+            seen = set()
+            for i, precio_raw in enumerate(precios[:25]):
+                try:
+                    precio_usd = float(precio_raw.replace(".", "").replace(",", "."))
+                    if precio_usd < 20000 or precio_usd > 5000000:
+                        continue
+                    m2_val = int(m2s[i]) if i < len(m2s) else None
+                    url_p  = "https://www.argenprop.com" + urls_ap[i] if i < len(urls_ap) else ""
+                    if url_p in seen:
+                        continue
+                    seen.add(url_p)
+                    extraidos.append({
+                        "titulo": f"{tipo.title()} en {barrio.title()}",
+                        "precio": f"USD {precio_usd:,.0f}",
+                        "precio_usd": precio_usd, "m2": m2_val,
+                        "ambientes": None, "tipo_pub": "inmobiliaria",
+                        "rebaja": None, "url": url_p, "addr": barrio.title(),
+                        "distancia_km": None, "lat": None, "lng": None,
+                        "fuente": "Argenprop",
+                    })
+                except Exception:
+                    continue
+
+        resultados.extend(extraidos)
         time.sleep(0.5)
 
     print(f"[ACM-AP] {len(resultados)} listings encontrados")
@@ -516,12 +545,9 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
         for fut, name in [(fut_zp, "ZP"), (fut_ml, "ML"), (fut_ap, "AP")]:
             try:
                 result = fut.result(timeout=35)
-                if name == "ZP":
-                    todos_zp = result
-                elif name == "ML":
-                    todos_ml = result
-                else:
-                    todos_ap = result
+                if name == "ZP":   todos_zp = result
+                elif name == "ML": todos_ml = result
+                else:              todos_ap = result
             except Exception as e:
                 print(f"[ACM-{name}] Timeout o error: {e}")
                 _cb(f"⚠️ {'Zonaprop' if name=='ZP' else 'MercadoLibre' if name=='ML' else 'Argenprop'} no respondió a tiempo")
