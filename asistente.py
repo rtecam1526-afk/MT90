@@ -1016,27 +1016,54 @@ def acm():
     agente_info = cfg.AGENTES.get(agente_key, cfg.AGENTES["gabriela"])
 
     def generar():
+        import queue as _queue, threading as _threading
         if direccion:
-            msg_busq = f'🔍 Buscando comparables cerca de **{direccion}** en {barrio.title()} ({tipo})...'
+            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre y Argenprop cerca de **{direccion}** ({barrio.title()})...\n'
         else:
-            msg_busq = f'🔍 Buscando comparables en **{barrio.title()}** ({tipo})...'
+            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre y Argenprop en **{barrio.title()}** ({tipo})...\n'
         yield f"data: {json.dumps({'texto': msg_busq})}\n\n"
 
-        try:
-            comparables = acm_scraper.buscar_comparables(
-                barrio, tipo, m2_int, amb_int, paginas=2,
-                direccion=direccion, radio_km=1.0
-            )
-        except Exception as e:
-            yield f"data: {json.dumps({'error': f'Error al buscar comparables: {e}'})}\n\n"
+        # Correr scraping en un thread y hacer streaming de progreso vía queue
+        prog_q      = _queue.Queue()
+        result_box  = {}
+
+        def _scrape():
+            try:
+                result_box['data'] = acm_scraper.buscar_comparables(
+                    barrio, tipo, m2_int, amb_int, paginas=1,
+                    direccion=direccion, radio_km=1.0,
+                    progress_cb=lambda msg: prog_q.put(msg)
+                )
+            except Exception as e:
+                result_box['error'] = str(e)
+            finally:
+                prog_q.put(None)  # sentinel
+
+        _threading.Thread(target=_scrape, daemon=True).start()
+
+        # Hacer yield de cada mensaje de progreso mientras scrapea
+        while True:
+            try:
+                msg = prog_q.get(timeout=40)
+            except _queue.Empty:
+                yield f"data: {json.dumps({'texto': '\\n⚠️ Timeout buscando comparables.'})}\n\n"
+                yield f"data: {json.dumps({'fin': True})}\n\n"
+                return
+            if msg is None:
+                break
+            yield f"data: {json.dumps({'texto': '  ' + msg + '\\n'})}\n\n"
+
+        if 'error' in result_box:
+            yield f"data: {json.dumps({'error': f'Error al buscar comparables: {result_box[\"error\"]}'})}\n\n"
             return
 
+        comparables = result_box.get('data', [])
         if not comparables:
-            yield f"data: {json.dumps({'texto': '\\n\\n⚠️ No se encontraron comparables en Zonaprop para ese barrio/tipo. Verificá el nombre del barrio (ej: \"palermo\", \"villa-urquiza\").'})}\n\n"
+            yield f"data: {json.dumps({'texto': '\\n⚠️ No se encontraron comparables. Verificá el nombre del barrio (ej: \"palermo\", \"villa-urquiza\").'})}\n\n"
             yield f"data: {json.dumps({'fin': True})}\n\n"
             return
 
-        yield f"data: {json.dumps({'texto': f'\\n\\n📊 {len(comparables)} comparables encontrados. Generando ACM...\\n\\n'})}\n\n"
+        yield f"data: {json.dumps({'texto': f'\\n📊 {len(comparables)} comparables encontrados. Generando ACM...\\n\\n'})}\n\n"
 
         from datetime import datetime
         datos_texto = acm_scraper.formatear_para_claude(
