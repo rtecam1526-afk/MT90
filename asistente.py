@@ -12,8 +12,9 @@ import requests as _req
 import config_ia as cfg
 import acm_scraper
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
+SUPABASE_URL  = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY  = os.environ.get("SUPABASE_KEY", "").strip()
+RADAR_TOKEN   = os.environ.get("RADAR_TOKEN", "mt90_radar_2024").strip()
 
 def _supa_hdrs():
     return {
@@ -125,7 +126,7 @@ def cargar_radar_hoy(agente_key: str = "") -> str:
 def upload_radar():
     data    = request.get_json()
     token   = data.get("token", "")
-    if token != app.secret_key:
+    if token != RADAR_TOKEN:
         return {"error": "No autorizado"}, 401
     agente   = data.get("agente", "")
     html     = data.get("html", "")
