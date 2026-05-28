@@ -596,6 +596,238 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
     if(contBtn&&contBtn.parentNode)contBtn.parentNode.insertBefore(btn,contBtn.nextSibling);
   })();
 
+  /* ════════════════════════════════════════════════════
+     MODO REVISIÓN — recorre todos los contactos uno a uno
+     ════════════════════════════════════════════════════ */
+  (function(){
+    var STAGE_ORD={Caliente:0,Media:1,Tibio:2,Fria:3,'Sin Etapa':4,'':4};
+    var rvList=[],rvIdx=0;
+
+    function buildRevList(){
+      var a=(typeof DATA!=='undefined'?DATA:[]).slice();
+      a.sort(function(x,y){
+        var d=(STAGE_ORD[x.etapa]||4)-(STAGE_ORD[y.etapa]||4);
+        return d!==0?d:(y.dias_desde_contacto||0)-(x.dias_desde_contacto||0);
+      });
+      return a;
+    }
+
+    function getAgNom(){
+      var g=document.getElementById('aurora-greet');
+      if(g){var m=g.textContent.match(/[Bb]uenos\s+\S+[,\s]+(\S+)/);if(m&&m[1])return m[1];}
+      return 'tu agente';
+    }
+
+    function waTpl(c){
+      var nom=(c.nombre||'').split(' ')[0]||'Hola';
+      var nec=c.necesidad||'el inmueble';
+      var ag=getAgNom();
+      var e=c.etapa||'';
+      if(e==='Caliente')
+        return'Hola '+nom+'! ¿Cómo va todo? Te escribo para ver cómo estamos con lo de '+nec+'. Cualquier novedad me avisás 🏠';
+      if(e==='Media')
+        return'Hola '+nom+'! ¿Cómo estás? Quería ver si seguís con planes de '+nec+'. Estoy disponible cuando lo necesites 👋';
+      if(e==='Tibio')
+        return'Hola '+nom+'! Soy '+ag+' de RE/MAX. Hablamos hace un tiempo sobre '+nec+'. Cuando quieras retomamos, sin apuro 😊';
+      return'Hola '+nom+'! Soy '+ag+' de RE/MAX. Hace un tiempo hablamos sobre '+nec+'. ¿Sigue vigente el tema? 🙌';
+    }
+
+    function etColor(e){
+      return{Caliente:'#ef4444',Media:'#f59e0b',Tibio:'#f97316',Fria:'#3b82f6'}[e]||'#6b7280';
+    }
+
+    /* ── Botón "Revisión" en topbar ── */
+    var rvBtn=document.createElement('button');
+    rvBtn.className='btn-topbar';
+    rvBtn.innerHTML='&#128203; Revisión';
+    rvBtn.style.cssText='background:#1a1830;border:1px solid #1a1830;color:#fff;font-weight:700;font-family:Inter,system-ui,sans-serif';
+    rvBtn.onmouseover=function(){this.style.background='#5b5ee0';this.style.borderColor='#5b5ee0';};
+    rvBtn.onmouseout=function(){this.style.background='#1a1830';this.style.borderColor='#1a1830';};
+    rvBtn.onclick=function(){window.abrirRevision();};
+    var acts=document.querySelector('.topbar-actions');
+    if(acts)acts.appendChild(rvBtn);
+
+    /* ── Modal HTML ── */
+    document.body.insertAdjacentHTML('beforeend',[
+      '<style>',
+      '#rvOv{font-family:Inter,system-ui,sans-serif;position:fixed;inset:0;background:rgba(10,6,30,.74);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)}',
+      '#rvOv.hidden{display:none!important}',
+      '#rvCard{background:#fff;border-radius:18px;width:min(940px,96vw);max-height:93vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 28px 72px rgba(10,6,30,.32);border:1px solid #ececf3}',
+      '#rvHead{background:#0f0a28;padding:14px 22px;display:flex;align-items:center;gap:12px}',
+      '#rvHead .rv-ttl{color:#fff;font-weight:700;font-size:.95rem;flex:1}',
+      '#rvHead .rv-etapa-strip{font-size:.7rem;font-weight:700;padding:2px 10px;border-radius:10px;color:#fff;letter-spacing:.04em;text-transform:uppercase}',
+      '#rvHead .rv-prog-txt{color:rgba(255,255,255,.45);font-size:.75rem;white-space:nowrap}',
+      '#rvHead .rv-x{background:transparent;border:none;color:rgba(255,255,255,.45);font-size:1.1rem;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1}',
+      '#rvHead .rv-x:hover{color:#fff;background:rgba(255,255,255,.1)}',
+      '#rvBody{display:flex;flex:1;overflow:hidden;min-height:0}',
+      '#rvLeft{width:220px;min-width:220px;padding:24px 18px 20px;display:flex;flex-direction:column;align-items:center;gap:11px;border-right:1px solid #ececf3;background:#f8f7fd;overflow-y:auto}',
+      '#rvAv{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.6rem;color:#fff;width:76px;height:76px;flex-shrink:0}',
+      '#rvNom{font-weight:700;font-size:1rem;color:#1a1830;text-align:center;line-height:1.25}',
+      '#rvEt{font-size:.68rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:3px 12px;border-radius:12px;color:#fff}',
+      '#rvDias{font-size:.77rem;color:#76748a;font-weight:500;text-align:center}',
+      '#rvAlert{font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:6px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;text-align:center;display:none}',
+      '#rvWABtn{width:100%;padding:9px;background:#25d366;color:#fff;border:none;border-radius:9px;font-weight:700;font-size:.79rem;cursor:pointer;font-family:inherit}',
+      '#rvWABtn:hover{background:#1db855}',
+      '#rvRight{flex:1;padding:22px 26px;overflow-y:auto;display:flex;flex-direction:column;gap:16px}',
+      '.rv-lbl{font-size:.67rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#76748a;margin-bottom:5px}',
+      '.rv-lbl.accent{color:#5b5ee0}',
+      '.rv-lbl.green{color:#16a34a}',
+      '.rv-chips{display:flex;flex-wrap:wrap;gap:6px}',
+      '.rv-chip{font-size:.75rem;padding:3px 11px;background:#f0f0f9;color:#3a3ad0;border-radius:6px;font-weight:500;border:1px solid #e0e0f5}',
+      '#rvPA{width:100%;min-height:88px;padding:10px 13px;border:2px solid #5b5ee0;border-radius:10px;font-family:inherit;font-size:.87rem;color:#1a1830;resize:vertical;outline:none;background:#fff;box-sizing:border-box;transition:border-color .15s}',
+      '#rvPA:focus{border-color:#3a3ad0;box-shadow:0 0 0 3px #ecebfb}',
+      '#rvPA::placeholder{color:#a09fc0}',
+      '#rvWAMsg{width:100%;min-height:76px;padding:10px 13px;border:1px solid #bbf7d0;border-radius:10px;font-family:inherit;font-size:.83rem;color:#1a1830;resize:vertical;outline:none;background:#f0fdf4;box-sizing:border-box}',
+      '#rvWAMsg:focus{border-color:#25d366;box-shadow:0 0 0 3px #dcfce7;background:#fff}',
+      '.rv-wa-btns{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}',
+      '.rv-wa-btns button{padding:7px 14px;border-radius:8px;font-size:.77rem;font-weight:700;cursor:pointer;font-family:inherit;border:1px solid #bbf7d0;background:#f0fdf4;color:#16a34a;transition:background .15s}',
+      '.rv-wa-btns button:hover{background:#dcfce7}',
+      '#rvFoot{padding:13px 22px;border-top:1px solid #ececf3;display:flex;align-items:center;gap:10px;background:#fff}',
+      '#rvPrev{background:#f6f6fa;color:#1a1830;border:1px solid #ececf3;padding:9px 18px;border-radius:9px;font-weight:600;font-size:.84rem;cursor:pointer;font-family:inherit}',
+      '#rvPrev:hover:not(:disabled){background:#ececf3}',
+      '#rvPrev:disabled{opacity:.35;cursor:default}',
+      '#rvNext{background:#1a1830;color:#fff;border:none;padding:9px 22px;border-radius:9px;font-weight:700;font-size:.84rem;cursor:pointer;font-family:inherit;margin-left:auto}',
+      '#rvNext:hover{background:#5b5ee0}',
+      '#rvBar{flex:1;height:4px;background:#ececf3;border-radius:2px;overflow:hidden;max-width:300px}',
+      '#rvFill{height:100%;background:#5b5ee0;border-radius:2px;transition:width .3s}',
+      '</style>',
+      '<div id="rvOv" class="hidden" onclick="if(event.target===this)window.cerrarRevision()">',
+      '<div id="rvCard">',
+      '<div id="rvHead">',
+      '<div class="rv-ttl">&#128203; Modo Revisión</div>',
+      '<span id="rvEtapaStrip" class="rv-etapa-strip"></span>',
+      '<div class="rv-prog-txt" id="rvProgTxt"></div>',
+      '<button class="rv-x" onclick="window.cerrarRevision()" title="Cerrar">&#x2715;</button>',
+      '</div>',
+      '<div id="rvBody">',
+      '<div id="rvLeft">',
+      '<div id="rvAv"></div>',
+      '<div id="rvNom"></div>',
+      '<span id="rvEt"></span>',
+      '<div id="rvDias"></div>',
+      '<div id="rvAlert"></div>',
+      '<button id="rvWABtn" onclick="window.rvAbrirWADirecto()">&#128222; WhatsApp</button>',
+      '</div>',
+      '<div id="rvRight">',
+      '<div><div class="rv-lbl">Contexto</div><div class="rv-chips" id="rvChips"></div></div>',
+      '<div>',
+      '<div class="rv-lbl accent">&#9733; Próxima acción <span style="font-size:.63rem;font-weight:400;text-transform:none;letter-spacing:0;color:#a09fc0">(se guarda al avanzar)</span></div>',
+      '<textarea id="rvPA" placeholder="¿Cuál es el siguiente paso concreto con este contacto?"></textarea>',
+      '</div>',
+      '<div>',
+      '<div class="rv-lbl green">&#128172; Mensaje WhatsApp</div>',
+      '<textarea id="rvWAMsg" placeholder="Mensaje sugerido — editá antes de enviar…"></textarea>',
+      '<div class="rv-wa-btns">',
+      '<button onclick="window.rvCopiarWA()" id="rvCopyBtn">&#128203; Copiar</button>',
+      '<button onclick="window.rvAbrirWAWeb()">&#9654; Abrir en WhatsApp Web</button>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '<div id="rvFoot">',
+      '<button id="rvPrev" onclick="window.rvAnterior()" disabled>&#8592; Anterior</button>',
+      '<div id="rvBar"><div id="rvFill" style="width:0%"></div></div>',
+      '<button id="rvNext" onclick="window.rvSiguiente()">Guardar y siguiente &#8594;</button>',
+      '</div>',
+      '</div>',
+      '</div>'
+    ].join(''));
+
+    function rvMostrar(idx){
+      var c=rvList[idx];if(!c)return;
+      // left panel
+      var av=document.getElementById('rvAv');
+      av.style.background=avBg(c.nombre);
+      av.textContent=avIni(c.nombre);
+      document.getElementById('rvNom').textContent=c.nombre||'—';
+      var etEl=document.getElementById('rvEt');
+      etEl.textContent=c.etapa||'Sin Etapa';
+      etEl.style.background=etColor(c.etapa);
+      var d=c.dias_desde_contacto||0;
+      document.getElementById('rvDias').textContent=d===1?'1 día sin contacto':d+' días sin contacto';
+      var al=document.getElementById('rvAlert');
+      if(c.alerta){al.textContent=c.alerta;al.style.display='block';}else{al.style.display='none';}
+      // strip in header
+      var strip=document.getElementById('rvEtapaStrip');
+      strip.textContent=c.etapa||'Sin Etapa';
+      strip.style.background=etColor(c.etapa);
+      // right panel
+      var chips='';
+      if(c.antecedente)chips+='<span class="rv-chip">'+c.antecedente+'</span>';
+      if(c.necesidad)chips+='<span class="rv-chip">'+c.necesidad+'</span>';
+      if(c.prioridad)chips+='<span class="rv-chip" style="background:#fff7ed;color:#c2410c;border-color:#fed7aa">'+c.prioridad+'</span>';
+      document.getElementById('rvChips').innerHTML=chips||'<span class="rv-chip" style="background:#f8fafc;color:#94a3b8;border-color:#e2e8f0">Sin datos</span>';
+      document.getElementById('rvPA').value=c.proxima_accion||'';
+      document.getElementById('rvWAMsg').value=waTpl(c);
+      // progress
+      var tot=rvList.length;
+      document.getElementById('rvProgTxt').textContent=(idx+1)+' / '+tot;
+      document.getElementById('rvFill').style.width=Math.round((idx+1)/tot*100)+'%';
+      // nav buttons
+      var prev=document.getElementById('rvPrev');
+      prev.disabled=(idx===0);
+      prev.style.opacity=(idx===0)?'.35':'1';
+      document.getElementById('rvNext').textContent=(idx===tot-1)?'Finalizar revisión ✓':'Guardar y siguiente →';
+    }
+
+    window.abrirRevision=function(){
+      rvList=buildRevList();
+      if(!rvList.length){alert('No hay contactos para revisar.');return;}
+      rvIdx=0;
+      rvMostrar(0);
+      document.getElementById('rvOv').classList.remove('hidden');
+    };
+
+    window.cerrarRevision=function(){
+      document.getElementById('rvOv').classList.add('hidden');
+    };
+
+    window.rvAnterior=function(){
+      if(rvIdx>0){rvIdx--;rvMostrar(rvIdx);}
+    };
+
+    window.rvSiguiente=function(){
+      var c=rvList[rvIdx];
+      var pa=document.getElementById('rvPA').value.trim();
+      var req;
+      if(pa!==(c.proxima_accion||'').trim()){
+        req=fetch('/contactos/'+c.id,{
+          method:'PUT',credentials:'same-origin',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({proxima_accion:pa})
+        }).then(function(){c.proxima_accion=pa;});
+      }else{req=Promise.resolve();}
+      req.then(function(){
+        if(rvIdx<rvList.length-1){rvIdx++;rvMostrar(rvIdx);}
+        else{window.cerrarRevision();cargarDesdeSupabase();}
+      }).catch(function(e){alert('Error al guardar: '+e.message);});
+    };
+
+    window.rvAbrirWADirecto=function(){
+      var c=rvList[rvIdx];
+      if(c&&c.whatsapp_url)window.open(c.whatsapp_url,'_blank');
+    };
+
+    window.rvCopiarWA=function(){
+      var msg=document.getElementById('rvWAMsg').value;
+      var btn=document.getElementById('rvCopyBtn');
+      (navigator.clipboard?navigator.clipboard.writeText(msg):Promise.resolve()).then(function(){
+        btn.textContent='✓ Copiado!';
+        setTimeout(function(){btn.innerHTML='&#128203; Copiar';},2200);
+      });
+    };
+
+    window.rvAbrirWAWeb=function(){
+      var c=rvList[rvIdx];if(!c)return;
+      var msg=encodeURIComponent(document.getElementById('rvWAMsg').value);
+      var phone='';
+      if(c.whatsapp_url){var m=c.whatsapp_url.match(/wa\.me\/(\d+)/);if(m)phone=m[1];}
+      window.open('https://wa.me/'+(phone?phone:'')+'?text='+msg,'_blank');
+    };
+
+  })();
+  /* ════════════════════════════════════════════════════ */
+
   window.sincronizar=cargarDesdeSupabase;
   window.cargarTodo=cargarDesdeSupabase;
   cargarDesdeSupabase();
