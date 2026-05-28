@@ -5,6 +5,7 @@ Obtiene comparables de Zonaprop, MercadoLibre y Argenprop
 
 import cloudscraper, json, re, time, math, urllib.parse, urllib.request, os
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 BASE_ZP      = "https://www.zonaprop.com.ar"
 _SCRAPER_KEY = os.environ.get("SCRAPER_API_KEY", "").strip()
@@ -47,16 +48,16 @@ def _fetch(session, url):
         target = f"http://api.scraperapi.com?api_key={_SCRAPER_KEY}&url={urllib.parse.quote(url, safe='')}&country_code=ar"
     else:
         target = url
-    for i in range(3):
+    for i in range(2):
         try:
-            r = session.get(target, timeout=40)
+            r = session.get(target, timeout=25)
             print(f"[ACM] GET {url} → HTTP {r.status_code} ({len(r.text)} bytes)")
             if r.status_code == 200:
                 return r.text
-            time.sleep(3 * (i + 1))
+            time.sleep(2)
         except Exception as e:
             print(f"[ACM] Error fetching {url}: {e}")
-            time.sleep(4)
+            time.sleep(2)
     return None
 
 
@@ -243,7 +244,7 @@ def _buscar_zonaprop(barrio: str, tipo: str, session, paginas: int = 2) -> list:
             except Exception:
                 continue
 
-        time.sleep(1.5)
+        time.sleep(0.5)
 
     print(f"[ACM-ZP] {len(resultados)} listings encontrados")
     return resultados
@@ -458,7 +459,7 @@ def _buscar_argenprop(barrio: str, tipo: str, session, paginas: int = 1) -> list
             except Exception:
                 continue
 
-        time.sleep(1.5)
+        time.sleep(0.5)
 
     print(f"[ACM-AP] {len(resultados)} listings encontrados")
     return resultados
@@ -473,8 +474,6 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
     Busca comparables en Zonaprop + MercadoLibre + Argenprop.
     Retorna lista unificada con campo 'fuente' por cada comparable.
     """
-    session = _crear_session()
-
     # Geocodificar dirección objetivo si se provee
     target_lat = target_lng = None
     if direccion:
@@ -484,10 +483,32 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
         else:
             print(f"[ACM] No se pudo geocodificar '{direccion}', se usa barrio completo")
 
-    # Scrapers en secuencia (Zonaprop + ML + Argenprop)
-    todos_zp = _buscar_zonaprop(barrio, tipo, session, paginas)
-    todos_ml = _buscar_ml(barrio, tipo, m2_target, ambientes_target)
-    todos_ap = _buscar_argenprop(barrio, tipo, session, paginas=1)
+    # Scrapers en paralelo — cada uno con su propia sesión para evitar conflictos
+    def _run_zp():
+        return _buscar_zonaprop(barrio, tipo, _crear_session(), paginas)
+
+    def _run_ap():
+        return _buscar_argenprop(barrio, tipo, _crear_session(), paginas=1)
+
+    def _run_ml():
+        return _buscar_ml(barrio, tipo, m2_target, ambientes_target)
+
+    todos_zp = todos_ml = todos_ap = []
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        fut_zp = ex.submit(_run_zp)
+        fut_ml = ex.submit(_run_ml)
+        fut_ap = ex.submit(_run_ap)
+        for fut, name in [(fut_zp, "ZP"), (fut_ml, "ML"), (fut_ap, "AP")]:
+            try:
+                result = fut.result(timeout=90)
+                if name == "ZP":
+                    todos_zp = result
+                elif name == "ML":
+                    todos_ml = result
+                else:
+                    todos_ap = result
+            except Exception as e:
+                print(f"[ACM-{name}] Falló o timeout: {e}")
 
     # Calcular distancias para comparables de Zonaprop que tienen coordenadas
     if target_lat and target_lng:
