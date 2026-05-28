@@ -963,32 +963,47 @@ ACM_PROMPT = """Generá un ACM (Análisis Comparativo de Mercado) profesional en
 
 IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el informe como fecha del relevamiento.
 
-CONTEXTO CRÍTICO — leé esto antes de analizar:
-Los datos provienen de múltiples portales: Zonaprop, MercadoLibre y Argenprop. TODOS son PRECIOS DE PUBLICACIÓN (lo que el vendedor pide), NO precios de cierre. En el mercado actual de CABA:
-- La brecha entre precio pedido y precio de cierre es del 10 al 18%.
-- Zonaprop tiende a tener los precios de publicación más altos.
-- MercadoLibre y Argenprop suelen reflejar mejor el precio al que realmente se negocia.
-- El precio promedio de los tres portales combinados es el indicador más representativo del mercado real.
-- Si el promedio entre portales difiere más del 10%, mencionalo como señal de mercado disperso.
+═══ CONTEXTO DEL MERCADO — LEER ANTES DE CALCULAR ═══
 
-REGLA FUNDAMENTAL: El precio que recomendés para publicar NO puede estar por encima del promedio de publicación del mercado. Si lo pusieran más alto, la propiedad no recibiría visitas y quedaría estancada.
+Los datos son PRECIOS DE PUBLICACIÓN de Zonaprop, NO precios de cierre.
 
-Los datos de comparables activos son los siguientes:
+La realidad del mercado CABA hoy:
+- Los precios publicados en Zonaprop son aspiracionales. El vendedor pide, el comprador negocia.
+- La brecha real entre precio publicado y precio de cierre es del 15 al 25%.
+- Las propiedades que se publican por encima del mercado NO reciben consultas. Quedan estancadas meses.
+- Los compradores buscan por rango de precio: una propiedad publicada 15% arriba directamente no aparece en sus filtros.
+- El precio/m² en Zonaprop incluye las propiedades más caras que llevan meses sin venderse. Los cierres reales están por debajo.
+
+═══ REGLAS PARA EL PRECIO RECOMENDADO ═══
+
+1. Calculá el precio/m² de los comparables. Descartá el 25% más caro (son los que llevan meses sin venderse).
+2. El precio de publicación sugerido debe estar entre el percentil 25 y la mediana (percentil 50) del mercado. NUNCA por encima de la mediana.
+3. El precio de cierre estimado = precio de publicación menos 5 a 8%.
+4. Si el precio/m² que surge es menor al que el propietario espera, explicalo con los datos — es mejor decirlo ahora que perder la captación en 3 meses.
+
+Los datos de comparables activos en Zonaprop son los siguientes:
 
 {datos}
 
-El ACM debe tener esta estructura:
-1. **Relevamiento al {fecha_hoy}** — indicá esta fecha exacta al inicio
-2. **Resumen del Mercado** — mostrá el precio promedio por portal (Zonaprop, MercadoLibre, Argenprop), el promedio unificado, y el rango de precio/m². Indicá cuántos comparables activos hay en total. Aclarás que son precios pedidos, no de cierre.
-3. **Comparables Destacados** — 5 a 8 propiedades similares de distintos portales, con precio, superficie, portal de origen y link
-4. **Precio Recomendado** — dos valores claros y diferenciados:
-   - *Precio de publicación sugerido*: calculado sobre el promedio multi-portal, NO sobre el máximo de Zonaprop. Debe ser competitivo para generar consultas.
-   - *Precio de cierre estimado*: el rango realista de lo que el propietario va a cobrar (restá 10-15% al precio de publicación)
-   Justificá con números concretos del mercado relevado.
-5. **Argumento para el Propietario** — 3-4 líneas sobre por qué publicar al precio correcto desde el inicio genera más consultas, más competencia entre compradores y mejor precio final
+═══ ESTRUCTURA DEL INFORME ═══
 
-Tono: profesional, basado en datos, sin prometer valores que el mercado no convalida. Usá números concretos. Formato listo para mostrar en reunión.
-Si faltan datos de m² en algunos comparables, hacé el análisis con los disponibles y mencionalo brevemente.
+1. **Relevamiento al {fecha_hoy}**
+
+2. **Resumen del Mercado**
+   - Total de propiedades activas relevadas, rango de precios, precio/m² promedio y mediana
+   - Cuántas llevan más de 90 días publicadas (señal de precios fuera de mercado)
+   - Aclará que son precios pedidos, no de cierre
+
+3. **Comparables más relevantes** — 5 a 6 propiedades con precio, superficie, precio/m² y link. Priorizá las más similares en m² y ubicación.
+
+4. **Precio Recomendado** — con número concreto, no rangos vagos:
+   - *Precio de publicación sugerido*: basado en percentil 25-50 del mercado, con justificación del cálculo
+   - *Precio de cierre realista*: precio de publicación menos 5-8%
+   - Una línea explicando por qué publicar en ese valor genera más consultas que publicar más alto
+
+5. **Por qué trabajar con un agente profesional** — 3 líneas concretas, enfocadas en maximizar el precio de cierre y reducir el tiempo de venta
+
+Tono: directo, basado en números, sin sobreprometer. El propietario necesita confiar en el dato, no en el entusiasmo.
 """
 
 @app.route("/acm", methods=["POST"])
@@ -1054,7 +1069,8 @@ def acm():
             yield f"data: {json.dumps({'texto': '  ' + msg + '\\n'})}\n\n"
 
         if 'error' in result_box:
-            yield f"data: {json.dumps({'error': f'Error al buscar comparables: {result_box[\"error\"]}'})}\n\n"
+            err_msg = result_box['error']
+            yield f"data: {json.dumps({'error': 'Error al buscar comparables: ' + err_msg})}\n\n"
             return
 
         comparables = result_box.get('data', [])
