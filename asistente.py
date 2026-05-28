@@ -996,25 +996,21 @@ Los datos de comparables activos en Zonaprop son los siguientes:
 
 {datos}
 
-═══ ESTRUCTURA DEL INFORME ═══
+═══ ESTRUCTURA DEL INFORME — BREVE Y DIRECTA ═══
 
-1. **Relevamiento al {fecha_hoy}**
+El informe debe ser CORTO. El propietario lo va a leer en la reunión. Máximo 1 página. No pongas números altos al principio — generan ancla psicológica y después cuesta bajar al precio real.
 
-2. **Resumen del Mercado**
-   - Total de propiedades activas relevadas, rango de precios, precio/m² promedio y mediana
-   - Cuántas llevan más de 90 días publicadas (señal de precios fuera de mercado)
-   - Aclará que son precios pedidos, no de cierre
+1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m², tipo.
 
-3. **Comparables más relevantes** — 5 a 6 propiedades con precio, superficie, precio/m² y link. Priorizá las más similares en m² y ubicación.
+2. **La competencia real** — solo las 4-5 propiedades más baratas y similares (las que SÍ generan visitas). Tabla simple: m², ambientes, precio, precio/m², link. NO incluyas las propiedades caras. Una línea al final: "Promedio de la competencia activa: USD X/m²".
 
-4. **Precio Recomendado** — con número concreto, no rangos vagos:
-   - *Precio de publicación sugerido*: basado en percentil 25-50 del mercado, con justificación del cálculo
-   - *Precio de cierre realista*: precio de publicación menos 5-8%
-   - Una línea explicando por qué publicar en ese valor genera más consultas que publicar más alto
+3. **Precio recomendado** — directo al número:
+   - *Publicación sugerida*: USD [número concreto, no rango]. Calculado como promedio/m² de la competencia activa × m² de la propiedad. Una sola línea de justificación.
+   - *Cierre estimado*: USD [número] – USD [número] (5-8% menos que publicación).
 
-5. **Por qué trabajar con un agente profesional** — 3 líneas concretas, enfocadas en maximizar el precio de cierre y reducir el tiempo de venta
+4. **Próximos pasos** — 3 ítems concretos (firmar mandato, fotos, publicación).
 
-Tono: directo, basado en números, sin sobreprometer. El propietario necesita confiar en el dato, no en el entusiasmo.
+Tono: directo, sin rodeos, datos concretos. El propietario tiene que llegar al precio recomendado por su propio razonamiento antes de que el agente lo diga.
 """
 
 @app.route("/acm", methods=["POST"])
