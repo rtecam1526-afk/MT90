@@ -594,28 +594,119 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
     }).catch(function(err){alert('Error: '+err.message);});
   };
 
-  /* ── Botón eliminar contacto en panel de detalle ── */
+  /* ── Botón editar + eliminar contacto en panel de detalle ── */
   (function(){
-    var btn=document.createElement('button');
-    btn.id='dEliminarBtn';
-    btn.textContent='Eliminar contacto';
-    btn.style.cssText='width:100%;margin-top:10px;padding:8px;background:transparent;border:1px solid #fecaca;color:#dc2626;border-radius:7px;font-family:Inter,sans-serif;font-size:.76rem;font-weight:600;cursor:pointer;transition:all .15s';
-    btn.onmouseover=function(){this.style.background='#fef2f2';};
-    btn.onmouseout=function(){this.style.background='transparent';};
-    btn.onclick=function(){
+    // Modal de edición
+    document.body.insertAdjacentHTML('beforeend',[
+      '<style>',
+      '#editOv{font-family:Inter,system-ui,sans-serif}',
+      '#editOv .edit-card{background:#fff;border-radius:14px;padding:26px;width:460px;box-shadow:0 8px 32px rgba(26,24,48,.14);border:1px solid #ececf3}',
+      '#editOv .edit-kicker{font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#5b5ee0;margin-bottom:4px}',
+      '#editOv h3{font-size:1.05rem;font-weight:700;color:#1a1830;margin:0 0 16px}',
+      '#editOv .edit-grid{display:grid;gap:10px}',
+      '#editOv .edit-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}',
+      '#editOv .edit-field{display:flex;flex-direction:column;gap:4px}',
+      '#editOv .edit-field label{font-size:.71rem;font-weight:500;color:#76748a}',
+      '#editOv input,#editOv select{padding:9px 10px;border:1px solid #ececf3;background:#f6f6fa;color:#1a1830;border-radius:8px;font-size:.84rem;font-family:inherit;outline:none}',
+      '#editOv input:focus,#editOv select:focus{border-color:#5b5ee0;box-shadow:0 0 0 3px #ecebfb}',
+      '#editOv .edit-foot{display:flex;gap:8px;margin-top:18px}',
+      '#editOv .edit-save{flex:1;background:#1a1830;color:#fff;border:none;padding:11px;border-radius:8px;font-weight:700;font-size:.86rem;cursor:pointer;font-family:inherit}',
+      '#editOv .edit-save:hover{background:#5b5ee0}',
+      '#editOv .edit-cancel{flex:0 0 auto;background:transparent;color:#76748a;border:1px solid #ececf3;padding:11px 18px;border-radius:8px;font-size:.84rem;cursor:pointer;font-family:inherit}',
+      '#editOv .edit-cancel:hover{background:#f6f6fa}',
+      '</style>',
+      '<div id="editOv" class="resultado-overlay hidden" onclick="if(event.target===this)this.classList.add(\'hidden\')">',
+      '<div class="edit-card">',
+      '<div class="edit-kicker">CRM · MT90 Tracción</div>',
+      '<h3>Editar contacto</h3>',
+      '<div class="edit-grid">',
+      '<div class="edit-row">',
+      '<div class="edit-field"><label>Nombre *</label><input id="edNom" placeholder="Nombre"></div>',
+      '<div class="edit-field"><label>Teléfono</label><input id="edTel" placeholder="11 5926 7961"></div>',
+      '</div>',
+      '<div class="edit-row">',
+      '<div class="edit-field"><label>Etapa</label><select id="edEtapa"><option value="">Sin Etapa</option><option value="Caliente">Caliente</option><option value="Media">Media</option><option value="Tibio">Tibio</option><option value="Fria">Fría</option></select></div>',
+      '<div class="edit-field"><label>Último contacto</label><input id="edFuc" placeholder="dd/mm/aaaa"></div>',
+      '</div>',
+      '<div class="edit-field"><label>Antecedente</label><input id="edAnte" placeholder="Cómo lo conociste"></div>',
+      '<div class="edit-field"><label>Necesidad</label><input id="edNec" placeholder="Qué busca o qué tiene"></div>',
+      '<div class="edit-field"><label>Próxima acción</label><input id="edPA" placeholder="Siguiente paso concreto"></div>',
+      '</div>',
+      '<div class="edit-foot">',
+      '<button class="edit-save" onclick="window.guardarEdicion()">Guardar cambios</button>',
+      '<button class="edit-cancel" onclick="document.getElementById(\'editOv\').classList.add(\'hidden\')">Cancelar</button>',
+      '</div></div></div>'
+    ].join(''));
+
+    window.abrirEdicion=function(){
+      var c=DATA[selectedIdx];
+      if(!c)return;
+      document.getElementById('edNom').value=c.nombre||'';
+      document.getElementById('edTel').value=c.telefono||'';
+      document.getElementById('edEtapa').value=c.etapa||'';
+      document.getElementById('edFuc').value=c.fecha_ultimo_contacto||'';
+      document.getElementById('edAnte').value=c.antecedente||'';
+      document.getElementById('edNec').value=c.necesidad||'';
+      document.getElementById('edPA').value=c.proxima_accion||'';
+      document.getElementById('editOv').classList.remove('hidden');
+    };
+
+    window.guardarEdicion=function(){
+      var c=DATA[selectedIdx];
+      if(!c||!c.id)return;
+      var nom=document.getElementById('edNom').value.trim();
+      if(!nom){alert('El nombre es obligatorio');return;}
+      var tel=document.getElementById('edTel').value.trim();
+      fetch('/contactos/'+c.id,{
+        method:'PUT',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          nombre:nom,cliente:nom,telefono:tel,
+          whatsapp_link:tel?'https://wa.me/54'+tel.replace(/\D/g,''):'',
+          etapa:document.getElementById('edEtapa').value||null,
+          fecha_ultimo_contacto:document.getElementById('edFuc').value.trim(),
+          antecedente:document.getElementById('edAnte').value.trim(),
+          necesidad:document.getElementById('edNec').value.trim(),
+          proxima_accion:document.getElementById('edPA').value.trim(),
+        })
+      }).then(function(r){
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        document.getElementById('editOv').classList.add('hidden');
+        cargarDesdeSupabase();
+      }).catch(function(e){alert('Error al guardar: '+e.message);});
+    };
+
+    // Botón Editar
+    var btnE=document.createElement('button');
+    btnE.id='dEditarBtn';
+    btnE.textContent='Editar contacto';
+    btnE.style.cssText='width:100%;margin-top:10px;padding:8px;background:#5b5ee0;border:none;color:#fff;border-radius:7px;font-family:Inter,sans-serif;font-size:.76rem;font-weight:600;cursor:pointer;transition:all .15s';
+    btnE.onmouseover=function(){this.style.background='#3a3ad0';};
+    btnE.onmouseout=function(){this.style.background='#5b5ee0';};
+    btnE.onclick=function(){window.abrirEdicion();};
+
+    // Botón Eliminar
+    var btnD=document.createElement('button');
+    btnD.id='dEliminarBtn';
+    btnD.textContent='Eliminar contacto';
+    btnD.style.cssText='width:100%;margin-top:6px;padding:8px;background:transparent;border:1px solid #fecaca;color:#dc2626;border-radius:7px;font-family:Inter,sans-serif;font-size:.76rem;font-weight:600;cursor:pointer;transition:all .15s';
+    btnD.onmouseover=function(){this.style.background='#fef2f2';};
+    btnD.onmouseout=function(){this.style.background='transparent';};
+    btnD.onclick=function(){
       var c=DATA[selectedIdx];
       if(!c||!c.id)return;
       if(!confirm('¿Eliminar a '+c.nombre+'? Esta acción no se puede deshacer.'))return;
       fetch('/contactos/'+c.id,{method:'DELETE',credentials:'same-origin'})
         .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-        .then(function(){
-          cerrarDetalle();
-          cargarDesdeSupabase();
-        })
+        .then(function(){cerrarDetalle();cargarDesdeSupabase();})
         .catch(function(e){alert('Error al eliminar: '+e.message);});
     };
+
     var contBtn=document.getElementById('dContBtn');
-    if(contBtn&&contBtn.parentNode)contBtn.parentNode.insertBefore(btn,contBtn.nextSibling);
+    if(contBtn&&contBtn.parentNode){
+      contBtn.parentNode.insertBefore(btnE,contBtn.nextSibling);
+      contBtn.parentNode.insertBefore(btnD,btnE.nextSibling);
+    }
   })();
 
   /* ════════════════════════════════════════════════════
@@ -851,6 +942,97 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
   })();
   /* ════════════════════════════════════════════════════ */
 
+  /* ── Editar contacto desde el panel de detalle ── */
+  (function(){
+    var _esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
+
+    /* Botón "Editar" — se inserta junto al botón Eliminar */
+    var eBtn=document.createElement('button');
+    eBtn.id='dEditarBtn';
+    eBtn.textContent='Editar contacto';
+    eBtn.style.cssText='width:100%;margin-top:6px;padding:8px;background:transparent;border:1px solid #d8d6f4;color:#3a3ad0;border-radius:7px;font-family:Inter,sans-serif;font-size:.76rem;font-weight:600;cursor:pointer;transition:all .15s';
+    eBtn.onmouseover=function(){this.style.background='#ecebfb';};
+    eBtn.onmouseout=function(){this.style.background='transparent';};
+    eBtn.onclick=function(){window.toggleEdicionContacto();};
+    var elimBtn=document.getElementById('dEliminarBtn');
+    if(elimBtn&&elimBtn.parentNode)elimBtn.parentNode.insertBefore(eBtn,elimBtn);
+
+    window.toggleEdicionContacto=function(){
+      var c=DATA[selectedIdx];if(!c)return;
+      var fieldsEl=document.getElementById('dFields');if(!fieldsEl)return;
+      if(document.getElementById('dEditForm')){
+        _restoreFields(c);
+        document.getElementById('dEditarBtn').textContent='Editar contacto';
+        return;
+      }
+      document.getElementById('dEditarBtn').textContent='Cancelar';
+      var etapas=['Caliente','Media','Tibio','Fria','Sin Etapa'];
+      var etapaOpts=etapas.map(function(e){
+        return '<option value="'+e+'"'+(c.etapa===e?' selected':'')+'>'+e+'</option>';
+      }).join('');
+      fieldsEl.innerHTML=[
+        '<div id="dEditForm" style="display:flex;flex-direction:column;gap:9px">',
+        '<style>',
+        '#dEditForm .ef-lbl{font-size:.65rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#76748a;margin-bottom:3px}',
+        '#dEditForm input,#dEditForm select,#dEditForm textarea{width:100%;padding:8px 10px;border:1px solid #ececf3;background:#f6f6fa;color:#1a1830;border-radius:7px;font-family:Inter,sans-serif;font-size:.83rem;box-sizing:border-box;outline:none}',
+        '#dEditForm input:focus,#dEditForm select:focus,#dEditForm textarea:focus{border-color:#5b5ee0;box-shadow:0 0 0 2px #ecebfb;background:#fff}',
+        '#dEditForm textarea{min-height:58px;resize:vertical}',
+        '</style>',
+        '<div><div class="ef-lbl">Etapa</div><select id="deEtapa">'+etapaOpts+'</select></div>',
+        '<div><div class="ef-lbl">Próxima acción</div><textarea id="dePA">'+_esc(c.proxima_accion||'')+'</textarea></div>',
+        '<div><div class="ef-lbl">Necesidad</div><input id="deNec" value="'+_esc(c.necesidad||'')+'"></div>',
+        '<div><div class="ef-lbl">Antecedente</div><input id="deAnte" value="'+_esc(c.antecedente||'')+'"></div>',
+        '<div><div class="ef-lbl">Teléfono <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#a09fc0">sin +54</span></div><input id="deTel" value="'+_esc(c.telefono||'')+'"></div>',
+        '<div><div class="ef-lbl">Último contacto</div><input id="deFuc" value="'+_esc(c.fecha_ultimo_contacto||'')+'" placeholder="dd/mm/aaaa"></div>',
+        '<button id="dGuardarBtn" onclick="window.guardarEdicionContacto()" style="background:#1a1830;color:#fff;border:none;padding:10px;border-radius:8px;font-weight:700;font-size:.83rem;cursor:pointer;font-family:Inter,sans-serif;width:100%;margin-top:2px;transition:background .15s">Guardar cambios</button>',
+        '</div>'
+      ].join('');
+    };
+
+    window.guardarEdicionContacto=function(){
+      var c=DATA[selectedIdx];if(!c||!c.id)return;
+      var etapa   =document.getElementById('deEtapa').value;
+      var pa      =document.getElementById('dePA').value.trim();
+      var nec     =document.getElementById('deNec').value.trim();
+      var ante    =document.getElementById('deAnte').value.trim();
+      var tel     =document.getElementById('deTel').value.trim();
+      var fuc     =document.getElementById('deFuc').value.trim();
+      var payload ={etapa:etapa,proxima_accion:pa,necesidad:nec,antecedente:ante,telefono:tel,fecha_ultimo_contacto:fuc};
+      if(tel)payload.whatsapp_link='https://wa.me/54'+tel.replace(/\D/g,'');
+      var btn=document.getElementById('dGuardarBtn');
+      btn.textContent='Guardando...';btn.disabled=true;
+      fetch('/contactos/'+c.id,{
+        method:'PUT',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+      }).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+      .then(function(){
+        Object.assign(c,payload);
+        if(tel)c.whatsapp_url='https://wa.me/54'+tel.replace(/\D/g,'');
+        _restoreFields(c);
+        var eb=document.getElementById('dEditarBtn');
+        eb.textContent='✓ Guardado';eb.style.background='#dcfce7';eb.style.borderColor='#bbf7d0';eb.style.color='#16a34a';
+        setTimeout(function(){eb.textContent='Editar contacto';eb.style.background='transparent';eb.style.borderColor='#d8d6f4';eb.style.color='#3a3ad0';},2200);
+        cargarDesdeSupabase();
+      }).catch(function(e){btn.textContent='Guardar cambios';btn.disabled=false;alert('Error al guardar: '+e.message);});
+    };
+
+    function _restoreFields(c){
+      var fields=[
+        ['Etapa',c.etapa],['Telefono',c.telefono],['Antecedente',c.antecedente],
+        ['Necesidad',c.necesidad],['Proxima Accion',c.proxima_accion],
+        ['Ult. Contacto',c.fecha_ultimo_contacto],['Observaciones',c.observaciones],
+      ];
+      var el=document.getElementById('dFields');if(!el)return;
+      el.innerHTML=fields.filter(function(f){return f[1];}).map(function(f){
+        return '<div class="detail-field"><div class="detail-field-label">'+f[0]+'</div>'
+          +'<div class="detail-field-val">'+_esc(f[1])+'</div></div>';
+      }).join('')||'<div class="detail-field"><div class="detail-field-val em">Sin datos adicionales</div></div>';
+      var eb=document.getElementById('dEditarBtn');
+      if(eb)eb.textContent='Editar contacto';
+    }
+  })();
+
   window.sincronizar=cargarDesdeSupabase;
   window.cargarTodo=cargarDesdeSupabase;
   cargarDesdeSupabase();
@@ -966,31 +1148,31 @@ IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el in
 ═══ CONTEXTO DEL MERCADO — LEER ANTES DE CALCULAR ═══
 
 Los datos son PRECIOS DE PUBLICACIÓN de Zonaprop, NO precios de cierre.
+Los precios publicados en Zonaprop son aspiracionales y en muchos barrios de CABA están un 25-35% por encima del precio al que realmente se cierra una operación. Esto significa que incluso la mitad más barata de Zonaprop puede estar por encima del mercado real.
 
-La realidad del mercado CABA hoy:
-- Los precios publicados en Zonaprop son aspiracionales. El vendedor pide, el comprador negocia.
-- La brecha real entre precio publicado y precio de cierre es del 15 al 25%.
-- Las propiedades que se publican por encima del mercado NO reciben consultas. Quedan estancadas meses.
-- Los compradores buscan por rango de precio: una propiedad publicada 15% arriba directamente no aparece en sus filtros.
-- El precio/m² en Zonaprop incluye las propiedades más caras que llevan meses sin venderse. Los cierres reales están por debajo.
+═══ CÓMO CALCULAR EL PRECIO — SEGUÍ ESTOS PASOS ═══
 
-═══ REGLAS PARA EL PRECIO RECOMENDADO ═══
+PASO 1 — Filtrá los comparables más similares a la propiedad objetivo en m² y ambientes. Quedate con los 8-12 más parecidos.
 
-REALIDAD DEL MERCADO: En Zonaprop conviven dos tipos de propiedades muy distintas:
-- Las que se VENDEN: están publicadas al precio de mercado real, generan consultas en las primeras 2 semanas
-- Las que QUEDAN ESTANCADAS: están publicadas un 20-35% por encima del mercado, llevan meses o años sin visitas
+PASO 2 — Ordenalos por precio/m² de menor a mayor.
 
-El promedio de Zonaprop mezcla ambos grupos y siempre da un número inflado. El precio que le vas a sugerir al propietario tiene que ser el precio de las que SE VENDEN, no el promedio general.
+PASO 3 — Tomá solo el 20% más barato (quintil inferior). Si tenés 10 comparables, usá los 2 más baratos. Si tenés 50, usá los 10 más baratos. Esos son los únicos que están generando consultas reales hoy.
 
-CÓMO CALCULAR:
-1. De los comparables recibidos, filtrá los más similares en m² y ambientes a la propiedad objetivo (idealmente 6-10).
-2. Ordenalos por precio de menor a mayor.
-3. Separalos en dos grupos: la mitad más barata y la mitad más cara.
-   - La mitad más cara = propiedades sobrevaluadas que llevan meses sin venderse. NO las uses para calcular.
-   - La mitad más barata = el mercado activo real, las propiedades con las que va a competir en el buscador.
-4. El precio de publicación sugerido = promedio de precio/m² de la mitad más barata × m² de la propiedad objetivo.
-5. El precio de cierre estimado = precio de publicación menos 5 a 8%.
-6. En el informe, mencioná cuáles son las propiedades "estancadas" (más caras) y cuáles son la competencia real (más baratas), para que el propietario vea la diferencia con sus propios ojos.
+PASO 4 — Calculá el precio/m² promedio de ese 20% más barato. Ese es tu precio/m² base.
+
+PASO 5 — Aplicá descuentos adicionales si la propiedad tiene características que la posicionan por debajo del promedio de ese grupo:
+   - Antigüedad > 40 años: restar 8% adicional
+   - Antigüedad > 50 años: restar 12% adicional
+   - Planta baja o primer piso sin ascensor: restar 6% adicional
+   - Superficie cubierta < 40m²: restar 5% adicional
+   - Sin cochera en zona donde la mayoría tiene: restar 4% adicional
+   Solo aplicá los descuentos que correspondan. Podés combinarlos.
+
+PASO 6 — Precio de publicación sugerido = precio/m² base ajustado × m² de la propiedad.
+
+PASO 7 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
+
+IMPORTANTE: Si el precio resultante parece bajo comparado con lo que el propietario espera, eso es correcto. Significa que el mercado está por debajo de las expectativas. Es mejor mostrarlo con datos ahora que en 3 meses de propiedad sin consultas.
 
 Los datos de comparables activos en Zonaprop son los siguientes:
 
