@@ -942,6 +942,216 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
   })();
   /* ════════════════════════════════════════════════════ */
 
+  /* ════════════════════════════════════════════════════
+     VISTA HOY — pantalla de trabajo diario
+     ════════════════════════════════════════════════════ */
+  (function(){
+    var _esc2=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    var _hoyActivo=false;
+
+    /* ── Botón "Hoy" en topbar ── */
+    var hoyTabBtn=document.createElement('button');
+    hoyTabBtn.id='btnVistaHoy';
+    hoyTabBtn.innerHTML='☀ Hoy';
+    hoyTabBtn.style.cssText='background:#fff8e1;border:1px solid #fde68a;color:#92400e;font-weight:700;font-family:Inter,system-ui,sans-serif;font-size:.78rem;padding:5px 14px;border-radius:7px;cursor:pointer;transition:all .15s';
+    hoyTabBtn.onmouseover=function(){this.style.background='#fef3c7';};
+    hoyTabBtn.onmouseout=function(){if(!_hoyActivo)this.style.background='#fff8e1';};
+    hoyTabBtn.onclick=function(){window.toggleVistaHoy();};
+    var topActs=document.querySelector('.topbar-actions');
+    if(topActs)topActs.insertBefore(hoyTabBtn,topActs.firstChild);
+
+    /* ── Overlay HTML ── */
+    document.body.insertAdjacentHTML('beforeend',[
+      '<style>',
+      '#vhOv{position:fixed;inset:0;top:48px;background:#f6f6fa;z-index:500;overflow-y:auto;display:none;font-family:Inter,system-ui,sans-serif}',
+      '#vhOv.activo{display:block}',
+      '#vhHead{background:#fff;border-bottom:1px solid #ececf3;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:2}',
+      '#vhHead h2{font-size:1rem;font-weight:700;color:#1a1830;margin:0;flex:1}',
+      '#vhHead .vh-sub{font-size:.78rem;color:#76748a}',
+      '#vhHead .vh-cerrar{background:#f6f6fa;border:1px solid #ececf3;color:#76748a;padding:6px 14px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit}',
+      '#vhHead .vh-cerrar:hover{background:#ececf3;color:#1a1830}',
+      '#vhLista{padding:16px 20px;display:flex;flex-direction:column;gap:10px;max-width:860px;margin:0 auto}',
+      '.vh-card{background:#fff;border-radius:12px;border:1px solid #ececf3;padding:16px 18px;box-shadow:0 1px 3px rgba(26,24,48,.04)}',
+      '.vh-card.urgente{border-left:4px solid #ef4444}',
+      '.vh-card.media{border-left:4px solid #f59e0b}',
+      '.vh-card.fria{border-left:4px solid #3b82f6}',
+      '.vh-card-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}',
+      '.vh-av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:.9rem;flex-shrink:0;width:44px;height:44px}',
+      '.vh-nombre{font-weight:700;font-size:.97rem;color:#1a1830;flex:1}',
+      '.vh-badge{font-size:.67rem;font-weight:700;padding:2px 9px;border-radius:10px;color:#fff;text-transform:uppercase;letter-spacing:.04em}',
+      '.vh-dias{font-size:.75rem;font-weight:600;color:#76748a;white-space:nowrap}',
+      '.vh-dias.alto{color:#ef4444}',
+      '.vh-contexto{font-size:.82rem;color:#476280;margin-bottom:12px;line-height:1.45;padding-left:56px}',
+      '.vh-contexto .vh-pa{color:#1a1830;font-weight:600}',
+      '.vh-acciones{display:flex;gap:8px;flex-wrap:wrap;padding-left:56px}',
+      '.vh-btn{padding:7px 14px;border-radius:8px;font-size:.77rem;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:all .15s;white-space:nowrap}',
+      '.vh-btn.wa{background:#25d366;color:#fff}.vh-btn.wa:hover{background:#1db855}',
+      '.vh-btn.cont{background:#1a1830;color:#fff}.vh-btn.cont:hover{background:#5b5ee0}',
+      '.vh-btn.det{background:#f6f6fa;color:#1a1830;border:1px solid #ececf3}.vh-btn.det:hover{background:#ececf3}',
+      '.vh-etapa-sel{padding:7px 10px;border:1px solid #ececf3;border-radius:8px;font-size:.77rem;font-weight:600;font-family:inherit;background:#f6f6fa;color:#1a1830;cursor:pointer}',
+      '.vh-etapa-sel:focus{outline:none;border-color:#5b5ee0}',
+      '#vhEmpty{text-align:center;padding:60px 20px;color:#76748a;font-size:.9rem}',
+      '#vhEmpty .vh-em-icon{font-size:2.5rem;margin-bottom:12px}',
+      '</style>',
+      '<div id="vhOv">',
+      '<div id="vhHead">',
+      '<h2>☀ Hoy — ¿A quién contactás?</h2>',
+      '<span class="vh-sub" id="vhSub"></span>',
+      '<button class="vh-cerrar" onclick="window.toggleVistaHoy()">← Volver al Kanban</button>',
+      '</div>',
+      '<div id="vhLista"></div>',
+      '</div>'
+    ].join(''));
+
+    function urgPrio(c){
+      if(c.alerta==='ATRASADO'&&c.etapa==='Caliente')return 0;
+      if(c.etapa==='Caliente')return 1;
+      if(c.alerta==='ATRASADO'&&c.etapa==='Media')return 2;
+      if(c.etapa==='Media')return 3;
+      if(c.alerta==='ATRASADO'&&c.etapa==='Tibio')return 4;
+      if(c.etapa==='Tibio')return 5;
+      if(c.alerta==='ATRASADO'&&c.etapa==='Fria')return 6;
+      if(c.etapa==='Fria'&&(c.dias_desde_contacto||0)>45)return 7;
+      return 99;
+    }
+
+    function buildLista(){
+      return DATA.filter(function(c){
+        var d=c.dias_desde_contacto||0;
+        if(c.etapa==='Caliente')return true;
+        if(c.alerta==='ATRASADO')return true;
+        if(c.etapa==='Media'&&d>20)return true;
+        if((c.etapa==='Tibio')&&d>30)return true;
+        if(c.etapa==='Fria'&&d>60)return true;
+        return false;
+      }).sort(function(a,b){
+        var pa=urgPrio(a),pb=urgPrio(b);
+        return pa!==pb?pa-pb:(b.dias_desde_contacto||0)-(a.dias_desde_contacto||0);
+      }).slice(0,60);
+    }
+
+    function borderClass(c){
+      if(c.etapa==='Caliente'||c.alerta==='ATRASADO')return'urgente';
+      if(c.etapa==='Media'||c.etapa==='Tibio')return'media';
+      return'fria';
+    }
+
+    function renderVistaHoy(){
+      var lista=buildLista();
+      var sub='';
+      var cal=lista.filter(function(c){return c.etapa==='Caliente';}).length;
+      var atr=lista.filter(function(c){return c.alerta==='ATRASADO';}).length;
+      if(cal)sub+=cal+' calientes  ';
+      if(atr)sub+=atr+' atrasados';
+      document.getElementById('vhSub').textContent=sub.trim()||lista.length+' contactos para hoy';
+
+      if(!lista.length){
+        document.getElementById('vhLista').innerHTML='<div id="vhEmpty"><div class="vh-em-icon">✅</div><div>Todo al día — no hay contactos urgentes hoy.</div></div>';
+        return;
+      }
+
+      document.getElementById('vhLista').innerHTML=lista.map(function(c,i){
+        var idx=DATA.indexOf(c);
+        var etapas=['Caliente','Media','Tibio','Fria','Sin Etapa'];
+        var etapaOpts=etapas.map(function(e){return'<option value="'+e+'"'+(c.etapa===e?' selected':'')+'>'+e+'</option>';}).join('');
+        var etapaColor={Caliente:'#ef4444',Media:'#f59e0b',Tibio:'#f97316',Fria:'#3b82f6'}[c.etapa]||'#6b7280';
+        var diasCls=(c.dias_desde_contacto||0)>90?'alto':'';
+        var pa=c.proxima_accion?'<span class="vh-pa">'+_esc2(c.proxima_accion)+'</span>':
+               c.antecedente?_esc2(c.antecedente):'<span style="color:#a09fc0;font-style:italic">Sin próxima acción definida</span>';
+        var nec=c.necesidad?' · <em>'+_esc2(c.necesidad)+'</em>':'';
+        return[
+          '<div class="vh-card '+borderClass(c)+'" id="vhc'+i+'">',
+          '<div class="vh-card-top">',
+          '<div class="vh-av" style="background:'+avBg(c.nombre)+'">'+avIni(c.nombre)+'</div>',
+          '<div class="vh-nombre">'+_esc2(c.nombre)+'</div>',
+          '<span class="vh-badge" style="background:'+etapaColor+'">'+_esc2(c.etapa||'Sin Etapa')+'</span>',
+          '<span class="vh-dias '+diasCls+'">'+(c.dias_desde_contacto||0)+'d</span>',
+          '</div>',
+          '<div class="vh-contexto">'+pa+nec+'</div>',
+          '<div class="vh-acciones">',
+          c.whatsapp_url?'<button class="vh-btn wa" onclick="window.open(\''+c.whatsapp_url+'\',\'_blank\')">📱 WhatsApp</button>':'',
+          '<button class="vh-btn cont" onclick="window.vhContacte('+i+','+idx+',this)">✓ Contacté hoy</button>',
+          '<select class="vh-etapa-sel" onchange="window.vhCambiarEtapa('+i+','+idx+',this.value)" title="Cambiar etapa">'+etapaOpts+'</select>',
+          '<button class="vh-btn det" onclick="cerrarVistaHoyTemp();abrirDetalle('+idx+')">Ver detalle →</button>',
+          '</div>',
+          '</div>'
+        ].join('');
+      }).join('');
+    }
+
+    window.toggleVistaHoy=function(){
+      _hoyActivo=!_hoyActivo;
+      var ov=document.getElementById('vhOv');
+      var btn=document.getElementById('btnVistaHoy');
+      if(_hoyActivo){
+        renderVistaHoy();
+        ov.classList.add('activo');
+        btn.style.background='#fef3c7';
+        btn.style.borderColor='#f59e0b';
+        btn.style.color='#92400e';
+      } else {
+        ov.classList.remove('activo');
+        btn.style.background='#fff8e1';
+        btn.style.borderColor='#fde68a';
+        btn.style.color='#92400e';
+      }
+    };
+
+    window.cerrarVistaHoyTemp=function(){
+      if(_hoyActivo){
+        document.getElementById('vhOv').classList.remove('activo');
+      }
+    };
+
+    window.vhContacte=function(li,idx,btn){
+      var c=DATA[idx];if(!c||!c.id)return;
+      var hoy=new Date();
+      var fec=(hoy.getDate()+'').padStart(2,'0')+'/'+(hoy.getMonth()+1+'').padStart(2,'0')+'/'+hoy.getFullYear();
+      btn.textContent='Guardando...';btn.disabled=true;
+      fetch('/contactos/'+c.id,{
+        method:'PUT',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({fecha_ultimo_contacto:fec})
+      }).then(function(r){return r.json();}).then(function(){
+        c.fecha_ultimo_contacto=fec;
+        c.dias_desde_contacto=0;
+        btn.textContent='✓ Listo';btn.style.background='#16a34a';
+        // Fade out card after 1.5s
+        setTimeout(function(){
+          var card=document.getElementById('vhc'+li);
+          if(card){card.style.transition='opacity .4s';card.style.opacity='0';setTimeout(function(){if(card.parentNode)card.parentNode.removeChild(card);},400);}
+          var sub=document.getElementById('vhSub');
+          if(sub){var n=document.querySelectorAll('#vhLista .vh-card').length-1;sub.textContent=n+' contactos pendientes';}
+        },1200);
+      }).catch(function(){btn.textContent='✓ Contacté hoy';btn.disabled=false;});
+    };
+
+    window.vhCambiarEtapa=function(li,idx,etapa){
+      var c=DATA[idx];if(!c||!c.id)return;
+      fetch('/contactos/'+c.id,{
+        method:'PUT',credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({etapa:etapa})
+      }).then(function(r){return r.json();}).then(function(){
+        c.etapa=etapa;
+        var card=document.getElementById('vhc'+li);
+        if(card){
+          card.className='vh-card '+borderClass(c);
+          var badge=card.querySelector('.vh-badge');
+          var etapaColor={Caliente:'#ef4444',Media:'#f59e0b',Tibio:'#f97316',Fria:'#3b82f6'}[etapa]||'#6b7280';
+          if(badge){badge.textContent=etapa;badge.style.background=etapaColor;}
+        }
+      }).catch(function(){});
+    };
+
+    // Activar Vista Hoy por defecto cuando carga
+    document.addEventListener('DOMContentLoaded',function(){
+      setTimeout(function(){if(typeof DATA!=='undefined'&&DATA.length)window.toggleVistaHoy();},600);
+    });
+
+  })();
+  /* ════════════════════════════════════════════════════ */
+
   /* ── Editar contacto desde el panel de detalle ── */
   (function(){
     var _esc=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
