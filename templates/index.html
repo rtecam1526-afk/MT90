@@ -349,6 +349,22 @@
         <label>Ambientes</label>
         <input id="acm-ambientes" type="number" placeholder="ej: 3" min="1" max="10" />
       </div>
+      <div class="acm-field">
+        <label>m² cubiertos</label>
+        <input id="acm-m2cub" type="number" placeholder="ej: 45" min="5" max="1000" />
+      </div>
+      <div class="acm-field">
+        <label>m² descubiertos</label>
+        <input id="acm-m2desc" type="number" placeholder="ej: 12" min="0" max="500" />
+      </div>
+      <div class="acm-field">
+        <label>Antigüedad (años)</label>
+        <input id="acm-antiguedad" type="number" placeholder="ej: 30" min="0" max="120" />
+      </div>
+      <div class="acm-field">
+        <label>Amenities</label>
+        <input id="acm-amenities" type="text" placeholder="pileta, gym, SUM…" style="width:160px" />
+      </div>
       <button id="acm-submit" onclick="generarACM()">Generar ACM →</button>
     </div>
   </div>
@@ -356,10 +372,6 @@
 
 <div id="input-bar">
   <div class="input-wrap">
-    <button id="radar-btn" class="tool-btn" onclick="toggleRadar()" title="Incluir datos del radar como contexto">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49M19.07 4.93a10 10 0 0 1 0 14.14M7.76 16.24a6 6 0 0 1 0-8.49M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>
-      Radar del día
-    </button>
     <button id="acm-btn" class="tool-btn" onclick="toggleACM()" title="Generar ACM con datos de Zonaprop">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg>
       ACM
@@ -586,11 +598,15 @@
   }
 
   async function generarACM() {
-    const barrio    = document.getElementById("acm-barrio").value.trim();
-    const direccion = document.getElementById("acm-direccion").value.trim();
-    const tipo      = document.getElementById("acm-tipo").value;
-    const m2        = document.getElementById("acm-m2").value;
-    const ambientes = document.getElementById("acm-ambientes").value;
+    const barrio      = document.getElementById("acm-barrio").value.trim();
+    const direccion   = document.getElementById("acm-direccion").value.trim();
+    const tipo        = document.getElementById("acm-tipo").value;
+    const m2          = document.getElementById("acm-m2").value;
+    const ambientes   = document.getElementById("acm-ambientes").value;
+    const m2cub       = document.getElementById("acm-m2cub").value;
+    const m2desc      = document.getElementById("acm-m2desc").value;
+    const antiguedad  = document.getElementById("acm-antiguedad").value;
+    const amenities   = document.getElementById("acm-amenities").value.trim();
 
     if (!barrio) { document.getElementById("acm-barrio").focus(); return; }
     if (enviando) return;
@@ -600,10 +616,15 @@
     document.getElementById("acm-panel").classList.remove("open");
     document.getElementById("acm-btn").classList.remove("activo");
 
-    const resumen = `ACM · ${barrio.charAt(0).toUpperCase()+barrio.slice(1)}${direccion ? ` · ${direccion}` : ""} · ${tipo}${m2 ? ` · ${m2} m²` : ""}${ambientes ? ` · ${ambientes} amb` : ""}`;
+    const resumen = `ACM · ${barrio.charAt(0).toUpperCase()+barrio.slice(1)}${direccion ? ` · ${direccion}` : ""} · ${tipo}${m2 ? ` · ${m2} m²` : ""}${ambientes ? ` · ${ambientes} amb` : ""}${antiguedad ? ` · ${antiguedad} años` : ""}${amenities ? ` · ${amenities}` : ""}`;
     agregarMensaje("user", resumen, null);
 
-    await streamRespuesta("/acm", {barrio, tipo, m2: m2||null, ambientes: ambientes||null, direccion: direccion||null});
+    await streamRespuesta("/acm", {
+      barrio, tipo, direccion: direccion||null,
+      m2: m2||null, ambientes: ambientes||null,
+      m2cub: m2cub||null, m2desc: m2desc||null,
+      antiguedad: antiguedad||null, amenities: amenities||null
+    });
 
     enviando = false;
     document.getElementById("acm-submit").disabled = false;
