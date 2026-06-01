@@ -206,8 +206,7 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
 .btn-topbar:hover { background:#ecebfb !important; border-color:#5b5ee0 !important; color:#3a3ad0 !important; }
 .daily-badge { background:#f6f6fa !important; border-color:#ececf3 !important; color:#4a4861 !important; border-radius:7px !important; }
 .daily-badge:hover { background:#ecebfb !important; }
-.btn-resumen { background:#f6f6fa !important; border:1px solid #ececf3 !important; color:#4a4861 !important; font-family:"Inter",sans-serif !important; font-size:.78rem !important; border-radius:7px !important; text-transform:none !important; letter-spacing:0 !important; }
-.btn-resumen:hover { background:#ecebfb !important; border-color:#5b5ee0 !important; color:#3a3ad0 !important; }
+.btn-resumen { display:none !important; }
 
 /* ── Sidebar ── */
 .sidebar { background:#ffffff !important; border-right:1px solid #ececf3 !important; }
@@ -1375,8 +1374,10 @@ PASO 5 — Aplicá descuentos adicionales si la propiedad tiene características
    - Antigüedad > 50 años: restar 12% adicional
    - Planta baja o primer piso sin ascensor: restar 6% adicional
    - Superficie cubierta < 40m²: restar 5% adicional
-   - Sin cochera en zona donde la mayoría tiene: restar 4% adicional
-   Solo aplicá los descuentos que correspondan. Podés combinarlos.
+   - Sin amenities en zona donde la mayoría tiene (pileta, gym, SUM): restar 5% adicional
+   - Si tiene amenities y la mayoría de comparables no: sumar 5% al precio base
+   - m² descubiertos (patio, terraza, balcón grande): suman valor pero menos que los cubiertos. Consideralos a un 40% del valor del m² cubierto.
+   Solo aplicá los ajustes que correspondan según los datos recibidos.
 
 PASO 6 — Precio de publicación sugerido = precio/m² base ajustado × m² de la propiedad.
 
@@ -1411,20 +1412,27 @@ def acm():
     sid  = get_sid()
     data = request.get_json()
 
-    barrio     = (data.get("barrio")    or "").strip()
-    tipo       = (data.get("tipo")      or "departamento").strip()
-    m2         = data.get("m2")
-    ambientes  = data.get("ambientes")
-    direccion  = (data.get("direccion") or "").strip() or None
+    barrio      = (data.get("barrio")     or "").strip()
+    tipo        = (data.get("tipo")       or "departamento").strip()
+    m2          = data.get("m2")
+    ambientes   = data.get("ambientes")
+    direccion   = (data.get("direccion")  or "").strip() or None
+    m2cub       = data.get("m2cub")
+    m2desc      = data.get("m2desc")
+    antiguedad  = data.get("antiguedad")
+    amenities   = (data.get("amenities")  or "").strip() or None
 
     if not barrio:
         return {"error": "Barrio requerido"}, 400
 
     try:
-        m2_int  = int(m2)        if m2        else None
-        amb_int = int(ambientes) if ambientes  else None
+        m2_int    = int(m2)         if m2         else None
+        amb_int   = int(ambientes)  if ambientes  else None
+        m2cub_int = int(m2cub)      if m2cub      else None
+        m2desc_int= int(m2desc)     if m2desc     else None
+        antig_int = int(antiguedad) if antiguedad else None
     except (ValueError, TypeError):
-        m2_int = amb_int = None
+        m2_int = amb_int = m2cub_int = m2desc_int = antig_int = None
 
     agente_key  = _agentes.get(sid, "gabriela")
     agente_info = cfg.AGENTES.get(agente_key, cfg.AGENTES["gabriela"])
@@ -1485,11 +1493,22 @@ def acm():
             barrio, tipo, m2_int, amb_int, comparables,
             direccion=direccion, radio_km=1.0 if direccion else None
         )
+        # Agregar datos específicos de la propiedad objetivo
+        prop_extra = []
+        if m2cub_int:   prop_extra.append(f"m² cubiertos: {m2cub_int}")
+        if m2desc_int:  prop_extra.append(f"m² descubiertos: {m2desc_int}")
+        if antig_int is not None: prop_extra.append(f"Antigüedad: {antig_int} años")
+        if amenities:   prop_extra.append(f"Amenities: {amenities}")
+        if prop_extra:
+            datos_texto += "\n\nDATOS ESPECÍFICOS DE LA PROPIEDAD OBJETIVO:\n" + "\n".join(prop_extra)
+
         prompt_acm  = ACM_PROMPT.format(datos=datos_texto, fecha_hoy=datetime.now().strftime("%d/%m/%Y"))
 
         history = _historiales.get(sid, [])
-        dir_txt = f", Dirección: {direccion}" if direccion else ""
-        history.append({"role": "user", "content": f"[ACM solicitado] Barrio: {barrio.title()}, Tipo: {tipo}, m²: {m2_int or 'n/d'}, Ambientes: {amb_int or 'n/d'}{dir_txt}"})
+        dir_txt  = f", Dirección: {direccion}" if direccion else ""
+        antig_txt = f", {antig_int} años" if antig_int else ""
+        am_txt   = f", {amenities}" if amenities else ""
+        history.append({"role": "user", "content": f"[ACM solicitado] Barrio: {barrio.title()}, Tipo: {tipo}, m²: {m2_int or 'n/d'}, Cub: {m2cub_int or 'n/d'}, Desc: {m2desc_int or 'n/d'}, Amb: {amb_int or 'n/d'}{antig_txt}{am_txt}{dir_txt}"})
 
         respuesta_completa = ""
         try:
