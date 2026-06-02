@@ -9,17 +9,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg:          #f6f6fa;
-      --panel:       #ffffff;
-      --border:      #ececf3;
-      --border-soft: #f4f3fb;
-      --ink:         #1a1830;
-      --ink2:        #4a4861;
-      --mute:        #76748a;
-      --mute2:       #8b89a4;
-      --accent:      #5b5ee0;
-      --accent-deep: #3a3ad0;
-      --accent-bg:   #ecebfb;
+      --bg:          #FBF6F0;
+      --panel:       #FFFFFF;
+      --border:      #EBE2D6;
+      --border-soft: #F6EFE7;
+      --ink:         #2A2530;
+      --ink2:        #4A3F38;
+      --mute:        #8C8475;
+      --mute2:       #B6AE9F;
+      --accent:      #E0633A;
+      --accent-deep: #C84E28;
+      --accent-bg:   #FBEAE2;
       --red:         #ef4f5b;
       --red-bg:      #fce7e9;
       --green:       #16a374;
@@ -27,7 +27,7 @@
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: 'Hanken Grotesk', system-ui, sans-serif;
       background: var(--bg);
       color: var(--ink);
       height: 100vh;
@@ -50,7 +50,7 @@
     .logo { display: flex; align-items: center; gap: 10px; }
     .logo-mark {
       width: 30px; height: 30px; border-radius: 7px;
-      background: linear-gradient(135deg, #6e6ff0, #3a3ad0);
+      background: linear-gradient(135deg, #E0633A, #C84E28);
       color: #fff; display: grid; place-items: center;
       font-weight: 700; font-size: 14px; flex-shrink: 0;
     }
@@ -234,7 +234,7 @@
       cursor: pointer; flex-shrink: 0; font-family: inherit;
       transition: background .15s;
     }
-    #enviar:hover    { background: var(--accent); }
+    #enviar:hover    { background: var(--accent-deep); }
     #enviar:disabled { background: var(--border); color: var(--mute); cursor: not-allowed; }
     .hint { font-size: .72rem; color: var(--mute2); margin-top: 8px; max-width: 900px; }
 

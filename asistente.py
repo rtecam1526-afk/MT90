@@ -1492,17 +1492,9 @@ body,
 @login_required
 def crm():
     agente_key = session.get("agente_key", "gabriela")
-    _here = os.path.dirname(__file__)
-    for candidate in [
-        os.path.join(_here, f"{agente_key}.html"),
-        os.path.join(_here, "crm", f"{agente_key}.html"),
-    ]:
-        if os.path.exists(candidate):
-            with open(candidate, encoding="utf-8") as f:
-                content = f.read()
-            agente_js = f'<script>window._AGENTE_KEY="{agente_key}";</script>'
-            return content + agente_js + _SUPA_INJECT, 200, {"Content-Type": "text/html; charset=utf-8"}
-    return redirect(url_for("index"))
+    agente_data = cfg.AGENTES.get(agente_key, {})
+    agente_nombre = agente_data.get("nombre", agente_key.capitalize())
+    return render_template("crm.html", agente_key=agente_key, agente_nombre=agente_nombre)
 
 
 @app.route("/")

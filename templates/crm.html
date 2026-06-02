@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MT90 Tracción</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/crm.css">
+<style>
+/* Spinner keyframe needed before React mounts */
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+// Inyectado por Flask: agente activo
+window._AGENTE_KEY    = "{{ agente_key }}";
+window._AGENTE_NOMBRE = "{{ agente_nombre }}";
+
+// API wrapper para llamadas al backend Flask
+window.CRM_API = {
+  _fetch: async function(method, path, body) {
+    const opts = {
+      method: method,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    const r = await fetch(path, opts);
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error(txt || ('HTTP ' + r.status));
+    }
+    return r.json();
+  },
+  get:    function(p)    { return window.CRM_API._fetch('GET', p, undefined); },
+  post:   function(p, b) { return window.CRM_API._fetch('POST', p, b); },
+  put:    function(p, b) { return window.CRM_API._fetch('PUT', p, b); },
+  delete: function(p)    { return window.CRM_API._fetch('DELETE', p, undefined); },
+};
+</script>
+
+<!-- React 18 + Babel in-browser (CDN) -->
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Componentes CRM (orden importa) -->
+<script type="text/babel" src="/static/crm-components.jsx"></script>
+<script type="text/babel" src="/static/crm-data.jsx"></script>
+<script type="text/babel" src="/static/crm-views.jsx"></script>
+<script type="text/babel" src="/static/crm-semana.jsx"></script>
+<script type="text/babel" src="/static/crm-extras.jsx"></script>
+<script type="text/babel" src="/static/crm-agente.jsx"></script>
+<script type="text/babel" src="/static/crm-campanas.jsx"></script>
+<script type="text/babel" src="/static/crm-revision.jsx"></script>
+<script type="text/babel" src="/static/crm-tweaks.jsx"></script>
+<script type="text/babel" src="/static/crm-app.jsx"></script>
+</body>
+</html>
