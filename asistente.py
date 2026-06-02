@@ -150,7 +150,8 @@ def upload_radar():
 
 _SUPA_INJECT = r"""
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Hanken+Grotesque:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ================================================================
    AURORA CRM OVERRIDE  —  injected into legacy McKinsey CRM HTML
@@ -376,6 +377,56 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
 [style*="color:#86bc25"],[style*="color: #86bc25"] { color:#5b5ee0 !important; }
 [style*="color:#c8e87a"],[style*="color: #c8e87a"] { color:#ecebfb !important; }
 [style*="border-color:#86bc25"] { border-color:#5b5ee0 !important; }
+
+/* ════════════════════════════════════════════════════════
+   WARM REDESIGN — paleta cálida y tipografía nueva
+   primary #E0633A coral · bg #FBF6F0 crema · ink #2A2530
+   Fuentes: Bricolage Grotesque (títulos) · Hanken Grotesque (body)
+   ════════════════════════════════════════════════════════ */
+:root {
+  --wr-primary:   #E0633A;
+  --wr-primary-d: #c4431e;
+  --wr-soft:      #FBE9E0;
+  --wr-soft-b:    #F2C4B0;
+  --wr-bg:        #FBF6F0;
+  --wr-sf2:       #F6EFE7;
+  --wr-line:      #EBE2D6;
+  --wr-line-s:    #DED2C2;
+  --wr-ink:       #2A2530;
+  --wr-mute:      #8C8475;
+  --wr-mute2:     #B6AE9F;
+  --wr-wa:        #1FB855;
+  --wr-wa-d:      #149B45;
+  --wr-radius:    18px;
+  --wr-radius-sm: 12px;
+}
+
+/* Background warm cream */
+body,
+.main-content,.view-container,main,.main,
+.kanban-section { background:var(--wr-bg) !important; }
+
+/* Topbar button warm */
+.btn-topbar {
+  background:var(--wr-sf2) !important; border:1px solid var(--wr-line) !important;
+  color:var(--wr-ink) !important; border-radius:9px !important;
+}
+.btn-topbar:hover { background:var(--wr-soft) !important; border-color:var(--wr-soft-b) !important; color:var(--wr-primary) !important; }
+
+/* Kanban card hover → coral */
+.card:hover { border-color:var(--wr-soft-b) !important; box-shadow:0 2px 6px rgba(224,99,58,.1) !important; }
+.card.selected { border-color:var(--wr-primary) !important; background:var(--wr-soft) !important; }
+
+/* Sidebar active → coral */
+.nav-item.active { background:var(--wr-soft) !important; border-left-color:var(--wr-primary) !important; color:var(--wr-primary-d) !important; }
+.fb.on { background:var(--wr-soft) !important; border-left-color:var(--wr-primary) !important; color:var(--wr-primary-d) !important; }
+
+/* Sync dot coral */
+.sync-dot { background:var(--wr-primary) !important; }
+
+/* Detail button coral */
+.detail-cont-btn { background:var(--wr-primary) !important; }
+.detail-cont-btn:hover { background:var(--wr-primary-d) !important; }
 </style>
 
 <script>
@@ -942,205 +993,393 @@ body { font-family:"Inter",system-ui,sans-serif !important; background:#f6f6fa !
   /* ════════════════════════════════════════════════════ */
 
   /* ════════════════════════════════════════════════════
-     VISTA HOY — pantalla de trabajo diario
+     VISTA HOY — rediseño cálido (PersonCards + Modo Enfoque)
+     Basado en Tracción - Rediseño UX.html
      ════════════════════════════════════════════════════ */
   (function(){
-    var _esc2=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
+    var _e=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
     var _hoyActivo=false;
+    var _modoEnfoque=false;
+    var _enfIdx=0;
+    var _hechos={}; // {id: bool}
+
+    /* ── Helpers ── */
+    var MESES_H=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    function tiempoSinH(d){
+      if(d===null||d===undefined)return 'Sin fecha de contacto';
+      if(d<7)return 'Hace '+d+' día'+(d===1?'':'s');
+      if(d<60)return 'Hace '+d+' días';
+      var m=Math.round(d/30);
+      if(m<12)return 'Hace '+m+' meses sin hablar';
+      return 'Hace más de '+Math.floor(d/365)+' año'+(d>=730?'s':'');
+    }
+    function esUrg(d){return d!==null&&d!==undefined&&d>120;}
+    function esCumpleHoyH(fn){
+      if(!fn)return false;
+      var now=new Date();
+      var mm=String(now.getMonth()+1).padStart(2,'0');
+      var dd=String(now.getDate()).padStart(2,'0');
+      if(fn.includes('-'))return fn.slice(5)===mm+'-'+dd;
+      var p=fn.split('/');
+      if(p.length>=2)return p[0].padStart(2,'0')===dd&&p[1].padStart(2,'0')===mm;
+      return false;
+    }
+    function lunesH(){var d=new Date();d.setDate(d.getDate()-((d.getDay()+6)%7));return d;}
+    function fechaCortaH(d){return d.getDate()+' de '+MESES_H[d.getMonth()];}
+    function etapaC(e){return{Caliente:'#DB5337',Media:'#D9912F',Tibio:'#D9912F',Fria:'#5E86B8'}[e]||'#A89C8C';}
+    function etapaS(e){return{Caliente:'#FBE7E0',Media:'#FAF0DC',Tibio:'#FAF0DC',Fria:'#E8EFF7'}[e]||'#F0EAE0';}
+    function getAgH(){
+      var g=document.getElementById('aurora-greet');
+      if(g){var m=g.textContent.match(/[Bb]uenos\s+\S+[,\s]+(\S+)/);if(m&&m[1])return m[1];}
+      return 'vos';
+    }
+    function buildListaH(){
+      if(typeof DATA==='undefined')return[];
+      var list=DATA.filter(function(c){
+        var d=c.dias_desde_contacto||0;
+        if(esCumpleHoyH(c.fecha_nacimiento))return true;
+        if(c.etapa==='Caliente')return true;
+        if(c.alerta==='ATRASADO')return true;
+        if(c.etapa==='Media'&&d>20)return true;
+        if(c.etapa==='Tibio'&&d>30)return true;
+        if(c.etapa==='Fria'&&d>60)return true;
+        return false;
+      });
+      list.sort(function(a,b){
+        var ca=esCumpleHoyH(a.fecha_nacimiento)?0:1,cb=esCumpleHoyH(b.fecha_nacimiento)?0:1;
+        if(ca!==cb)return ca-cb;
+        var PA={Caliente:0,Media:1,Tibio:1,Fria:2,'Sin Etapa':3,'':3};
+        var ea=PA[a.etapa]!==undefined?PA[a.etapa]:3,eb=PA[b.etapa]!==undefined?PA[b.etapa]:3;
+        if(ea!==eb)return ea-eb;
+        return(b.dias_desde_contacto||0)-(a.dias_desde_contacto||0);
+      });
+      return list.slice(0,60);
+    }
+    function waMsgH(c){
+      var nom=(c.nombre||'').split(' ')[0]||'Hola';
+      var nec=c.necesidad||'el inmueble';
+      var ag=getAgH();
+      var e=c.etapa||'';
+      if(esCumpleHoyH(c.fecha_nacimiento))return'¡Feliz cumpleaños, '+nom+'! Te deseo un día hermoso. Un fuerte abrazo 🎂';
+      if(e==='Caliente')return'Hola '+nom+'! ¿Cómo va todo? Te escribo para ver cómo estamos con lo de '+nec+'. Cualquier novedad me avisás 🏠';
+      if(e==='Media'||e==='Tibio')return'Hola '+nom+'! ¿Cómo estás? Quería ver si seguís con planes de '+nec+'. Estoy disponible cuando lo necesites 👋';
+      return'Hola '+nom+'! Soy '+ag+' de RE/MAX. Hace un tiempo hablamos sobre '+nec+'. ¿Sigue vigente? 🙌';
+    }
 
     /* ── Botón "Hoy" en topbar ── */
     var hoyTabBtn=document.createElement('button');
     hoyTabBtn.id='btnVistaHoy';
     hoyTabBtn.innerHTML='☀ Hoy';
-    hoyTabBtn.style.cssText='background:#fff8e1;border:1px solid #fde68a;color:#92400e;font-weight:700;font-family:Inter,system-ui,sans-serif;font-size:.78rem;padding:5px 14px;border-radius:7px;cursor:pointer;transition:all .15s';
-    hoyTabBtn.onmouseover=function(){this.style.background='#fef3c7';};
-    hoyTabBtn.onmouseout=function(){if(!_hoyActivo)this.style.background='#fff8e1';};
+    hoyTabBtn.style.cssText='background:#FBE9E0;border:1px solid #F2C4B0;color:#E0633A;font-weight:700;font-family:"Hanken Grotesque",Inter,system-ui,sans-serif;font-size:.78rem;padding:5px 14px;border-radius:9px;cursor:pointer;transition:all .15s';
+    hoyTabBtn.onmouseover=function(){this.style.background='#F2C4B0';};
+    hoyTabBtn.onmouseout=function(){if(!_hoyActivo)this.style.background='#FBE9E0';};
     hoyTabBtn.onclick=function(){window.toggleVistaHoy();};
     var topActs=document.querySelector('.topbar-actions');
     if(topActs)topActs.insertBefore(hoyTabBtn,topActs.firstChild);
 
-    /* ── Overlay HTML ── */
+    /* ── Overlay HTML + CSS ── */
     document.body.insertAdjacentHTML('beforeend',[
       '<style>',
-      '#vhOv{position:fixed;inset:0;top:48px;background:#f6f6fa;z-index:500;overflow-y:auto;display:none;font-family:Inter,system-ui,sans-serif}',
+      '#vhOv{position:fixed;inset:0;top:48px;background:#FBF6F0;z-index:500;overflow-y:auto;display:none;font-family:"Hanken Grotesque",Inter,system-ui,sans-serif}',
       '#vhOv.activo{display:block}',
-      '#vhHead{background:#fff;border-bottom:1px solid #ececf3;padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:2}',
-      '#vhHead h2{font-size:1rem;font-weight:700;color:#1a1830;margin:0;flex:1}',
-      '#vhHead .vh-sub{font-size:.78rem;color:#76748a}',
-      '#vhHead .vh-cerrar{background:#f6f6fa;border:1px solid #ececf3;color:#76748a;padding:6px 14px;border-radius:7px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit}',
-      '#vhHead .vh-cerrar:hover{background:#ececf3;color:#1a1830}',
-      '#vhLista{padding:16px 20px;display:flex;flex-direction:column;gap:10px;max-width:860px;margin:0 auto}',
-      '.vh-card{background:#fff;border-radius:12px;border:1px solid #ececf3;padding:16px 18px;box-shadow:0 1px 3px rgba(26,24,48,.04)}',
-      '.vh-card.urgente{border-left:4px solid #ef4444}',
-      '.vh-card.media{border-left:4px solid #f59e0b}',
-      '.vh-card.fria{border-left:4px solid #3b82f6}',
-      '.vh-card-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}',
-      '.vh-av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:.9rem;flex-shrink:0;width:44px;height:44px}',
-      '.vh-nombre{font-weight:700;font-size:.97rem;color:#1a1830;flex:1}',
-      '.vh-badge{font-size:.67rem;font-weight:700;padding:2px 9px;border-radius:10px;color:#fff;text-transform:uppercase;letter-spacing:.04em}',
-      '.vh-dias{font-size:.75rem;font-weight:600;color:#76748a;white-space:nowrap}',
-      '.vh-dias.alto{color:#ef4444}',
-      '.vh-contexto{font-size:.82rem;color:#476280;margin-bottom:12px;line-height:1.45;padding-left:56px}',
-      '.vh-contexto .vh-pa{color:#1a1830;font-weight:600}',
-      '.vh-acciones{display:flex;gap:8px;flex-wrap:wrap;padding-left:56px}',
-      '.vh-btn{padding:7px 14px;border-radius:8px;font-size:.77rem;font-weight:600;cursor:pointer;font-family:inherit;border:none;transition:all .15s;white-space:nowrap}',
-      '.vh-btn.wa{background:#25d366;color:#fff}.vh-btn.wa:hover{background:#1db855}',
-      '.vh-btn.cont{background:#1a1830;color:#fff}.vh-btn.cont:hover{background:#5b5ee0}',
-      '.vh-btn.det{background:#f6f6fa;color:#1a1830;border:1px solid #ececf3}.vh-btn.det:hover{background:#ececf3}',
-      '.vh-etapa-sel{padding:7px 10px;border:1px solid #ececf3;border-radius:8px;font-size:.77rem;font-weight:600;font-family:inherit;background:#f6f6fa;color:#1a1830;cursor:pointer}',
-      '.vh-etapa-sel:focus{outline:none;border-color:#5b5ee0}',
-      '#vhEmpty{text-align:center;padding:60px 20px;color:#76748a;font-size:.9rem}',
-      '#vhEmpty .vh-em-icon{font-size:2.5rem;margin-bottom:12px}',
+      /* ── Topbar ── */
+      '#vhBar{background:#fff;border-bottom:1px solid #EBE2D6;padding:12px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:2}',
+      '#vhBar .vb-cerrar{background:#F6EFE7;border:1px solid #EBE2D6;color:#8C8475;padding:6px 14px;border-radius:9px;font-size:.78rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}',
+      '#vhBar .vb-cerrar:hover{background:#EBE2D6;color:#2A2530}',
+      '#vhBar .vb-modo{display:flex;gap:4px;background:#F6EFE7;padding:4px;border-radius:999px;margin-left:auto}',
+      '#vhBar .vb-modo button{padding:7px 16px;border-radius:999px;font-weight:600;font-size:.75rem;color:#8C8475;background:transparent;border:none;cursor:pointer;font-family:inherit;transition:all .14s}',
+      '#vhBar .vb-modo button.active{background:#fff;color:#2A2530;box-shadow:0 1px 3px rgba(60,40,20,.07)}',
+      '#vhContent{max-width:760px;margin:0 auto;padding:32px 20px 100px}',
+      /* ── Greeting ── */
+      '.vh-greeting{margin-bottom:26px}',
+      '.vh-prep-chip{display:inline-flex;align-items:center;gap:7px;background:#FBE9E0;color:#E0633A;font-weight:700;font-size:.75rem;padding:5px 13px;border-radius:999px;margin-bottom:12px}',
+      '.vh-hello{font-family:"Bricolage Grotesque",Inter,system-ui,sans-serif;font-size:2rem;font-weight:700;letter-spacing:-.02em;line-height:1.15;margin:0 0 6px;color:#2A2530}',
+      '.vh-hello .acc{color:#E0633A}',
+      '.vh-sub{font-size:1rem;color:#8C8475;margin:0}',
+      '.vh-sub b{color:#2A2530;font-weight:700}',
+      /* ── Birthday banner ── */
+      '.vh-bday{display:flex;align-items:center;gap:14px;background:linear-gradient(100deg,#FDF1E3,#FBE7EE);border:1px solid #F3D9C4;border-radius:16px;padding:14px 18px;margin-bottom:16px;cursor:pointer;transition:transform .14s,box-shadow .16s}',
+      '.vh-bday:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(194,85,61,.1)}',
+      '.vh-bday-ic{font-size:22px;flex-shrink:0;color:#C2553D}',
+      '.vh-bday-tx{flex:1;font-size:.85rem;color:#2A2530;line-height:1.4}',
+      '.vh-bday-tx b{font-weight:700}',
+      '.vh-bday-go{font-size:.82rem;font-weight:700;color:#C2553D;white-space:nowrap}',
+      /* ── Day bar ── */
+      '.vh-daybar{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid #EBE2D6;border-radius:16px;padding:14px 18px;margin-bottom:20px;box-shadow:0 1px 3px rgba(60,40,20,.04)}',
+      '.vh-daybar .db-count{font-weight:700;font-size:.87rem;white-space:nowrap;color:#2A2530}',
+      '.vh-daybar .db-count b{color:#149B45}',
+      '.vh-daybar .db-track{flex:1;height:10px;background:#F6EFE7;border-radius:999px;overflow:hidden}',
+      '.vh-daybar .db-fill{height:100%;background:#1FB855;border-radius:999px;transition:width .4s cubic-bezier(.4,0,.2,1)}',
+      /* ── PersonCard ── */
+      '.pc{background:#fff;border:1px solid #EBE2D6;border-radius:18px;padding:20px 22px;box-shadow:0 1px 3px rgba(60,40,20,.04);transition:box-shadow .18s,border-color .18s;margin-bottom:12px}',
+      '.pc:hover{box-shadow:0 4px 16px rgba(60,40,20,.07);border-color:#DED2C2}',
+      '.pc.done{opacity:.5;background:#F6EFE7}',
+      '.pc.is-bday{border-color:#F3D9C4}',
+      '.pc-top{display:flex;align-items:center;gap:13px;cursor:pointer}',
+      '.pc-av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex-shrink:0;width:48px;height:48px;font-family:"Bricolage Grotesque",Inter,sans-serif;font-size:1rem}',
+      '.pc-id{flex:1;min-width:0}',
+      '.pc-name{font-weight:700;font-size:1.05rem;letter-spacing:-.01em;margin:0;color:#2A2530;font-family:"Bricolage Grotesque",Inter,sans-serif}',
+      '.pc-need{font-size:.83rem;color:#8C8475;margin:2px 0 0}',
+      '.pc-stag{display:inline-flex;align-items:center;gap:6px;padding:5px 12px 5px 10px;border-radius:999px;font-size:.75rem;font-weight:700;flex-shrink:0}',
+      '.pc-stag .sd{width:7px;height:7px;border-radius:50%}',
+      '.pc-action{margin:14px 0 0;padding:11px 14px;background:#F6EFE7;border-radius:12px;font-size:.86rem;color:#2A2530;display:flex;gap:8px;align-items:flex-start;line-height:1.45}',
+      '.pc-action .lbl{font-weight:700;color:#E0633A;white-space:nowrap}',
+      '.pc-meta{margin-top:10px;font-size:.78rem;color:#B6AE9F;font-weight:500}',
+      '.pc-meta.warn{color:#DB5337;font-weight:600}',
+      '.pc-acts{display:flex;gap:9px;margin-top:16px;flex-wrap:wrap}',
+      '.pc-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 18px;border-radius:12px;font-weight:700;font-size:.85rem;cursor:pointer;border:none;font-family:inherit;transition:all .14s;white-space:nowrap}',
+      '.pc-btn:active{transform:scale(.97)}',
+      '.pc-btn.wa{background:#1FB855;color:#fff;flex:1;min-width:120px}.pc-btn.wa:hover{background:#149B45}',
+      '.pc-btn.done-btn{background:#fff;color:#2A2530;border:1.5px solid #DED2C2}.pc-btn.done-btn:hover{background:#F6EFE7}',
+      '.pc-btn.done-btn.is-done{background:#2A2530;color:#fff;border-color:#2A2530}',
+      '.pc-btn.ghost{background:transparent;color:#8C8475;padding:11px 13px}.pc-btn.ghost:hover{background:#F6EFE7;color:#2A2530}',
+      /* ── All done ── */
+      '.vh-alldone{text-align:center;padding:60px 24px;background:#fff;border-radius:22px;border:1px solid #EBE2D6}',
+      '.vh-alldone .ad-em{font-size:3rem;margin-bottom:10px}',
+      '.vh-alldone h2{font-family:"Bricolage Grotesque",Inter,sans-serif;font-size:1.5rem;font-weight:700;margin:0 0 6px;color:#2A2530}',
+      '.vh-alldone p{color:#8C8475;margin:0;font-size:.93rem}',
+      /* ── Focus mode ── */
+      '.vh-focus-prog{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:14px}',
+      '.vh-focus-prog .fp-label{font-weight:600;color:#8C8475;font-size:.82rem;white-space:nowrap}',
+      '.vh-focus-prog .fp-track{flex:1;height:8px;background:#F6EFE7;border-radius:999px;overflow:hidden}',
+      '.vh-focus-prog .fp-fill{height:100%;background:#E0633A;border-radius:999px;transition:width .4s ease}',
+      '.vh-fcard{background:#fff;border:1px solid #EBE2D6;border-radius:22px;box-shadow:0 4px 20px rgba(60,40,20,.08);padding:36px 38px 30px;text-align:center}',
+      '.vh-fcard .fc-av{width:80px;height:80px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.6rem;color:#fff;margin:0 auto 14px;font-family:"Bricolage Grotesque",Inter,sans-serif}',
+      '.vh-fcard .fc-name{font-family:"Bricolage Grotesque",Inter,sans-serif;font-size:1.6rem;font-weight:700;margin:0 0 5px;color:#2A2530}',
+      '.vh-fcard .fc-meta{color:#8C8475;font-size:.87rem;margin:0 0 16px}',
+      '.vh-fcard .fc-chips{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-bottom:22px}',
+      '.vh-fcard .fc-chip{padding:6px 13px;border-radius:999px;background:#F6EFE7;color:#8C8475;font-size:.78rem;font-weight:600}',
+      '.vh-fblock{text-align:left;margin-bottom:18px}',
+      '.vh-fblock .fblbl{font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#B6AE9F;margin-bottom:7px}',
+      '.vh-fblock .fbtx{font-size:1rem;font-weight:600;color:#2A2530;line-height:1.45}',
+      '.vh-fblock .fbmsg{background:#F1FAF4;border:1px solid #CDEBD8;border-radius:12px;padding:14px 16px;font-size:.9rem;color:#1F4D33;line-height:1.5}',
+      '.vh-fcta{display:flex;gap:11px;margin-top:24px}',
+      '.vh-fcta .pc-btn.wa{flex:1;padding:14px;font-size:.96rem}',
+      '.vh-fnext{display:flex;gap:11px;margin-top:10px}',
+      '.fc-next-btn{flex:1;background:#E0633A;color:#fff;padding:14px;border-radius:13px;font-weight:700;font-size:.96rem;border:none;cursor:pointer;font-family:inherit;transition:filter .15s}',
+      '.fc-next-btn:hover{filter:brightness(1.08)}',
+      '.fc-back-btn{background:#fff;border:1.5px solid #DED2C2;color:#8C8475;padding:14px 20px;border-radius:13px;font-weight:600;font-size:.84rem;cursor:pointer;font-family:inherit}',
+      '.fc-back-btn:hover{color:#2A2530}',
       '</style>',
       '<div id="vhOv">',
-      '<div id="vhHead">',
-      '<h2>☀ Hoy — ¿A quién contactás?</h2>',
-      '<span class="vh-sub" id="vhSub"></span>',
-      '<button class="vh-cerrar" onclick="window.toggleVistaHoy()">← Volver al Kanban</button>',
+      '<div id="vhBar">',
+      '<button class="vb-cerrar" onclick="window.toggleVistaHoy()">← Kanban</button>',
+      '<div class="vb-modo">',
+      '<button id="vbLista" class="active" onclick="window.vhSetModo(false)">Lista del día</button>',
+      '<button id="vbEnfoque" onclick="window.vhSetModo(true)">Modo enfoque</button>',
       '</div>',
-      '<div id="vhLista"></div>',
+      '</div>',
+      '<div id="vhContent"></div>',
       '</div>'
     ].join(''));
 
-    function urgPrio(c){
-      if(c.alerta==='ATRASADO'&&c.etapa==='Caliente')return 0;
-      if(c.etapa==='Caliente')return 1;
-      if(c.alerta==='ATRASADO'&&c.etapa==='Media')return 2;
-      if(c.etapa==='Media')return 3;
-      if(c.alerta==='ATRASADO'&&c.etapa==='Tibio')return 4;
-      if(c.etapa==='Tibio')return 5;
-      if(c.alerta==='ATRASADO'&&c.etapa==='Fria')return 6;
-      if(c.etapa==='Fria'&&(c.dias_desde_contacto||0)>45)return 7;
-      return 99;
-    }
+    /* ── Render funciones ── */
 
-    function buildLista(){
-      return DATA.filter(function(c){
-        var d=c.dias_desde_contacto||0;
-        if(c.etapa==='Caliente')return true;
-        if(c.alerta==='ATRASADO')return true;
-        if(c.etapa==='Media'&&d>20)return true;
-        if((c.etapa==='Tibio')&&d>30)return true;
-        if(c.etapa==='Fria'&&d>60)return true;
-        return false;
-      }).sort(function(a,b){
-        var pa=urgPrio(a),pb=urgPrio(b);
-        return pa!==pb?pa-pb:(b.dias_desde_contacto||0)-(a.dias_desde_contacto||0);
-      }).slice(0,60);
-    }
+    function vhRenderLista(lista){
+      var total=lista.length;
+      var hechos=lista.filter(function(c){return _hechos[c.id];}).length;
+      var pct=total?Math.round(hechos/total*100):0;
+      var cumpleHoy=lista.filter(function(c){return esCumpleHoyH(c.fecha_nacimiento)&&!_hechos[c.id];});
+      var ag=getAgH();
+      var lunes=fechaCortaH(lunesH());
+      var pendientes=total-hechos;
 
-    function borderClass(c){
-      if(c.etapa==='Caliente'||c.alerta==='ATRASADO')return'urgente';
-      if(c.etapa==='Media'||c.etapa==='Tibio')return'media';
-      return'fria';
-    }
+      var html='';
+      // Greeting
+      html+='<div class="vh-greeting">';
+      html+='<div class="vh-prep-chip">✦ Preparado por Tracción · '+lunes+'</div>';
+      html+='<h1 class="vh-hello">Buenos días, <span class="acc">'+_e(ag)+'</span></h1>';
+      if(hechos<total){
+        html+='<p class="vh-sub">Esta semana revisé tus <b>'+(typeof DATA!=='undefined'?DATA.length:0)+' contactos</b> y te separé <b>'+pendientes+'</b> para saludar. Empezá por arriba.</p>';
+      } else {
+        html+='<p class="vh-sub">¡Hablaste con todos los que te preparé! Tu semana está al día. 🎉</p>';
+      }
+      html+='</div>';
 
-    function renderVistaHoy(){
-      var lista=buildLista();
-      var sub='';
-      var cal=lista.filter(function(c){return c.etapa==='Caliente';}).length;
-      var atr=lista.filter(function(c){return c.alerta==='ATRASADO';}).length;
-      if(cal)sub+=cal+' calientes  ';
-      if(atr)sub+=atr+' atrasados';
-      document.getElementById('vhSub').textContent=sub.trim()||lista.length+' contactos para hoy';
+      // Birthday banner
+      if(cumpleHoy.length){
+        var cb=cumpleHoy[0];
+        var cbIdx=DATA.indexOf(cb);
+        html+='<div class="vh-bday" onclick="cerrarVistaHoyTemp();abrirDetalle('+cbIdx+')">';
+        html+='<span class="vh-bday-ic">🎂</span>';
+        html+='<div class="vh-bday-tx"><b>Hoy cumple '+_e(cb.nombre.split(' ')[0])+(cumpleHoy.length>1?' y '+(cumpleHoy.length-1)+' más':'')+'.</b> Buena excusa para saludar y mantener el vínculo cálido.</div>';
+        html+='<span class="vh-bday-go">Saludar →</span>';
+        html+='</div>';
+      }
 
-      if(!lista.length){
-        document.getElementById('vhLista').innerHTML='<div id="vhEmpty"><div class="vh-em-icon">✅</div><div>Todo al día — no hay contactos urgentes hoy.</div></div>';
+      // Day bar
+      if(total){
+        html+='<div class="vh-daybar">';
+        html+='<span class="db-count"><b>'+hechos+'</b> de '+total+' contactados</span>';
+        html+='<div class="db-track"><div class="db-fill" style="width:'+pct+'%"></div></div>';
+        html+='</div>';
+      }
+
+      // All done
+      if(hechos>=total&&total>0){
+        html+='<div class="vh-alldone"><div class="ad-em">✅</div><h2>¡Listo por hoy!</h2><p>Hablaste con las '+total+' personas de tu lista. Mañana te preparo la próxima tanda.</p></div>';
+        document.getElementById('vhContent').innerHTML=html;
         return;
       }
 
-      document.getElementById('vhLista').innerHTML=lista.map(function(c,i){
+      // PersonCards — pendientes primero, luego completados
+      var pendList=lista.filter(function(c){return!_hechos[c.id];});
+      var doneList=lista.filter(function(c){return _hechos[c.id];});
+      var ordered=pendList.concat(doneList);
+
+      ordered.forEach(function(c){
+        var i=lista.indexOf(c);
         var idx=DATA.indexOf(c);
-        var etapas=['Caliente','Media','Tibio','Fria','Sin Etapa'];
-        var etapaOpts=etapas.map(function(e){return'<option value="'+e+'"'+(c.etapa===e?' selected':'')+'>'+e+'</option>';}).join('');
-        var etapaColor={Caliente:'#ef4444',Media:'#f59e0b',Tibio:'#f97316',Fria:'#3b82f6'}[c.etapa]||'#6b7280';
-        var diasCls=(c.dias_desde_contacto||0)>90?'alto':'';
-        var pa=c.proxima_accion?'<span class="vh-pa">'+_esc2(c.proxima_accion)+'</span>':
-               c.antecedente?_esc2(c.antecedente):'<span style="color:#a09fc0;font-style:italic">Sin próxima acción definida</span>';
-        var nec=c.necesidad?' · <em>'+_esc2(c.necesidad)+'</em>':'';
-        return[
-          '<div class="vh-card '+borderClass(c)+'" id="vhc'+i+'">',
-          '<div class="vh-card-top">',
-          '<div class="vh-av" style="background:'+avBg(c.nombre)+'">'+avIni(c.nombre)+'</div>',
-          '<div class="vh-nombre">'+_esc2(c.nombre)+'</div>',
-          '<span class="vh-badge" style="background:'+etapaColor+'">'+_esc2(c.etapa||'Sin Etapa')+'</span>',
-          '<span class="vh-dias '+diasCls+'">'+(c.dias_desde_contacto||0)+'d</span>',
-          '</div>',
-          '<div class="vh-contexto">'+pa+nec+'</div>',
-          '<div class="vh-acciones">',
-          c.whatsapp_url?'<button class="vh-btn wa" onclick="window.open(\''+c.whatsapp_url+'\',\'_blank\')">📱 WhatsApp</button>':'',
-          '<button class="vh-btn cont" onclick="window.vhContacte('+i+','+idx+',this)">✓ Contacté hoy</button>',
-          '<select class="vh-etapa-sel" onchange="window.vhCambiarEtapa('+i+','+idx+',this.value)" title="Cambiar etapa">'+etapaOpts+'</select>',
-          '<button class="vh-btn det" onclick="cerrarVistaHoyTemp();abrirDetalle('+idx+')">Ver detalle →</button>',
-          '</div>',
-          '</div>'
-        ].join('');
-      }).join('');
+        var isDone=!!_hechos[c.id];
+        var isBday=esCumpleHoyH(c.fecha_nacimiento);
+        var urgente=esUrg(c.dias_desde_contacto);
+        var stColor=etapaC(c.etapa),stSoft=etapaS(c.etapa);
+        var pa=isBday?'Saludar por su cumpleaños':c.proxima_accion||c.antecedente||'';
+        var msg=waMsgH(c);
+        var waUrl=c.whatsapp_url||c.whatsapp_link||'';
+        // WA URL with pre-filled message
+        var waHref=waUrl;
+        if(waUrl&&msg){var ph=waUrl.replace(/.*wa\.me\//,'').replace(/[^\d]/,'');if(ph)waHref='https://wa.me/'+ph+'?text='+encodeURIComponent(msg);}
+        html+='<div class="pc'+(isDone?' done':'')+(isBday?' is-bday':'')+'" id="vhpc'+i+'">';
+        if(isBday)html+='<div style="display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:700;color:#C2553D;background:#FDF1E3;padding:4px 11px;border-radius:999px;margin-bottom:10px">🎂 Hoy cumple años</div>';
+        html+='<div class="pc-top" onclick="cerrarVistaHoyTemp();abrirDetalle('+idx+')">';
+        html+='<div class="pc-av" style="background:'+avBg(c.nombre)+'">'+avIni(c.nombre)+'</div>';
+        html+='<div class="pc-id"><p class="pc-name">'+_e(c.nombre)+'</p><p class="pc-need">'+_e(c.necesidad||c.antecedente||'')+'</p></div>';
+        html+='<span class="pc-stag" style="background:'+stSoft+';color:'+stColor+'"><span class="sd" style="background:'+stColor+'"></span>'+_e(c.etapa||'Sin etapa')+'</span>';
+        html+='</div>';
+        if(pa){html+='<div class="pc-action"><span class="lbl">Hacer:</span><span>'+_e(pa)+'</span></div>';}
+        var diasTxt=tiempoSinH(c.dias_desde_contacto);
+        html+='<div class="pc-meta'+(urgente?' warn':'')+'">'+_e(diasTxt)+'</div>';
+        html+='<div class="pc-acts">';
+        html+='<button class="pc-btn wa" onclick="window.open(\''+waHref+'\',\'_blank\')">📱 '+( isBday?'Saludar':'WhatsApp')+'</button>';
+        html+='<button class="pc-btn done-btn'+(isDone?' is-done':'')+'" onclick="window.vhToggleDone('+i+','+idx+',this)">✓ '+(isDone?'Ya hablé':'Marcar como hablado')+'</button>';
+        html+='<button class="pc-btn ghost" onclick="cerrarVistaHoyTemp();abrirDetalle('+idx+')">Ver ficha</button>';
+        html+='</div>';
+        html+='</div>';
+      });
+
+      document.getElementById('vhContent').innerHTML=html;
     }
+
+    function vhRenderEnfoque(lista){
+      var pendientes=lista.filter(function(c){return!_hechos[c.id];});
+      var total=lista.length;
+      var hechos=total-pendientes.length;
+
+      if(_enfIdx>=pendientes.length&&pendientes.length>0)_enfIdx=0;
+      var p=pendientes[_enfIdx];
+
+      var html='';
+
+      if(!pendientes.length){
+        html='<div class="vh-alldone"><div class="ad-em">✅</div><h2>¡Listo por hoy!</h2><p>Hablaste con las '+total+' personas de tu lista. Mañana te preparo la próxima tanda.</p></div>';
+        document.getElementById('vhContent').innerHTML=html;
+        return;
+      }
+
+      // Progress
+      html+='<div class="vh-focus-prog">';
+      html+='<span class="fp-label">Persona '+(hechos+1)+' de '+total+'</span>';
+      html+='<div class="fp-track"><div class="fp-fill" style="width:'+(total?Math.round(hechos/total*100):0)+'%"></div></div>';
+      html+='<span class="fp-label">'+(total-hechos)+' por hablar</span>';
+      html+='</div>';
+
+      // Focus card
+      var msg=waMsgH(p);
+      var waUrl=p.whatsapp_url||p.whatsapp_link||'';
+      var waHref=waUrl;
+      if(waUrl&&msg){var ph=waUrl.replace(/.*wa\.me\//,'').replace(/[^\d]/,'');if(ph)waHref='https://wa.me/'+ph+'?text='+encodeURIComponent(msg);}
+      var chips=[p.necesidad,p.antecedente].filter(Boolean);
+      var pa=p.proxima_accion||'Contactar y ver en qué podés ayudar';
+
+      html+='<div class="vh-fcard">';
+      html+='<div class="fc-av" style="background:'+avBg(p.nombre)+'">'+avIni(p.nombre)+'</div>';
+      html+='<h2 class="fc-name">'+_e(p.nombre)+'</h2>';
+      html+='<p class="fc-meta">'+_e(tiempoSinH(p.dias_desde_contacto))+' · '+_e(p.etapa||'Sin etapa')+'</p>';
+      if(chips.length){
+        html+='<div class="fc-chips">';
+        chips.forEach(function(ch){html+='<span class="fc-chip">'+_e(ch)+'</span>';});
+        html+='</div>';
+      }
+      html+='<div class="vh-fblock"><div class="fblbl">🎯 Qué querés lograr</div><div class="fbtx">'+_e(pa)+'</div></div>';
+      if(msg){html+='<div class="vh-fblock"><div class="fblbl">💬 Mensaje listo para enviar</div><div class="fbmsg">'+_e(msg)+'</div></div>';}
+      html+='<div class="vh-fcta"><button class="pc-btn wa" onclick="window.open(\''+waHref+'\',\'_blank\')">📱 Abrir en WhatsApp</button></div>';
+      html+='<div class="vh-fnext">';
+      if(_enfIdx>0)html+='<button class="fc-back-btn" onclick="window.vhEnfAnterior()">← Anterior</button>';
+      var pIdx=DATA.indexOf(p);
+      html+='<button class="fc-next-btn" onclick="window.vhEnfSiguiente('+pIdx+')">Listo, siguiente →</button>';
+      html+='</div>';
+      html+='</div>';
+
+      document.getElementById('vhContent').innerHTML=html;
+    }
+
+    function vhRender(){
+      var lista=buildListaH();
+      if(_modoEnfoque){vhRenderEnfoque(lista);}
+      else{vhRenderLista(lista);}
+    }
+
+    window.vhSetModo=function(enfoque){
+      _modoEnfoque=enfoque;
+      _enfIdx=0;
+      document.getElementById('vbLista').classList.toggle('active',!enfoque);
+      document.getElementById('vbEnfoque').classList.toggle('active',enfoque);
+      vhRender();
+    };
 
     window.toggleVistaHoy=function(){
       _hoyActivo=!_hoyActivo;
       var ov=document.getElementById('vhOv');
       var btn=document.getElementById('btnVistaHoy');
       if(_hoyActivo){
-        renderVistaHoy();
+        vhRender();
         ov.classList.add('activo');
-        btn.style.background='#fef3c7';
-        btn.style.borderColor='#f59e0b';
-        btn.style.color='#92400e';
+        btn.style.background='#F2C4B0';
+        btn.style.borderColor='#E0633A';
+        btn.style.color='#E0633A';
       } else {
         ov.classList.remove('activo');
-        btn.style.background='#fff8e1';
-        btn.style.borderColor='#fde68a';
-        btn.style.color='#92400e';
+        btn.style.background='#FBE9E0';
+        btn.style.borderColor='#F2C4B0';
+        btn.style.color='#E0633A';
       }
     };
 
     window.cerrarVistaHoyTemp=function(){
-      if(_hoyActivo){
-        document.getElementById('vhOv').classList.remove('activo');
-      }
+      if(_hoyActivo)document.getElementById('vhOv').classList.remove('activo');
     };
 
-    window.vhContacte=function(li,idx,btn){
-      var c=DATA[idx];if(!c||!c.id)return;
+    window.vhToggleDone=function(li,idx,btn){
+      var c=DATA[idx];if(!c)return;
+      _hechos[c.id]=!_hechos[c.id];
+      if(_hechos[c.id]){
+        // Save date to Supabase
+        var hoy=new Date();
+        var fec=(hoy.getDate()+'').padStart(2,'0')+'/'+(hoy.getMonth()+1+'').padStart(2,'0')+'/'+hoy.getFullYear();
+        fetch('/contactos/'+c.id,{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha_ultimo_contacto:fec})})
+          .then(function(r){return r.json();}).then(function(){c.fecha_ultimo_contacto=fec;c.dias_desde_contacto=0;}).catch(function(){});
+      }
+      // Re-render after brief delay for visual feedback
+      btn.textContent=_hechos[c.id]?'✓ Ya hablé':'Marcar como hablado';
+      setTimeout(function(){vhRender();},600);
+    };
+
+    window.vhEnfSiguiente=function(idx){
+      var c=DATA[idx];if(!c)return;
+      _hechos[c.id]=true;
       var hoy=new Date();
       var fec=(hoy.getDate()+'').padStart(2,'0')+'/'+(hoy.getMonth()+1+'').padStart(2,'0')+'/'+hoy.getFullYear();
-      btn.textContent='Guardando...';btn.disabled=true;
-      fetch('/contactos/'+c.id,{
-        method:'PUT',credentials:'same-origin',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({fecha_ultimo_contacto:fec})
-      }).then(function(r){return r.json();}).then(function(){
-        c.fecha_ultimo_contacto=fec;
-        c.dias_desde_contacto=0;
-        btn.textContent='✓ Listo';btn.style.background='#16a34a';
-        // Fade out card after 1.5s
-        setTimeout(function(){
-          var card=document.getElementById('vhc'+li);
-          if(card){card.style.transition='opacity .4s';card.style.opacity='0';setTimeout(function(){if(card.parentNode)card.parentNode.removeChild(card);},400);}
-          var sub=document.getElementById('vhSub');
-          if(sub){var n=document.querySelectorAll('#vhLista .vh-card').length-1;sub.textContent=n+' contactos pendientes';}
-        },1200);
-      }).catch(function(){btn.textContent='✓ Contacté hoy';btn.disabled=false;});
+      fetch('/contactos/'+c.id,{method:'PUT',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({fecha_ultimo_contacto:fec})})
+        .then(function(r){return r.json();}).then(function(){c.fecha_ultimo_contacto=fec;c.dias_desde_contacto=0;}).catch(function(){});
+      var lista=buildListaH();
+      var pendientes=lista.filter(function(x){return!_hechos[x.id];});
+      if(_enfIdx>=pendientes.length-1)_enfIdx=0; else _enfIdx=0;
+      vhRenderEnfoque(lista);
     };
 
-    window.vhCambiarEtapa=function(li,idx,etapa){
-      var c=DATA[idx];if(!c||!c.id)return;
-      fetch('/contactos/'+c.id,{
-        method:'PUT',credentials:'same-origin',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({etapa:etapa})
-      }).then(function(r){return r.json();}).then(function(){
-        c.etapa=etapa;
-        var card=document.getElementById('vhc'+li);
-        if(card){
-          card.className='vh-card '+borderClass(c);
-          var badge=card.querySelector('.vh-badge');
-          var etapaColor={Caliente:'#ef4444',Media:'#f59e0b',Tibio:'#f97316',Fria:'#3b82f6'}[etapa]||'#6b7280';
-          if(badge){badge.textContent=etapa;badge.style.background=etapaColor;}
-        }
-      }).catch(function(){});
+    window.vhEnfAnterior=function(){
+      if(_enfIdx>0){_enfIdx--;vhRender();}
     };
 
     // Activar Vista Hoy por defecto cuando carga
