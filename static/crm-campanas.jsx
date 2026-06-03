@@ -60,7 +60,7 @@ function Campanas({ data, onWhatsapp }) {
                 <div className="camp-agenda-title">{a.titulo}</div>
                 <div className="camp-agenda-sub">En {a.enDias} días</div>
               </div>
-              <button className="camp-agenda-btn" onClick={() => setEnviando({ ...a, alcance: data.campanas.proxima.alcance, mensaje: "¡Feliz " + a.titulo + "! Te mando un saludo grande. — Gabriela" })}>
+              <button className="camp-agenda-btn" onClick={() => setEnviando({ ...a, alcance: data.campanas.proxima.alcance, mensaje: a.mensaje || ("¡Feliz " + a.titulo + "! Te mando un saludo grande. — " + data.agente) })}>
                 Preparar
               </button>
             </div>

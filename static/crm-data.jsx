@@ -76,11 +76,15 @@ function buildCampanas(contacts, agente) {
   }
 
   const fechas = [
-    { id: 'padre', titulo: 'Día del Padre',       fecha: toISO(nthWeekday(year, 5, 0, 3)) },  // 3rd Sun June
-    { id: 'madre', titulo: 'Día de la Madre',      fecha: toISO(nthWeekday(year, 9, 0, 3)) },  // 3rd Sun Oct
-    { id: 'navidad', titulo: 'Navidad',            fecha: `${year}-12-25` },
-    { id: 'anionievo', titulo: 'Año Nuevo',        fecha: `${year+1}-01-01` },
-    { id: 'independencia', titulo: '9 de Julio',   fecha: `${year}-07-09` },
+    { id: 'padre',         titulo: 'Día del Padre',           fecha: toISO(nthWeekday(year, 5, 0, 3)) },  // 3rd Sun June
+    { id: 'independencia', titulo: '9 de Julio',              fecha: `${year}-07-09` },
+    { id: 'amigo',         titulo: 'Día del Amigo',           fecha: `${year}-07-20` },
+    { id: 'maestra',       titulo: 'Día del Maestro',         fecha: `${year}-09-11` },
+    { id: 'primavera',     titulo: 'Día de la Primavera',     fecha: `${year}-09-21` },
+    { id: 'madre',         titulo: 'Día de la Madre',         fecha: toISO(nthWeekday(year, 9, 0, 3)) },  // 3rd Sun Oct
+    { id: 'navidad',       titulo: 'Navidad',                 fecha: `${year}-12-25` },
+    { id: 'anonuevo',      titulo: 'Año Nuevo',               fecha: `${year+1}-01-01` },
+    // Para agregar una fecha: { id: 'id-unico', titulo: 'Nombre', fecha: `${year}-MM-DD` }
   ]
     .map(f => {
       const diff = Math.round((new Date(f.fecha) - now) / 86400000);
