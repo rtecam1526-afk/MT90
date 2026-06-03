@@ -2,7 +2,7 @@
 const { useState: useStateV, useEffect: useEffectV, useRef: useRefV } = React;
 
 /* ============================================================
-   VISTA HOY â€” LISTA DEL DÍA
+   VISTA HOY — LISTA DEL DÍA
    Clean vertical list of "who to talk to today". WhatsApp-first,
    one tap to mark "Ya hablé". No filters, no jargon.
    ============================================================ */
@@ -12,7 +12,7 @@ function HoyLista({ data, done, onToggleDone, onWhatsapp, onOpen }) {
   const pct = total ? Math.round((hechos / total) * 100) : 0;
   const pendientes = data.hoy.filter((p) => !done[p.id]);
   const completados = data.hoy.filter((p) => done[p.id]);
-  // Birthday people first among pending â€” a warm, concrete reason to reach out.
+  // Birthday people first among pending — a warm, concrete reason to reach out.
   const ordenarPend = [...pendientes].sort((a, b) => (esCumpleHoy(b.cumple) ? 1 : 0) - (esCumpleHoy(a.cumple) ? 1 : 0));
   const ordenados = [...ordenarPend, ...completados];
   const cumpleHoy = data.hoy.filter((p) => esCumpleHoy(p.cumple) && !done[p.id]);
@@ -94,9 +94,9 @@ function PersonCard({ p, done, onToggleDone, onWhatsapp, onOpen }) {
 }
 
 /* ============================================================
-   VISTA HOY â€” MODO ENFOQUE
+   VISTA HOY — MODO ENFOQUE
    One person at a time. Message already drafted. Zero decisions:
-   WhatsApp â†’ "Listo, siguiente". Like a guided queue.
+   WhatsApp → "Listo, siguiente". Like a guided queue.
    ============================================================ */
 function HoyEnfoque({ data, done, onToggleDone, onWhatsapp }) {
   const queue = data.hoy;
@@ -267,82 +267,164 @@ function InicioAsistente({ data, done, onEmpezar, onWhatsapp, onToggleDone, onOp
 }
 
 /* ============================================================
-   CARTERA — lista simple con buscador. Sin kanban, sin badges.
-   Lenguaje humano: "Hace 8 meses sin hablar".
+   CARTERA — Kanban / Lista (vista secundaria, opcional)
    ============================================================ */
-function Cartera({ data, onOpen }) {
-  const [q, setQ] = useStateV("");
-  const all = [
-    ...data.cartera.caliente,
-    ...data.cartera.media,
-    ...data.cartera.fria,
-    ...data.cartera.sin,
+function Cartera({ data, onOpen, onWhatsapp, onToggleDone, done }) {
+  const [mode, setMode] = useStateV(“kanban”);
+  const [recorriendo, setRecorriendo] = useStateV(false);
+  const cols = [
+    { key: “caliente”, ...STAGE.caliente, items: data.cartera.caliente },
+    { key: “media”, label: “Media / Tibio”, color: STAGE.media.color, items: data.cartera.media },
+    { key: “fria”, ...STAGE.fria, items: data.cartera.fria },
+    { key: “sin”, label: “Sin etapa”, color: STAGE.sin.color, items: data.cartera.sin },
   ];
+  const allRows = cols.flatMap((c) => c.items.map((it) => ({ ...it, etapa: c.key })));
 
-  const filtered = q.trim()
-    ? all.filter(c =>
-        (c.nombre || "").toLowerCase().includes(q.toLowerCase()) ||
-        (c.nota || "").toLowerCase().includes(q.toLowerCase()) ||
-        (c.necesidad || "").toLowerCase().includes(q.toLowerCase())
-      )
-    : all;
+  if (recorriendo) {
+    return <CarteraRecorrer queue={allRows} done={done} onToggleDone={onToggleDone} onWhatsapp={onWhatsapp} onOpen={onOpen} onSalir={() => setRecorriendo(false)} />;
+  }
 
   return (
-    <div className="fade-in">
-      <div className="cartera-head">
+    <div className=”fade-in”>
+      <div className=”cartera-head”>
         <div>
           <h1>Tu cartera completa</h1>
-          <p>{data.totalContactos} contactos · tu día ya está en “Hoy”.</p>
+          <p>{data.totalContactos} contactos · esto es opcional, tu día ya está en “Hoy”.</p>
+        </div>
+        <div style={{ display: “flex”, gap: “10px”, alignItems: “center”, flexWrap: “wrap” }}>
+          <button className=”btn-recorrer” onClick={() => setRecorriendo(true)}>
+            Recorrer uno a uno <Icon.arrow />
+          </button>
+          <div className=”view-toggle”>
+            <button className={mode === “kanban” ? “active” : “”} onClick={() => setMode(“kanban”)}>Tablero</button>
+            <button className={mode === “lista” ? “active” : “”} onClick={() => setMode(“lista”)}>Lista</button>
+          </div>
         </div>
       </div>
 
-      <div style={{ marginBottom: "16px", maxWidth: "440px", position: "relative" }}>
-        <span style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none", display: "flex" }}>
-          <Icon.search />
-        </span>
-        <input
-          style={{ width: "100%", padding: "11px 14px 11px 40px", border: "1.5px solid var(--line-strong)", borderRadius: "var(--radius-sm)", fontFamily: "inherit", fontSize: "calc(15px * var(--fs-scale))", background: "var(--surface)", color: "var(--ink)", outline: "none", transition: "border-color .16s" }}
-          placeholder={`Buscar entre ${data.totalContactos} contactos…`}
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          onFocus={e  => { e.target.style.borderColor = "var(--primary)"; }}
-          onBlur={e   => { e.target.style.borderColor = "var(--line-strong)"; }}
-        />
-      </div>
-
-      <div className="list-rows">
-        {filtered.map(it => {
-          const urgente = esUrgente(it.dias);
-          return (
-            <div className="lrow" key={it.id} onClick={() => onOpen && onOpen(it)}>
+      {mode === “kanban” ? (
+        <div className=”kanban”>
+          {cols.map((c) => (
+            <div className=”kcol” key={c.key}>
+              <div className=”kcol-head”>
+                <span className=”dot” style={{ background: c.color }}></span>
+                {c.label}
+                <span className=”cnt”>{c.items.length}</span>
+              </div>
+              {c.items.map((it) => <KCard key={it.id} it={{ ...it, etapa: c.key }} onOpen={onOpen} />)}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className=”list-rows”>
+          {allRows.map((it) => (
+            <div className=”lrow” key={it.id} onClick={() => onOpen && onOpen(it)}>
               <Avatar iniciales={it.iniciales} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="lr-name">{it.nombre}</div>
-                {(it.nota || it.necesidad) && (
-                  <div className="lr-note">{it.nota || it.necesidad}</div>
-                )}
+                <div className=”lr-name”>{it.nombre}</div>
+                <div className=”lr-note”>{it.nota}</div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "5px", flexShrink: 0 }}>
-                <StageTag etapa={it.etapa} />
-                {it.dias != null && (
-                  <span style={{ fontSize: "calc(12px * var(--fs-scale))", color: urgente ? "var(--caliente)" : "var(--muted-2)", fontWeight: urgente ? 600 : 400 }}>
-                    {tiempoSinHablar(it.dias)}
-                  </span>
-                )}
-              </div>
+              <div className=”lr-stage”><StageTag etapa={it.etapa} /></div>
             </div>
-          );
-        })}
-        {filtered.length === 0 && q && (
-          <div style={{ padding: "48px 20px", textAlign: "center", color: "var(--muted)" }}>
-            Sin resultados para “{q}”
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CarteraRecorrer({ queue, done, onToggleDone, onWhatsapp, onOpen, onSalir }) {
+  const [idx, setIdx] = useStateV(0);
+  const total = queue.length;
+  const p = queue[idx];
+  const pct = Math.round((idx / total) * 100);
+  const hecho = !!(done && done[p.id]);
+
+  return (
+    <div className=”focus-wrap fade-in”>
+      <button className=”cola-back” onClick={onSalir}><Icon.back /> Volver a Cartera</button>
+
+      <div className=”focus-progress”>
+        <span className=”label”>{idx + 1} de {total}</span>
+        <div className=”track”><div className=”fill” style={{ width: pct + “%” }}></div></div>
+        <span className=”label”>{total - idx - 1} restantes</span>
+      </div>
+
+      <div className=”focus-card” key={p.id}>
+        <Avatar iniciales={p.iniciales} />
+        <h2 className=”fc-name”>{p.nombre}</h2>
+        <p className=”fc-meta”>
+          <StageTagInline etapa={p.etapa} />
+          {p.diasSinContacto != null && <> · {tiempoSinHablar(p.diasSinContacto)}</>}
+        </p>
+
+        {(p.necesidad || p.antecedente) && (
+          <div className=”fc-context”>
+            {p.necesidad && <span className=”chip”>{p.necesidad}</span>}
+            {p.antecedente && <span className=”chip”>{p.antecedente}</span>}
           </div>
         )}
+
+        {p.mensaje && (
+          <div className=”fc-block”>
+            <div className=”blabel”><Icon.wa /> Mensaje sugerido</div>
+            <div className=”fc-msg”>{p.mensaje}</div>
+          </div>
+        )}
+
+        <div className=”fc-cta”>
+          <button className=”btn btn-wa” onClick={() => onWhatsapp && onWhatsapp(p)}>
+            <Icon.wa /> Abrir en WhatsApp
+          </button>
+        </div>
+
+        <button className={“btn btn-done” + (hecho ? “ is-done” : “”)} style={{ width: “100%”, marginTop: “4px” }}
+                onClick={() => onToggleDone && onToggleDone(p.id)}>
+          <Icon.check /> {hecho ? “Ya hablé hoy” : “Marcar como hablado”}
+        </button>
+
+        <div className=”fc-next”>
+          {idx > 0 && (
+            <button className=”btn-back-lg” onClick={() => setIdx(idx - 1)}>
+              <Icon.back /> Anterior
+            </button>
+          )}
+          {idx < total - 1 ? (
+            <button className=”btn-primary-lg” onClick={() => setIdx(idx + 1)}>
+              Siguiente <Icon.arrow />
+            </button>
+          ) : (
+            <button className=”btn-primary-lg” onClick={onSalir}>
+              <Icon.check /> Listo
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
+function KCard({ it, onOpen }) {
+  return (
+    <div className="kcard" onClick={() => onOpen && onOpen(it)}>
+      <div className="kc-top">
+        <Avatar iniciales={it.iniciales} />
+        <span className="kc-name">{it.nombre}</span>
+      </div>
+      {it.nota && <p className="kc-note">{it.nota}</p>}
+      <div className="kc-foot">
+        {it.señales.map((s, i) => (
+          <span key={i} className={"signal" + (s === "venta" ? " venta" : s.includes("reunión") ? " reunion" : "")}>{s}</span>
+        ))}
+        {it.dias != null && <span className="kc-dias">{it.dias}d</span>}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   NUEVO CONTACTO — modal corto (5 segundos)
+   ============================================================ */
 function NuevoContacto({ onClose, onSave }) {
   const [nombre, setNombre] = useStateV("");
   const [tel, setTel] = useStateV("");
@@ -367,7 +449,7 @@ function NuevoContacto({ onClose, onSave }) {
           necesidad: necesidad.trim(),
           antecedente: ante.trim(),
           etapa: EMAP[etapa] || 'Sin Etapa',
-          fecha_cumpleanos: cumple || '',
+          fecha_nacimiento: cumple || '',
         });
       }
       onSave(nombre.trim());
@@ -429,7 +511,7 @@ function NuevoContacto({ onClose, onSave }) {
 }
 
 /* ============================================================
-   DETALLE DE CONTACTO â€” panel lateral
+   DETALLE DE CONTACTO — panel lateral
    Se abre al tocar cualquier tarjeta. Funciona con contactos de
    "Hoy" (datos completos) y de "Cartera" (datos parciales).
    ============================================================ */
@@ -569,5 +651,5 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
   );
 }
 
-Object.assign(window, { HoyLista, HoyEnfoque, InicioAsistente, Cartera, NuevoContacto, PersonCard, ContactoDetalle });
+Object.assign(window, { HoyLista, HoyEnfoque, InicioAsistente, Cartera, CarteraRecorrer, NuevoContacto, PersonCard, ContactoDetalle });
 
