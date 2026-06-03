@@ -367,7 +367,7 @@ function NuevoContacto({ onClose, onSave }) {
           necesidad: necesidad.trim(),
           antecedente: ante.trim(),
           etapa: EMAP[etapa] || 'Sin Etapa',
-          fecha_nacimiento: cumple || '',
+          fecha_cumpleanos: cumple || '',
         });
       }
       onSave(nombre.trim());

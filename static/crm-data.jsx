@@ -1,4 +1,4 @@
-// buildCrmData — transforma contactos crudos de Supabase al formato de los componentes React.
+// buildCrmData — transforma contactos crudos de Supabase al formato de los componentes.
 // Cargado después de crm-components.jsx (necesita tiempoSinHablar, esUrgente).
 
 (function() {
@@ -34,9 +34,9 @@ function mkIniciales(nombre) {
 function mapEtapa(e) {
   if (!e) return 'sin';
   const l = e.toLowerCase();
-  if (l.includes('caliente'))             return 'caliente';
-  if (l.includes('media') || l.includes('tibio')) return 'media';
-  if (l.includes('fria') || l.includes('fría')) return 'fria';
+  if (l.includes('caliente'))                       return 'caliente';
+  if (l.includes('media') || l.includes('tibio'))   return 'media';
+  if (l.includes('fria') || l.includes('fría'))     return 'fria';
   return 'sin';
 }
 
@@ -52,7 +52,54 @@ function genMensaje(c, agente) {
     return `Hola ${primer}! ¿Cómo estás? Quería ver cómo sigue lo de ${nec}. Estoy a disposición cuando necesites.`;
   if (c.etapa === 'media')
     return `Hola ${primer}! Hace un tiempo no hablamos. ¿Seguís con planes de ${nec}?`;
-  return `Hola ${primer}! Soy ${agente} de MT90. ¿Seguís con interés en ${nec}?`;
+  return `Hola ${primer}! Soy ${agente}. ¿Seguís con interés en ${nec}?`;
+}
+
+// Genera campañas de fechas especiales argentinas
+function buildCampanas(contacts, agente) {
+  const now = new Date();
+  const year = now.getFullYear();
+
+  // Fechas especiales ARG (aproximadas; se ajustan al año actual)
+  function nthWeekday(y, month, weekday, n) {
+    // weekday: 0=Sun,1=Mon...6=Sat  n: 1=first, 2=second, etc.
+    let d = new Date(y, month, 1);
+    let count = 0;
+    while (true) {
+      if (d.getDay() === weekday) { count++; if (count === n) return d; }
+      d.setDate(d.getDate() + 1);
+    }
+  }
+
+  function toISO(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  const fechas = [
+    { id: 'padre', titulo: 'Día del Padre',       fecha: toISO(nthWeekday(year, 5, 0, 3)) },  // 3rd Sun June
+    { id: 'madre', titulo: 'Día de la Madre',      fecha: toISO(nthWeekday(year, 9, 0, 3)) },  // 3rd Sun Oct
+    { id: 'navidad', titulo: 'Navidad',            fecha: `${year}-12-25` },
+    { id: 'anionievo', titulo: 'Año Nuevo',        fecha: `${year+1}-01-01` },
+    { id: 'independencia', titulo: '9 de Julio',   fecha: `${year}-07-09` },
+  ]
+    .map(f => {
+      const diff = Math.round((new Date(f.fecha) - now) / 86400000);
+      return { ...f, enDias: diff, mensaje: `¡Feliz ${f.titulo}, ${'{nombre}'}! Un saludo grande de mi parte. — ${agente}` };
+    })
+    .filter(f => f.enDias >= 0)
+    .sort((a, b) => a.enDias - b.enDias);
+
+  const proxima = fechas[0] || {
+    id: 'generic', titulo: 'Año Nuevo', fecha: `${year+1}-01-01`, enDias: 30,
+    mensaje: `¡Feliz {titulo}! Un saludo de ${agente}.`,
+  };
+
+  proxima.alcance = contacts.length;
+
+  return {
+    proxima,
+    agenda: fechas.slice(1),
+  };
 }
 
 window.buildCrmData = function(contacts, done) {
@@ -61,7 +108,8 @@ window.buildCrmData = function(contacts, done) {
   const all = contacts.map(c => {
     const etapa = mapEtapa(c.etapa);
     const diasSinContacto = diasDesde(c.fecha_ultimo_contacto);
-    const cumple = parseCumple(c.fecha_nacimiento || c.cumpleanos || '');
+    // columna en Supabase es fecha_cumpleanos
+    const cumple = parseCumple(c.fecha_cumpleanos || c.fecha_nacimiento || c.birthday || '');
     const nombre = c.nombre || c.cliente || '';
     const base = {
       id:               c.id,
@@ -85,20 +133,35 @@ window.buildCrmData = function(contacts, done) {
 
   all.sort((a, b) => urgencia(b) - urgencia(a));
 
-  // Cola del día: calientes primero, luego medias, max 60
-  const hoy = all.filter(c => c.etapa === 'caliente' || c.etapa === 'media' || (c.diasSinContacto != null && c.diasSinContacto > 30)).slice(0, 60);
-  if (hoy.length < 5) all.slice(0, 10).forEach(c => { if (!hoy.find(h => h.id === c.id)) hoy.push(c); });
+  // Cola del día: calientes + medias + contactos con mucho tiempo sin hablar
+  const hoy = all.filter(c =>
+    c.etapa === 'caliente' ||
+    c.etapa === 'media' ||
+    (c.diasSinContacto != null && c.diasSinContacto > 30)
+  ).slice(0, 60);
+
+  // Fallback: si hay muy pocos, completar con los primeros
+  if (hoy.length < 5) {
+    all.slice(0, 15).forEach(c => { if (!hoy.find(h => h.id === c.id)) hoy.push(c); });
+  }
 
   const byEtapa = k => all.filter(c => c.etapa === k);
 
   const calientes  = byEtapa('caliente');
-  const enfriando  = calientes.filter(c => c.diasSinContacto != null && c.diasSinContacto > 60).slice(0, 3).map(c => c.id);
-  const opors      = calientes.slice(0, 3).map(c => ({
+  const enfriando  = calientes
+    .filter(c => c.diasSinContacto != null && c.diasSinContacto > 60)
+    .slice(0, 3).map(c => c.id);
+
+  const opors = calientes.slice(0, 3).map(c => ({
     id:      c.id,
     icono:   'deal',
     titulo:  c.nombre + ' · caliente',
-    detalle: (c.necesidad ? `Necesita: ${c.necesidad}. ` : '') + (c.diasSinContacto != null ? window.tiempoSinHablar(c.diasSinContacto) + '.' : ''),
+    detalle: (c.necesidad ? `Necesita: ${c.necesidad}. ` : '') +
+             (c.diasSinContacto != null ? window.tiempoSinHablar(c.diasSinContacto) + '.' : ''),
   }));
+
+  // carteraQueue: todos los contactos con teléfono, para cola de campañas
+  const carteraQueue = all.filter(c => c.telefono && c.telefono.trim()).slice(0, 30);
 
   return {
     agente,
@@ -110,6 +173,8 @@ window.buildCrmData = function(contacts, done) {
       fria:     byEtapa('fria'),
       sin:      byEtapa('sin'),
     },
+    campanas:     buildCampanas(all, agente),
+    carteraQueue,
     semana: {
       servicio:      'Tracción',
       revisados:     all.length,
