@@ -25,7 +25,7 @@ function CarteraRecorrer({ data, done, onToggleDone, onWhatsapp, onSalir }) {
   const hecho = !!(done && done[p.id]);
 
   return (
-    <div className="focus-wrap fade-in">
+    <div className="focus-wrap ck-wrap fade-in">
       <button className="cola-back" onClick={onSalir}><Icon.back /> Volver a Cartera</button>
 
       <div className="focus-progress">

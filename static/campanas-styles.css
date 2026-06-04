@@ -144,3 +144,18 @@
 }
 .cola-send:hover { background: var(--whatsapp-dark); }
 .cola-send:active { transform: scale(.98); }
+
+/* Cartera Recorrer — versión compacta */
+.ck-wrap { max-width: 520px; }
+.ck-wrap .focus-card { padding: 22px 26px 20px; }
+.ck-wrap .focus-card .avatar { width: 52px; height: 52px; font-size: calc(17px * var(--fs-scale)); margin: 0 auto 10px; }
+.ck-wrap .focus-card .fc-name { font-size: calc(19px * var(--fs-scale)); margin-bottom: 4px; }
+.ck-wrap .focus-card .fc-meta { font-size: calc(13px * var(--fs-scale)); margin-bottom: 12px; }
+.ck-wrap .fc-context { margin-bottom: 12px; }
+.ck-wrap .fc-block { margin-bottom: 14px; }
+.ck-wrap .fc-msg { padding: 11px 14px; font-size: calc(14px * var(--fs-scale)); }
+.ck-wrap .fc-cta { margin-bottom: 8px; }
+.ck-wrap .fc-cta .btn-wa { padding: 12px; font-size: calc(15px * var(--fs-scale)); }
+.ck-wrap .btn-primary-lg { padding: 13px 24px; font-size: calc(15px * var(--fs-scale)); }
+.ck-wrap .btn-back-lg { padding: 10px 16px; font-size: calc(14px * var(--fs-scale)); }
+.ck-wrap .focus-progress { margin-bottom: 16px; }
