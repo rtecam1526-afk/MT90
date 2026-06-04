@@ -221,7 +221,7 @@ function App() {
             onOpen={openDetalle} onIrHoy={() => { setTab("hoy"); setForceEnfoque(false); }}
             onRevision={() => setRevision(true)} />
         )}
-        {tab === "cartera" && <Cartera data={data} onOpen={openDetalle} onWhatsapp={onWhatsapp} onToggleDone={toggleDone} done={done} />}
+        {tab === "cartera" && <Cartera data={data} onOpen={openDetalle} />}
         {tab === "agente" && <AgenteIA data={data} onWhatsapp={onWhatsapp} />}
         {tab === "campanas" && <Campanas data={data} onWhatsapp={onWhatsapp} />}
       </main>
