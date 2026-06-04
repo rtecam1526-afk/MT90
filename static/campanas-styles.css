@@ -145,6 +145,38 @@
 .cola-send:hover { background: var(--whatsapp-dark); }
 .cola-send:active { transform: scale(.98); }
 
+/* Rev-launch (Mi semana — revisión con asesor) */
+.rev-launch {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px 20px;
+  box-shadow: var(--shadow-sm);
+}
+.rev-launch-ic {
+  width: 38px; height: 38px; border-radius: 11px;
+  background: var(--primary-soft); color: var(--primary);
+  display: grid; place-items: center; flex-shrink: 0; font-size: 18px;
+}
+.rev-launch-tx {
+  flex: 1; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.rev-launch-tx b {
+  font-weight: 700; font-size: calc(14.5px * var(--fs-scale));
+  color: var(--ink); line-height: 1.3;
+}
+.rev-launch-tx small {
+  font-size: calc(13px * var(--fs-scale));
+  color: var(--muted); font-weight: 400; line-height: 1.4;
+}
+.rev-launch-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-weight: 700; font-size: calc(13.5px * var(--fs-scale));
+  color: var(--primary); white-space: nowrap; flex-shrink: 0;
+}
+.rev-launch-btn .icon { width: 15px; height: 15px; }
+.rev-launch-btn:hover { opacity: .8; }
+
 /* Cartera Recorrer — versión compacta */
 .ck-wrap { max-width: 520px; }
 .ck-wrap .focus-card { padding: 22px 26px 20px; }
