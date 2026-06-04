@@ -51,6 +51,7 @@ function App() {
   }, [rawContacts, done]);
 
   const [tab, setTab] = useStateA("hoy");
+  const [recorriendo, setRecorriendo] = useStateA(false);
   const [forceEnfoque, setForceEnfoque] = useStateA(false);
   const [modal, setModal] = useStateA(false);
   const [detalle, setDetalle] = useStateA(null);
@@ -200,6 +201,11 @@ function App() {
         </nav>
 
         <div className="topbar-spacer"></div>
+        {tab === "cartera" && !recorriendo && (
+          <button className="btn-recorrer" onClick={() => setRecorriendo(true)}>
+            Recorrer <Icon.arrow />
+          </button>
+        )}
         <span className="topbar-meta">{data.totalContactos} contactos</span>
         <button className="icon-btn" onClick={() => setBuscar(true)} aria-label="Buscar"><Icon.search /></button>
         <div className="mas-wrap">
@@ -221,7 +227,8 @@ function App() {
             onOpen={openDetalle} onIrHoy={() => { setTab("hoy"); setForceEnfoque(false); }}
             onRevision={() => setRevision(true)} />
         )}
-        {tab === "cartera" && <Cartera data={data} onOpen={openDetalle} onWhatsapp={onWhatsapp} onToggleDone={toggleDone} done={done} />}
+        {tab === "cartera" && !recorriendo && <Cartera data={data} onOpen={openDetalle} onWhatsapp={onWhatsapp} onToggleDone={toggleDone} done={done} />}
+        {tab === "cartera" && recorriendo && window.CarteraRecorrer && React.createElement(window.CarteraRecorrer, { data: data, done: done, onToggleDone: toggleDone, onWhatsapp: onWhatsapp, onSalir: () => setRecorriendo(false) })}
         {tab === "agente" && <AgenteIA data={data} onWhatsapp={onWhatsapp} />}
         {tab === "campanas" && <Campanas data={data} onWhatsapp={onWhatsapp} />}
       </main>
