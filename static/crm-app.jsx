@@ -154,7 +154,18 @@ function App() {
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'var(--bg)',fontFamily:'var(--font-body)',flexDirection:'column',gap:'14px'}}>
+        <div style={{fontSize:'1.5rem'}}>📭</div>
+        <div style={{color:'var(--ink)',fontWeight:700}}>Sin contactos cargados</div>
+        <div style={{color:'var(--muted)',fontSize:'.9rem',textAlign:'center',maxWidth:320}}>
+          La base de datos no devolvió contactos para este agente. Revisá las variables de entorno en Render (SUPABASE_URL, SUPABASE_KEY).
+        </div>
+        <button onClick={loadContacts} style={{background:'var(--primary)',color:'#fff',border:'none',padding:'12px 24px',borderRadius:'12px',fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>Reintentar</button>
+      </div>
+    );
+  }
 
   const dir = t.inicioDir;
   let hoyView;
