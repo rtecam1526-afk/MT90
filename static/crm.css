@@ -793,6 +793,16 @@ button {
 }
 .cartera-head p { margin: 4px 0 0; color: var(--muted); font-size: calc(15px * var(--fs-scale)); }
 
+.btn-recorrer {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--primary); color: #fff;
+  padding: 10px 20px; border-radius: 999px;
+  font-weight: 700; font-size: calc(14px * var(--fs-scale));
+  white-space: nowrap; transition: filter .14s ease;
+}
+.btn-recorrer:hover { filter: brightness(1.07); }
+.btn-recorrer .icon { width: 16px; height: 16px; }
+
 .view-toggle {
   display: flex;
   gap: 4px;
