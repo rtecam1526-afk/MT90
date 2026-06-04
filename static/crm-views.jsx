@@ -96,7 +96,7 @@ function PersonCard({ p, done, onToggleDone, onWhatsapp, onOpen }) {
 /* ============================================================
    VISTA HOY — MODO ENFOQUE
    One person at a time. Message already drafted. Zero decisions:
-   WhatsApp → "Listo, siguiente". Like a guided queue.
+   WhatsApp â†’ "Listo, siguiente". Like a guided queue.
    ============================================================ */
 function HoyEnfoque({ data, done, onToggleDone, onWhatsapp }) {
   const queue = data.hoy;
@@ -267,68 +267,86 @@ function InicioAsistente({ data, done, onEmpezar, onWhatsapp, onToggleDone, onOp
 }
 
 /* ============================================================
-   CARTERA — Kanban / Lista (vista secundaria, opcional)
+   CARTERA — lista simple con buscador. Sin kanban, sin badges.
+   Lenguaje humano: "Hace 8 meses sin hablar".
    ============================================================ */
 function Cartera({ data, onOpen, onWhatsapp, onToggleDone, done }) {
-  const [mode, setMode] = useStateV(“kanban”);
+  const [q, setQ] = useStateV("");
   const [recorriendo, setRecorriendo] = useStateV(false);
-  const cols = [
-    { key: “caliente”, ...STAGE.caliente, items: data.cartera.caliente },
-    { key: “media”, label: “Media / Tibio”, color: STAGE.media.color, items: data.cartera.media },
-    { key: “fria”, ...STAGE.fria, items: data.cartera.fria },
-    { key: “sin”, label: “Sin etapa”, color: STAGE.sin.color, items: data.cartera.sin },
+  const all = [
+    ...data.cartera.caliente,
+    ...data.cartera.media,
+    ...data.cartera.fria,
+    ...data.cartera.sin,
   ];
-  const allRows = cols.flatMap((c) => c.items.map((it) => ({ ...it, etapa: c.key })));
 
   if (recorriendo) {
-    return <CarteraRecorrer queue={allRows} done={done} onToggleDone={onToggleDone} onWhatsapp={onWhatsapp} onOpen={onOpen} onSalir={() => setRecorriendo(false)} />;
+    return <CarteraRecorrer queue={all} done={done} onToggleDone={onToggleDone} onWhatsapp={onWhatsapp} onOpen={onOpen} onSalir={() => setRecorriendo(false)} />;
   }
 
+  const filtered = q.trim()
+    ? all.filter(c =>
+        (c.nombre || "").toLowerCase().includes(q.toLowerCase()) ||
+        (c.nota || "").toLowerCase().includes(q.toLowerCase()) ||
+        (c.necesidad || "").toLowerCase().includes(q.toLowerCase())
+      )
+    : all;
+
   return (
-    <div className=”fade-in”>
+    <div className="fade-in">
       <div className=”cartera-head”>
         <div>
           <h1>Tu cartera completa</h1>
-          <p>{data.totalContactos} contactos · esto es opcional, tu día ya está en “Hoy”.</p>
+          <p>{data.totalContactos} contactos · tu día ya está en “Hoy”.</p>
         </div>
-        <div style={{ display: “flex”, gap: “10px”, alignItems: “center”, flexWrap: “wrap” }}>
-          <button className=”btn-recorrer” onClick={() => setRecorriendo(true)}>
-            Recorrer uno a uno <Icon.arrow />
-          </button>
-          <div className=”view-toggle”>
-            <button className={mode === “kanban” ? “active” : “”} onClick={() => setMode(“kanban”)}>Tablero</button>
-            <button className={mode === “lista” ? “active” : “”} onClick={() => setMode(“lista”)}>Lista</button>
-          </div>
-        </div>
+        <button className=”btn-recorrer” onClick={() => setRecorriendo(true)}>
+          Recorrer uno a uno <Icon.arrow />
+        </button>
       </div>
 
-      {mode === “kanban” ? (
-        <div className=”kanban”>
-          {cols.map((c) => (
-            <div className=”kcol” key={c.key}>
-              <div className=”kcol-head”>
-                <span className=”dot” style={{ background: c.color }}></span>
-                {c.label}
-                <span className=”cnt”>{c.items.length}</span>
-              </div>
-              {c.items.map((it) => <KCard key={it.id} it={{ ...it, etapa: c.key }} onOpen={onOpen} />)}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className=”list-rows”>
-          {allRows.map((it) => (
-            <div className=”lrow” key={it.id} onClick={() => onOpen && onOpen(it)}>
+      <div style={{ marginBottom: "16px", maxWidth: "440px", position: "relative" }}>
+        <span style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none", display: "flex" }}>
+          <Icon.search />
+        </span>
+        <input
+          style={{ width: "100%", padding: "11px 14px 11px 40px", border: "1.5px solid var(--line-strong)", borderRadius: "var(--radius-sm)", fontFamily: "inherit", fontSize: "calc(15px * var(--fs-scale))", background: "var(--surface)", color: "var(--ink)", outline: "none", transition: "border-color .16s" }}
+          placeholder={`Buscar entre ${data.totalContactos} contactos…`}
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          onFocus={e  => { e.target.style.borderColor = "var(--primary)"; }}
+          onBlur={e   => { e.target.style.borderColor = "var(--line-strong)"; }}
+        />
+      </div>
+
+      <div className="list-rows">
+        {filtered.map(it => {
+          const urgente = esUrgente(it.dias);
+          return (
+            <div className="lrow" key={it.id} onClick={() => onOpen && onOpen(it)}>
               <Avatar iniciales={it.iniciales} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className=”lr-name”>{it.nombre}</div>
-                <div className=”lr-note”>{it.nota}</div>
+                <div className="lr-name">{it.nombre}</div>
+                {(it.nota || it.necesidad) && (
+                  <div className="lr-note">{it.nota || it.necesidad}</div>
+                )}
               </div>
-              <div className=”lr-stage”><StageTag etapa={it.etapa} /></div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "5px", flexShrink: 0 }}>
+                <StageTag etapa={it.etapa} />
+                {it.dias != null && (
+                  <span style={{ fontSize: "calc(12px * var(--fs-scale))", color: urgente ? "var(--caliente)" : "var(--muted-2)", fontWeight: urgente ? 600 : 400 }}>
+                    {tiempoSinHablar(it.dias)}
+                  </span>
+                )}
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+        {filtered.length === 0 && q && (
+          <div style={{ padding: "48px 20px", textAlign: "center", color: "var(--muted)" }}>
+            Sin resultados para “{q}”
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -336,65 +354,71 @@ function Cartera({ data, onOpen, onWhatsapp, onToggleDone, done }) {
 function CarteraRecorrer({ queue, done, onToggleDone, onWhatsapp, onOpen, onSalir }) {
   const [idx, setIdx] = useStateV(0);
   const total = queue.length;
+  if (!total) return (
+    <div className="focus-wrap fade-in">
+      <button className="cola-back" onClick={onSalir}><Icon.back /> Volver</button>
+      <p style={{ textAlign: "center", color: "var(--muted)", marginTop: 40 }}>No hay contactos en la cartera.</p>
+    </div>
+  );
   const p = queue[idx];
   const pct = Math.round((idx / total) * 100);
   const hecho = !!(done && done[p.id]);
+  const urgente = esUrgente(p.dias);
 
   return (
-    <div className=”focus-wrap fade-in”>
-      <button className=”cola-back” onClick={onSalir}><Icon.back /> Volver a Cartera</button>
+    <div className="focus-wrap fade-in">
+      <button className="cola-back" onClick={onSalir}><Icon.back /> Volver a Cartera</button>
 
-      <div className=”focus-progress”>
-        <span className=”label”>{idx + 1} de {total}</span>
-        <div className=”track”><div className=”fill” style={{ width: pct + “%” }}></div></div>
-        <span className=”label”>{total - idx - 1} restantes</span>
+      <div className="focus-progress">
+        <span className="label">{idx + 1} de {total}</span>
+        <div className="track"><div className="fill" style={{ width: pct + "%" }}></div></div>
+        <span className="label">{total - idx - 1} restantes</span>
       </div>
 
-      <div className=”focus-card” key={p.id}>
+      <div className="focus-card" key={p.id}>
         <Avatar iniciales={p.iniciales} />
-        <h2 className=”fc-name”>{p.nombre}</h2>
-        <p className=”fc-meta”>
+        <h2 className="fc-name">{p.nombre}</h2>
+        <p className="fc-meta">
           <StageTagInline etapa={p.etapa} />
-          {p.diasSinContacto != null && <> · {tiempoSinHablar(p.diasSinContacto)}</>}
+          {p.dias != null && <span style={{ color: urgente ? "var(--caliente)" : "var(--muted)", marginLeft: 8 }}>{tiempoSinHablar(p.dias)}</span>}
         </p>
 
-        {(p.necesidad || p.antecedente) && (
-          <div className=”fc-context”>
-            {p.necesidad && <span className=”chip”>{p.necesidad}</span>}
-            {p.antecedente && <span className=”chip”>{p.antecedente}</span>}
+        {(p.nota || p.necesidad) && (
+          <div className="fc-context">
+            {(p.nota || p.necesidad) && <span className="chip">{p.nota || p.necesidad}</span>}
           </div>
         )}
 
         {p.mensaje && (
-          <div className=”fc-block”>
-            <div className=”blabel”><Icon.wa /> Mensaje sugerido</div>
-            <div className=”fc-msg”>{p.mensaje}</div>
+          <div className="fc-block">
+            <div className="blabel"><Icon.wa /> Mensaje sugerido</div>
+            <div className="fc-msg">{p.mensaje}</div>
           </div>
         )}
 
-        <div className=”fc-cta”>
-          <button className=”btn btn-wa” onClick={() => onWhatsapp && onWhatsapp(p)}>
+        <div className="fc-cta">
+          <button className="btn btn-wa" onClick={() => onWhatsapp && onWhatsapp(p)}>
             <Icon.wa /> Abrir en WhatsApp
           </button>
         </div>
 
-        <button className={“btn btn-done” + (hecho ? “ is-done” : “”)} style={{ width: “100%”, marginTop: “4px” }}
+        <button className={"btn btn-done" + (hecho ? " is-done" : "")} style={{ width: "100%", marginTop: "4px" }}
                 onClick={() => onToggleDone && onToggleDone(p.id)}>
-          <Icon.check /> {hecho ? “Ya hablé hoy” : “Marcar como hablado”}
+          <Icon.check /> {hecho ? "Ya hablé hoy" : "Marcar como hablado"}
         </button>
 
-        <div className=”fc-next”>
+        <div className="fc-next">
           {idx > 0 && (
-            <button className=”btn-back-lg” onClick={() => setIdx(idx - 1)}>
+            <button className="btn-back-lg" onClick={() => setIdx(idx - 1)}>
               <Icon.back /> Anterior
             </button>
           )}
           {idx < total - 1 ? (
-            <button className=”btn-primary-lg” onClick={() => setIdx(idx + 1)}>
+            <button className="btn-primary-lg" onClick={() => setIdx(idx + 1)}>
               Siguiente <Icon.arrow />
             </button>
           ) : (
-            <button className=”btn-primary-lg” onClick={onSalir}>
+            <button className="btn-primary-lg" onClick={onSalir}>
               <Icon.check /> Listo
             </button>
           )}
@@ -404,27 +428,6 @@ function CarteraRecorrer({ queue, done, onToggleDone, onWhatsapp, onOpen, onSali
   );
 }
 
-function KCard({ it, onOpen }) {
-  return (
-    <div className="kcard" onClick={() => onOpen && onOpen(it)}>
-      <div className="kc-top">
-        <Avatar iniciales={it.iniciales} />
-        <span className="kc-name">{it.nombre}</span>
-      </div>
-      {it.nota && <p className="kc-note">{it.nota}</p>}
-      <div className="kc-foot">
-        {it.señales.map((s, i) => (
-          <span key={i} className={"signal" + (s === "venta" ? " venta" : s.includes("reunión") ? " reunion" : "")}>{s}</span>
-        ))}
-        {it.dias != null && <span className="kc-dias">{it.dias}d</span>}
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   NUEVO CONTACTO — modal corto (5 segundos)
-   ============================================================ */
 function NuevoContacto({ onClose, onSave }) {
   const [nombre, setNombre] = useStateV("");
   const [tel, setTel] = useStateV("");
@@ -449,7 +452,7 @@ function NuevoContacto({ onClose, onSave }) {
           necesidad: necesidad.trim(),
           antecedente: ante.trim(),
           etapa: EMAP[etapa] || 'Sin Etapa',
-          fecha_nacimiento: cumple || '',
+          fecha_cumpleanos: cumple || '',
         });
       }
       onSave(nombre.trim());
