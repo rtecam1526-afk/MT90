@@ -55,6 +55,7 @@ function App() {
   const [forceEnfoque, setForceEnfoque] = useStateA(false);
   const [modal, setModal] = useStateA(false);
   const [detalle, setDetalle] = useStateA(null);
+  const [editando, setEditando] = useStateA(null);
   const [toast, setToast] = useStateA(null);
   const [buscar, setBuscar] = useStateA(false);
   const [menuMas, setMenuMas] = useStateA(false);
@@ -243,6 +244,23 @@ function App() {
           onUpdate={loadContacts}
         />
       )}
+
+      {detalle && window.EditarContacto && (
+        <div style={{ position:'fixed', bottom:'90px', right:'24px', zIndex:60 }}>
+          <button
+            onClick={() => setEditando(detalle)}
+            style={{ background:'var(--ink)', color:'#fff', padding:'10px 18px', borderRadius:'999px', fontWeight:700, fontFamily:'inherit', fontSize:'calc(14px * var(--fs-scale))', display:'flex', alignItems:'center', gap:'7px', boxShadow:'var(--shadow-lg)' }}
+          >
+            ✏️ Editar contacto
+          </button>
+        </div>
+      )}
+
+      {editando && window.EditarContacto && React.createElement(window.EditarContacto, {
+        contacto: editando,
+        onClose: () => setEditando(null),
+        onSave: () => { setEditando(null); setDetalle(null); loadContacts(); showToast('Contacto actualizado'); }
+      })}
 
       {modal && <NuevoContacto onClose={() => setModal(false)} onSave={saveContact} />}
       {buscar && <BuscarOverlay data={data} onOpen={openDetalle} onClose={() => setBuscar(false)} />}
