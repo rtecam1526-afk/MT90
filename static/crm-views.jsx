@@ -2,9 +2,9 @@
 const { useState: useStateV, useEffect: useEffectV, useRef: useRefV } = React;
 
 /* ============================================================
-   VISTA HOY — LISTA DEL DÍA
+   VISTA HOY â€” LISTA DEL DÃA
    Clean vertical list of "who to talk to today". WhatsApp-first,
-   one tap to mark "Ya hablé". No filters, no jargon.
+   one tap to mark "Ya hablÃ©". No filters, no jargon.
    ============================================================ */
 function HoyLista({ data, done, onToggleDone, onWhatsapp, onOpen }) {
   const total = data.hoy.length;
@@ -12,7 +12,7 @@ function HoyLista({ data, done, onToggleDone, onWhatsapp, onOpen }) {
   const pct = total ? Math.round((hechos / total) * 100) : 0;
   const pendientes = data.hoy.filter((p) => !done[p.id]);
   const completados = data.hoy.filter((p) => done[p.id]);
-  // Birthday people first among pending — a warm, concrete reason to reach out.
+  // Birthday people first among pending â€” a warm, concrete reason to reach out.
   const ordenarPend = [...pendientes].sort((a, b) => (esCumpleHoy(b.cumple) ? 1 : 0) - (esCumpleHoy(a.cumple) ? 1 : 0));
   const ordenados = [...ordenarPend, ...completados];
   const cumpleHoy = data.hoy.filter((p) => esCumpleHoy(p.cumple) && !done[p.id]);
@@ -21,13 +21,13 @@ function HoyLista({ data, done, onToggleDone, onWhatsapp, onOpen }) {
     <div className="fade-in">
       <div className="greeting">
         <div className="prep-chip">
-          <Icon.spark /> Preparado por {data.semana.servicio} · {fechaCorta(lunesDeEstaSemana())}
+          <Icon.spark /> Preparado por {data.semana.servicio} Â· {fechaCorta(lunesDeEstaSemana())}
         </div>
-        <h1 className="hello">Buenos días, <span className="accent">{data.agente}</span></h1>
+        <h1 className="hello">Buenos dÃ­as, <span className="accent">{data.agente}</span></h1>
         <p className="sub">
           {hechos < total
-            ? <>Esta semana revisé tus <b>{data.semana.revisados} contactos</b> y te separé <b>{total - hechos}</b> para saludar. Empezá por arriba.</>
-            : <>¡Hablaste con todos los que te preparé! Tu semana está al día.</>}
+            ? <>Esta semana revisÃ© tus <b>{data.semana.revisados} contactos</b> y te separÃ© <b>{total - hechos}</b> para saludar. EmpezÃ¡ por arriba.</>
+            : <>Â¡Hablaste con todos los que te preparÃ©! Tu semana estÃ¡ al dÃ­a.</>}
         </p>
       </div>
 
@@ -35,8 +35,8 @@ function HoyLista({ data, done, onToggleDone, onWhatsapp, onOpen }) {
         <div className="bday-banner" onClick={() => onWhatsapp({ ...cumpleHoy[0], mensaje: mensajeCumple(cumpleHoy[0].nombre) })}>
           <span className="cake"><Icon.gift /></span>
           <div className="bday-text">
-            <b>Hoy cumple {cumpleHoy[0].nombre.split(" ")[0]}{cumpleHoy.length > 1 ? ` y ${cumpleHoy.length - 1} más` : ""}.</b>
-            <span> Buena excusa para saludar y mantener el vínculo cálido.</span>
+            <b>Hoy cumple {cumpleHoy[0].nombre.split(" ")[0]}{cumpleHoy.length > 1 ? ` y ${cumpleHoy.length - 1} mÃ¡s` : ""}.</b>
+            <span> Buena excusa para saludar y mantener el vÃ­nculo cÃ¡lido.</span>
           </div>
           <span className="bday-go">Saludar <Icon.arrow /></span>
         </div>
@@ -61,7 +61,7 @@ function PersonCard({ p, done, onToggleDone, onWhatsapp, onOpen }) {
   const cumple = esCumpleHoy(p.cumple);
   return (
     <div className={"person-card" + (done ? " done" : "") + (cumple ? " is-bday" : "")}>
-      {cumple && <div className="card-bday"><Icon.gift /> Hoy cumple años</div>}
+      {cumple && <div className="card-bday"><Icon.gift /> Hoy cumple aÃ±os</div>}
       <div className="pc-top tap" onClick={() => onOpen && onOpen(p)}>
         <Avatar iniciales={p.iniciales} />
         <div className="pc-id">
@@ -73,7 +73,7 @@ function PersonCard({ p, done, onToggleDone, onWhatsapp, onOpen }) {
 
       <div className="pc-action">
         <span className="label">Hacer:</span>
-        <span>{cumple ? "Saludarlo por su cumpleaños" : p.proximaAccion}</span>
+        <span>{cumple ? "Saludarlo por su cumpleaÃ±os" : p.proximaAccion}</span>
       </div>
 
       <div className="pc-meta">
@@ -85,7 +85,7 @@ function PersonCard({ p, done, onToggleDone, onWhatsapp, onOpen }) {
           <Icon.wa /> {cumple ? "Saludar" : "WhatsApp"}
         </button>
         <button className={"btn btn-done" + (done ? " is-done" : "")} onClick={() => onToggleDone(p.id)}>
-          <Icon.check /> {done ? "Ya hablé" : "Marcar como hablado"}
+          <Icon.check /> {done ? "Ya hablÃ©" : "Marcar como hablado"}
         </button>
         <button className="btn-ghost" onClick={() => onOpen && onOpen(p)}>Ver ficha</button>
       </div>
@@ -94,7 +94,7 @@ function PersonCard({ p, done, onToggleDone, onWhatsapp, onOpen }) {
 }
 
 /* ============================================================
-   VISTA HOY — MODO ENFOQUE
+   VISTA HOY â€” MODO ENFOQUE
    One person at a time. Message already drafted. Zero decisions:
    WhatsApp â†’ "Listo, siguiente". Like a guided queue.
    ============================================================ */
@@ -127,8 +127,8 @@ function HoyEnfoque({ data, done, onToggleDone, onWhatsapp }) {
       <div className="focus-wrap fade-in">
         <div className="all-done">
           <div className="big"><Icon.check /></div>
-          <h2>¡Listo por hoy!</h2>
-          <p>Hablaste con las {total} personas de tu lista. Mañana te preparo la próxima tanda.</p>
+          <h2>Â¡Listo por hoy!</h2>
+          <p>Hablaste con las {total} personas de tu lista. MaÃ±ana te preparo la prÃ³xima tanda.</p>
         </div>
       </div>
     );
@@ -145,14 +145,14 @@ function HoyEnfoque({ data, done, onToggleDone, onWhatsapp }) {
       <div className="focus-card" key={p.id}>
         <Avatar iniciales={p.iniciales} />
         <h2 className="fc-name">{p.nombre}</h2>
-        <p className="fc-meta">{tiempoSinHablar(p.diasSinContacto)} · <StageTagInline etapa={p.etapa} /></p>
+        <p className="fc-meta">{tiempoSinHablar(p.diasSinContacto)} Â· <StageTagInline etapa={p.etapa} /></p>
 
         <div className="fc-context">
           {p.contexto.map((c, i) => <span className="chip" key={i}>{c}</span>)}
         </div>
 
         <div className="fc-block">
-          <div className="blabel"><Icon.target /> Qué querés lograr</div>
+          <div className="blabel"><Icon.target /> QuÃ© querÃ©s lograr</div>
           <div className="fc-action-text">{p.proximaAccion}</div>
         </div>
 
@@ -213,13 +213,13 @@ function InicioAsistente({ data, done, onEmpezar, onWhatsapp, onToggleDone, onOp
         <div className="spark"><Icon.spark /></div>
         <h1>
           {restantes > 0
-            ? <>Hola {data.agente}. Esta semana te preparé <span className="accent">{restantes} personas</span> para contactar.</>
-            : <>¡Buenísimo, {data.agente}! <span className="accent">Ya hablaste con todos</span> los de esta semana.</>}
+            ? <>Hola {data.agente}. Esta semana te preparÃ© <span className="accent">{restantes} personas</span> para contactar.</>
+            : <>Â¡BuenÃ­simo, {data.agente}! <span className="accent">Ya hablaste con todos</span> los de esta semana.</>}
         </h1>
         <p>
           {restantes > 0
-            ? `Revisé tus ${data.semana.revisados} contactos uno por uno, elegí a quién conviene escribirle y te dejé el mensaje listo. Vos solo tocás \u201cEmpezar\u201d.`
-            : "Disfrutá el día. El lunes vuelvo a revisar tu cartera y te armo la próxima tanda."}
+            ? `RevisÃ© tus ${data.semana.revisados} contactos uno por uno, elegÃ­ a quiÃ©n conviene escribirle y te dejÃ© el mensaje listo. Vos solo tocÃ¡s \u201cEmpezar\u201d.`
+            : "DisfrutÃ¡ el dÃ­a. El lunes vuelvo a revisar tu cartera y te armo la prÃ³xima tanda."}
         </p>
         {restantes > 0 && (
           <button className="assistant-cta" onClick={onEmpezar}>
@@ -270,19 +270,14 @@ function InicioAsistente({ data, done, onEmpezar, onWhatsapp, onToggleDone, onOp
    CARTERA — lista simple con buscador. Sin kanban, sin badges.
    Lenguaje humano: "Hace 8 meses sin hablar".
    ============================================================ */
-function Cartera({ data, onOpen, onWhatsapp, onToggleDone, done }) {
+function Cartera({ data, onOpen }) {
   const [q, setQ] = useStateV("");
-  const [recorriendo, setRecorriendo] = useStateV(false);
   const all = [
     ...data.cartera.caliente,
     ...data.cartera.media,
     ...data.cartera.fria,
     ...data.cartera.sin,
   ];
-
-  if (recorriendo) {
-    return <CarteraRecorrer queue={all} done={done} onToggleDone={onToggleDone} onWhatsapp={onWhatsapp} onOpen={onOpen} onSalir={() => setRecorriendo(false)} />;
-  }
 
   const filtered = q.trim()
     ? all.filter(c =>
@@ -294,14 +289,11 @@ function Cartera({ data, onOpen, onWhatsapp, onToggleDone, done }) {
 
   return (
     <div className="fade-in">
-      <div className=”cartera-head”>
+      <div className="cartera-head">
         <div>
           <h1>Tu cartera completa</h1>
           <p>{data.totalContactos} contactos · tu día ya está en “Hoy”.</p>
         </div>
-        <button className=”btn-recorrer” onClick={() => setRecorriendo(true)}>
-          Recorrer uno a uno <Icon.arrow />
-        </button>
       </div>
 
       <div style={{ marginBottom: "16px", maxWidth: "440px", position: "relative" }}>
@@ -346,83 +338,6 @@ function Cartera({ data, onOpen, onWhatsapp, onToggleDone, done }) {
             Sin resultados para “{q}”
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function CarteraRecorrer({ queue, done, onToggleDone, onWhatsapp, onOpen, onSalir }) {
-  const [idx, setIdx] = useStateV(0);
-  const total = queue.length;
-  if (!total) return (
-    <div className="focus-wrap fade-in">
-      <button className="cola-back" onClick={onSalir}><Icon.back /> Volver</button>
-      <p style={{ textAlign: "center", color: "var(--muted)", marginTop: 40 }}>No hay contactos en la cartera.</p>
-    </div>
-  );
-  const p = queue[idx];
-  const pct = Math.round((idx / total) * 100);
-  const hecho = !!(done && done[p.id]);
-  const urgente = esUrgente(p.dias);
-
-  return (
-    <div className="focus-wrap fade-in">
-      <button className="cola-back" onClick={onSalir}><Icon.back /> Volver a Cartera</button>
-
-      <div className="focus-progress">
-        <span className="label">{idx + 1} de {total}</span>
-        <div className="track"><div className="fill" style={{ width: pct + "%" }}></div></div>
-        <span className="label">{total - idx - 1} restantes</span>
-      </div>
-
-      <div className="focus-card" key={p.id}>
-        <Avatar iniciales={p.iniciales} />
-        <h2 className="fc-name">{p.nombre}</h2>
-        <p className="fc-meta">
-          <StageTagInline etapa={p.etapa} />
-          {p.dias != null && <span style={{ color: urgente ? "var(--caliente)" : "var(--muted)", marginLeft: 8 }}>{tiempoSinHablar(p.dias)}</span>}
-        </p>
-
-        {(p.nota || p.necesidad) && (
-          <div className="fc-context">
-            {(p.nota || p.necesidad) && <span className="chip">{p.nota || p.necesidad}</span>}
-          </div>
-        )}
-
-        {p.mensaje && (
-          <div className="fc-block">
-            <div className="blabel"><Icon.wa /> Mensaje sugerido</div>
-            <div className="fc-msg">{p.mensaje}</div>
-          </div>
-        )}
-
-        <div className="fc-cta">
-          <button className="btn btn-wa" onClick={() => onWhatsapp && onWhatsapp(p)}>
-            <Icon.wa /> Abrir en WhatsApp
-          </button>
-        </div>
-
-        <button className={"btn btn-done" + (hecho ? " is-done" : "")} style={{ width: "100%", marginTop: "4px" }}
-                onClick={() => onToggleDone && onToggleDone(p.id)}>
-          <Icon.check /> {hecho ? "Ya hablé hoy" : "Marcar como hablado"}
-        </button>
-
-        <div className="fc-next">
-          {idx > 0 && (
-            <button className="btn-back-lg" onClick={() => setIdx(idx - 1)}>
-              <Icon.back /> Anterior
-            </button>
-          )}
-          {idx < total - 1 ? (
-            <button className="btn-primary-lg" onClick={() => setIdx(idx + 1)}>
-              Siguiente <Icon.arrow />
-            </button>
-          ) : (
-            <button className="btn-primary-lg" onClick={onSalir}>
-              <Icon.check /> Listo
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
@@ -514,7 +429,7 @@ function NuevoContacto({ onClose, onSave }) {
 }
 
 /* ============================================================
-   DETALLE DE CONTACTO — panel lateral
+   DETALLE DE CONTACTO â€” panel lateral
    Se abre al tocar cualquier tarjeta. Funciona con contactos de
    "Hoy" (datos completos) y de "Cartera" (datos parciales).
    ============================================================ */
@@ -654,5 +569,5 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
   );
 }
 
-Object.assign(window, { HoyLista, HoyEnfoque, InicioAsistente, Cartera, CarteraRecorrer, NuevoContacto, PersonCard, ContactoDetalle });
+Object.assign(window, { HoyLista, HoyEnfoque, InicioAsistente, Cartera, NuevoContacto, PersonCard, ContactoDetalle });
 
