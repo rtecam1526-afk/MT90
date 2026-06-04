@@ -246,10 +246,10 @@ function App() {
       )}
 
       {detalle && window.EditarContacto && (
-        <div style={{ position:'fixed', bottom:'90px', right:'24px', zIndex:60 }}>
+        <div style={{ position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)', zIndex:80 }}>
           <button
             onClick={() => setEditando(detalle)}
-            style={{ background:'var(--ink)', color:'#fff', padding:'10px 18px', borderRadius:'999px', fontWeight:700, fontFamily:'inherit', fontSize:'calc(14px * var(--fs-scale))', display:'flex', alignItems:'center', gap:'7px', boxShadow:'var(--shadow-lg)' }}
+            style={{ background:'var(--ink)', color:'#fff', padding:'11px 22px', borderRadius:'999px', fontWeight:700, fontFamily:'inherit', fontSize:'calc(14px * var(--fs-scale))', display:'flex', alignItems:'center', gap:'8px', boxShadow:'var(--shadow-lg)', whiteSpace:'nowrap' }}
           >
             ✏️ Editar contacto
           </button>

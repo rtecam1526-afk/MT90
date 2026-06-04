@@ -177,6 +177,16 @@
 .rev-launch-btn .icon { width: 15px; height: 15px; }
 .rev-launch-btn:hover { opacity: .8; }
 
+/* Drawer de contacto — más compacto */
+.drawer { width: 360px !important; }
+.drawer-scroll { padding: 16px 20px 20px !important; }
+.drawer .dh { margin-bottom: 14px; }
+.drawer .dh-name { font-size: calc(18px * var(--fs-scale)) !important; }
+.drawer .btn-wa-full { padding: 12px !important; font-size: calc(15px * var(--fs-scale)) !important; }
+.drawer .dsection { margin-bottom: 14px !important; }
+.drawer .dlabel { font-size: calc(12px * var(--fs-scale)) !important; margin-bottom: 6px !important; }
+.drawer .dmsg { font-size: calc(13.5px * var(--fs-scale)) !important; padding: 12px 14px !important; }
+
 /* Cartera Recorrer — versión compacta */
 .ck-wrap { max-width: 520px; }
 .ck-wrap .focus-card { padding: 22px 26px 20px; }
