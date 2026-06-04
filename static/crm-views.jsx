@@ -270,19 +270,14 @@ function InicioAsistente({ data, done, onEmpezar, onWhatsapp, onToggleDone, onOp
    CARTERA — lista simple con buscador. Sin kanban, sin badges.
    Lenguaje humano: "Hace 8 meses sin hablar".
    ============================================================ */
-function Cartera({ data, onOpen, onWhatsapp, onToggleDone, done }) {
+function Cartera({ data, onOpen }) {
   const [q, setQ] = useStateV("");
-  const [recorriendo, setRecorriendo] = useStateV(false);
   const all = [
     ...data.cartera.caliente,
     ...data.cartera.media,
     ...data.cartera.fria,
     ...data.cartera.sin,
   ];
-
-  if (recorriendo) {
-    return <CarteraRecorrer queue={all} done={done} onToggleDone={onToggleDone} onWhatsapp={onWhatsapp} onSalir={() => setRecorriendo(false)} />;
-  }
 
   const filtered = q.trim()
     ? all.filter(c =>
@@ -294,14 +289,11 @@ function Cartera({ data, onOpen, onWhatsapp, onToggleDone, done }) {
 
   return (
     <div className="fade-in">
-      <div className=”cartera-head”>
+      <div className="cartera-head">
         <div>
           <h1>Tu cartera completa</h1>
           <p>{data.totalContactos} contactos · tu día ya está en “Hoy”.</p>
         </div>
-        <button className=”btn-recorrer” onClick={() => setRecorriendo(true)}>
-          Recorrer uno a uno <Icon.arrow />
-        </button>
       </div>
 
       <div style={{ marginBottom: "16px", maxWidth: "440px", position: "relative" }}>
