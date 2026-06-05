@@ -97,7 +97,8 @@ function AgenteIA({ data, onWhatsapp }) {
     setTimeout(() => {
       setTyping(false);
       const comps = data.comparables;
-      const prom = Math.round(comps.reduce((s, c) => s + c.precio / c.m2, 0) / comps.length);
+      const promBase = comps.reduce((s, c) => s + c.precio / c.m2, 0) / comps.length;
+      const prom = Math.round(promBase * 1.10);
       const m2 = parseInt(form.m2, 10) || 65;
       const sugerido = prom * m2;
       push({
