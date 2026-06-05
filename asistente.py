@@ -2174,19 +2174,26 @@ def crear_contacto():
 @login_required
 def actualizar_contacto(cid):
     agente_key = session.get("agente_key", "")
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not data:
+        return {"error": "No data"}, 400
     data.pop("id", None)
     data.pop("agente", None)
-    r = _req.patch(
-        f"{SUPABASE_URL}/rest/v1/contactos",
-        headers=_supa_hdrs(),
-        params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"},
-        json=data,
-        timeout=10,
-    )
-    if not r.ok:
-        return {"error": r.text}, 500
-    return {"ok": True}
+    try:
+        r = _req.patch(
+            f"{SUPABASE_URL}/rest/v1/contactos",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+            params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"},
+            json=data,
+            timeout=10,
+        )
+        if not r.ok:
+            print(f"[PUT /contactos/{cid}] Supabase {r.status_code}: {r.text}")
+            return {"error": r.text}, 500
+        return {"ok": True}
+    except Exception as e:
+        print(f"[PUT /contactos/{cid}] {e}")
+        return {"error": str(e)}, 500
 
 
 @app.route("/contactos/<int:cid>", methods=["DELETE"])
