@@ -5,7 +5,7 @@ function EditarContacto({ contacto, onClose, onSave }) {
   const [nombre,    setNombre]    = useStateE(contacto.nombre || '');
   const [tel,       setTel]       = useStateE(contacto.telefono || '');
   const [necesidad, setNecesidad] = useStateE(contacto.necesidad || '');
-  const [cumple,    setCumple]    = useStateE(contacto._raw ? (contacto._raw.fecha_nacimiento || '') : '');
+  const [cumple,    setCumple]    = useStateE(contacto.cumple || '');
   const [saving,    setSaving]    = useStateE(false);
   const [error,     setError]     = useStateE('');
 
@@ -20,7 +20,7 @@ function EditarContacto({ contacto, onClose, onSave }) {
         telefono:         digits,
         whatsapp_link:    digits ? 'https://wa.me/54' + digits : '',
         necesidad:        necesidad.trim(),
-        fecha_nacimiento: cumple || '',
+        fecha_cumpleanos: cumple || null,
       });
       onSave();
     } catch(e) {
