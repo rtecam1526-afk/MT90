@@ -245,8 +245,8 @@ function App() {
         />
       )}
 
-      {detalle && window.EditarContacto && (
-        <div style={{ position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)', zIndex:80 }}>
+      {detalle && (
+        <div style={{ position:'fixed', bottom:'72px', left:'50%', transform:'translateX(-50%)', zIndex:80 }}>
           <button
             onClick={() => setEditando(detalle)}
             style={{ background:'var(--ink)', color:'#fff', padding:'11px 22px', borderRadius:'999px', fontWeight:700, fontFamily:'inherit', fontSize:'calc(14px * var(--fs-scale))', display:'flex', alignItems:'center', gap:'8px', boxShadow:'var(--shadow-lg)', whiteSpace:'nowrap' }}
@@ -256,11 +256,14 @@ function App() {
         </div>
       )}
 
-      {editando && window.EditarContacto && React.createElement(window.EditarContacto, {
-        contacto: editando,
-        onClose: () => setEditando(null),
-        onSave: () => { setEditando(null); setDetalle(null); loadContacts(); showToast('Contacto actualizado'); }
-      })}
+      {editando && React.createElement(
+        window.EditarContacto || function(){ return null; },
+        {
+          contacto: editando,
+          onClose: () => setEditando(null),
+          onSave: () => { setEditando(null); setDetalle(null); loadContacts(); showToast('Contacto actualizado'); }
+        }
+      )}
 
       {modal && <NuevoContacto onClose={() => setModal(false)} onSave={saveContact} />}
       {buscar && <BuscarOverlay data={data} onOpen={openDetalle} onClose={() => setBuscar(false)} />}
