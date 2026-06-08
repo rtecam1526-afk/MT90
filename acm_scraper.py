@@ -10,22 +10,6 @@ from concurrent.futures import ThreadPoolExecutor
 BASE_ZP      = "https://www.zonaprop.com.ar"
 _SCRAPER_KEY = os.environ.get("SCRAPER_API_KEY", "").strip()
 
-# Localidades GBA → partido para armar URL de Zonaprop (barrio-partido)
-_GBA_PARTIDOS = {
-    "wilde": "avellaneda", "dock-sud": "avellaneda", "sarandi": "avellaneda",
-    "quilmes": "quilmes", "bernal": "quilmes", "berazategui": "berazategui",
-    "lanus": "lanus", "valentin-alsina": "lanus",
-    "lomas-de-zamora": "lomas-de-zamora", "temperley": "lomas-de-zamora", "banfield": "lomas-de-zamora",
-    "san-justo": "la-matanza", "ramos-mejia": "la-matanza", "ciudadela": "tres-de-febrero",
-    "san-isidro": "san-isidro", "martinez": "san-isidro", "beccar": "san-isidro",
-    "olivos": "vicente-lopez", "florida": "vicente-lopez", "munro": "vicente-lopez",
-    "tigre": "tigre", "san-fernando": "san-fernando",
-    "moron": "moron", "haedo": "moron", "castelar": "moron",
-    "san-martin": "general-san-martin", "villa-lynch": "general-san-martin",
-    "caseros": "tres-de-febrero", "el-palomar": "moron",
-    "adroguer": "almirante-brown", "burzaco": "almirante-brown",
-}
-
 TIPO_URL_ZP = {
     "departamento": "departamentos",
     "casa":         "casas",
@@ -123,6 +107,47 @@ def _geocodificar(direccion: str, barrio: str = "") -> Optional[tuple]:
     return None
 
 
+def _slug(texto: str) -> str:
+    """Normaliza texto a slug de URL: minúsculas, sin tildes, guiones."""
+    trans = str.maketrans("áéíóúüñÁÉÍÓÚÜÑ", "aeiouunAEIOUUN")
+    return texto.translate(trans).lower().strip().replace(" ", "-")
+
+
+def _detectar_partido_zonaprop(barrio: str) -> Optional[str]:
+    """
+    Llama a Nominatim con addressdetails=1 para detectar si 'barrio' es una
+    localidad de GBA y extraer el partido. Devuelve el slug del partido para
+    armar la URL de Zonaprop (ej: 'avellaneda'), o None si es CABA/no detectado.
+    """
+    query = f"{barrio}, Buenos Aires, Argentina"
+    try:
+        q = urllib.parse.quote(query)
+        req = urllib.request.Request(
+            f"https://nominatim.openstreetmap.org/search?q={q}&format=json&limit=1"
+            f"&countrycodes=ar&addressdetails=1",
+            headers={"User-Agent": "MT90-ACM/1.0 (captacion inmobiliaria)"}
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            results = json.loads(resp.read().decode())
+        if not results:
+            return None
+        addr  = results[0].get("address", {})
+        state = addr.get("state", "")
+        city  = addr.get("city", "") or addr.get("town", "") or addr.get("municipality", "")
+        # CABA se llama "Ciudad Autónoma de Buenos Aires" o city == "Buenos Aires"
+        if "autónoma" in state.lower() or city.lower() in ("buenos aires", "ciudad de buenos aires"):
+            return None  # Es CABA, no necesita partido
+        # GBA: extraer partido del campo county o city_district
+        county = addr.get("county", "") or addr.get("city_district", "")
+        if county:
+            partido = _slug(county.replace("Partido de ", "").replace("partido de ", ""))
+            print(f"[ACM-ZP] Partido detectado via Nominatim: '{partido}' (county='{county}')")
+            return partido
+    except Exception as e:
+        print(f"[ACM-ZP] Error detectando partido para '{barrio}': {e}")
+    return None
+
+
 def _extraer_datos_posting_zp(p):
     m2 = None
     ambientes = None
@@ -181,51 +206,42 @@ def _extraer_datos_posting_zp(p):
 
 # ── Zonaprop ──────────────────────────────────────────────────────────────────
 
+def _zp_postings(session, tipo_url: str, barrio_url: str, pag: int) -> list:
+    """Descarga una página de Zonaprop y devuelve la lista de postings (puede ser [])."""
+    if pag == 1:
+        url = f"{BASE_ZP}/{tipo_url}-venta-{barrio_url}.html"
+    else:
+        url = f"{BASE_ZP}/{tipo_url}-venta-{barrio_url}-pagina-{pag}.html"
+    html = _fetch(session, url)
+    if not html:
+        return []
+    state = _extraer_state_zp(html)
+    if not state:
+        print(f"[ACM-ZP] Sin PRELOADED_STATE en: {url}")
+        return []
+    postings = state.get("listStore", {}).get("listPostings", [])
+    print(f"[ACM-ZP] {url}: {len(postings)} postings")
+    return postings
+
+
 def _buscar_zonaprop(barrio: str, tipo: str, session, paginas: int = 2) -> list:
-    barrio_url = barrio.strip().lower().replace(" ", "-")
+    barrio_url = _slug(barrio)
     tipo_url   = TIPO_URL_ZP.get(tipo.lower(), tipo.lower() + "s")
     resultados = []
 
-    # Si el barrio no incluye ya el partido y es GBA conocido, agregarlo
-    barrio_base = barrio_url.split("-")[0] if "-" in barrio_url else barrio_url
-    if "-" not in barrio_url and barrio_url in _GBA_PARTIDOS:
-        barrio_url = f"{barrio_url}-{_GBA_PARTIDOS[barrio_url]}"
-        print(f"[ACM-ZP] Barrio GBA detectado, usando slug: {barrio_url}")
+    # Página 1: primer intento con el barrio tal como viene
+    postings_p1 = _zp_postings(session, tipo_url, barrio_url, 1)
 
-    for pag in range(1, paginas + 1):
-        if pag == 1:
-            url = f"{BASE_ZP}/{tipo_url}-venta-{barrio_url}.html"
-        else:
-            url = f"{BASE_ZP}/{tipo_url}-venta-{barrio_url}-pagina-{pag}.html"
+    # Si no hay resultados y el slug no tiene partido, intentar detectarlo via Nominatim
+    if not postings_p1:
+        partido = _detectar_partido_zonaprop(barrio)
+        if partido:
+            barrio_con_partido = f"{barrio_url}-{partido}"
+            postings_p1 = _zp_postings(session, tipo_url, barrio_con_partido, 1)
+            if postings_p1:
+                barrio_url = barrio_con_partido  # usar este slug para las páginas siguientes
 
-        html = _fetch(session, url)
-        if not html:
-            continue
-
-        state = _extraer_state_zp(html)
-        if not state:
-            print(f"[ACM-ZP] Sin PRELOADED_STATE en: {url}")
-            # Si falla la primera página y el barrio es GBA simple, intentar con partido
-            if pag == 1 and barrio_url in _GBA_PARTIDOS:
-                barrio_url = f"{barrio_url}-{_GBA_PARTIDOS[barrio_url]}"
-                print(f"[ACM-ZP] Reintentando con partido: {barrio_url}")
-            continue
-
-        postings = state.get("listStore", {}).get("listPostings", [])
-        print(f"[ACM-ZP] Página {pag}: {len(postings)} postings")
-
-        # Si página 1 retorna 0 resultados y es barrio GBA simple, probar con partido
-        if pag == 1 and len(postings) == 0 and barrio_base in _GBA_PARTIDOS and barrio_url == barrio_base:
-            barrio_url = f"{barrio_base}-{_GBA_PARTIDOS[barrio_base]}"
-            url2 = f"{BASE_ZP}/{tipo_url}-venta-{barrio_url}.html"
-            print(f"[ACM-ZP] Sin resultados, reintentando con: {url2}")
-            html2 = _fetch(session, url2)
-            if html2:
-                state2 = _extraer_state_zp(html2)
-                if state2:
-                    postings = state2.get("listStore", {}).get("listPostings", [])
-                    print(f"[ACM-ZP] Reintento con partido: {len(postings)} postings")
-
+    def _procesar(postings):
         for p in postings:
             try:
                 titulo = (p.get("generatedTitle") or p.get("title") or "").strip()
@@ -279,6 +295,9 @@ def _buscar_zonaprop(barrio: str, tipo: str, session, paginas: int = 2) -> list:
             except Exception:
                 continue
 
+    _procesar(postings_p1)
+    for pag in range(2, paginas + 1):
+        _procesar(_zp_postings(session, tipo_url, barrio_url, pag))
         time.sleep(0.5)
 
     print(f"[ACM-ZP] {len(resultados)} listings encontrados")
@@ -386,9 +405,7 @@ def _buscar_argenprop(barrio: str, tipo: str, session, paginas: int = 1) -> list
     luego extracción directa del HTML renderizado.
     """
     tipo_ap    = TIPO_URL_AP.get(tipo.lower(), tipo.lower())
-    barrio_url = barrio.strip().lower().replace(" ", "-")
-    # Argenprop GBA usa solo el nombre sin partido en la URL
-    barrio_ap  = barrio_url.split("-")[0] if barrio_url in _GBA_PARTIDOS.values() else barrio_url
+    barrio_url = _slug(barrio)
     resultados = []
 
     for pag in range(1, paginas + 1):
