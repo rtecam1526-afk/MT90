@@ -1608,7 +1608,7 @@ PASO 5 — Precio de publicación sugerido = precio/m² ajustado × m² de la pr
 
 PASO 6 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
 
-Los datos de comparables son los siguientes:
+{premium_nota}Los datos de comparables son los siguientes:
 
 {datos}
 
@@ -1643,6 +1643,7 @@ def acm():
     m2desc      = data.get("m2desc")
     antiguedad  = data.get("antiguedad")
     amenities   = (data.get("amenities")  or "").strip() or None
+    premium     = bool(data.get("premium", False))
 
     if not barrio:
         return {"error": "Barrio requerido"}, 400
@@ -1724,7 +1725,17 @@ def acm():
         if prop_extra:
             datos_texto += "\n\nDATOS ESPECÍFICOS DE LA PROPIEDAD OBJETIVO:\n" + "\n".join(prop_extra)
 
-        prompt_acm  = ACM_PROMPT.format(datos=datos_texto, fecha_hoy=datetime.now().strftime("%d/%m/%Y"))
+        premium_nota = (
+            "\n⚡ PROPIEDAD PREMIUM: Esta propiedad está por encima de la media del barrio. "
+            "En el PASO 3, usá el promedio del 50% MÁS CARO de los comparables filtrados (no el promedio general). "
+            "Aplicá también el ajuste de amenities/calidad si corresponde.\n"
+            if premium else ""
+        )
+        prompt_acm  = ACM_PROMPT.format(
+            datos=datos_texto,
+            fecha_hoy=datetime.now().strftime("%d/%m/%Y"),
+            premium_nota=premium_nota,
+        )
 
         history = _historiales.get(sid, [])
         dir_txt  = f", Dirección: {direccion}" if direccion else ""
