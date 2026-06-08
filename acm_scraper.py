@@ -548,6 +548,45 @@ def _buscar_argenprop(barrio: str, tipo: str, session, paginas: int = 1) -> list
     return resultados
 
 
+# ── Zonas GBA similares para ampliar búsqueda cuando faltan comparables ────────
+
+# Agrupa barrios GBA por zona socioeconómica similar para búsqueda de respaldo.
+# Cuando el barrio principal devuelve pocos comparables del tamaño buscado,
+# se agrega automáticamente la zona de respaldo.
+_ZONAS_SIMILARES_GBA = {
+    # Sur / Sureste
+    "wilde":        ["quilmes", "bernal", "lanus"],
+    "quilmes":      ["bernal", "wilde", "berazategui"],
+    "bernal":       ["quilmes", "wilde", "lanus"],
+    "berazategui":  ["quilmes", "bernal", "florencio-varela"],
+    # Suroeste
+    "lanus":        ["wilde", "lomas-de-zamora", "banfield"],
+    "lomas-de-zamora": ["banfield", "temperley", "lanus"],
+    "banfield":     ["lomas-de-zamora", "temperley", "lanus"],
+    "temperley":    ["lomas-de-zamora", "banfield", "adroguer"],
+    # Oeste
+    "moron":        ["haedo", "castelar", "ramos-mejia"],
+    "haedo":        ["moron", "castelar", "el-palomar"],
+    "castelar":     ["moron", "haedo", "ituzaingo"],
+    "ramos-mejia":  ["moron", "san-justo", "haedo"],
+    # Noroeste
+    "san-martin":   ["villa-lynch", "ciudadela", "caseros"],
+    "ciudadela":    ["san-martin", "caseros", "villa-lynch"],
+    "caseros":      ["ciudadela", "san-martin", "el-palomar"],
+    # Norte
+    "olivos":       ["florida", "munro", "martinez"],
+    "florida":      ["olivos", "munro", "san-isidro"],
+    "martinez":     ["san-isidro", "olivos", "beccar"],
+    "san-isidro":   ["martinez", "beccar", "florida"],
+    "beccar":       ["san-isidro", "martinez", "tigre"],
+    # Noreste
+    "tigre":        ["san-fernando", "beccar", "san-isidro"],
+    "san-fernando": ["tigre", "beccar"],
+}
+
+MIN_COMP_CREIBLES = 5   # Mínimo de comparables con m² conocido antes de ampliar
+
+
 # ── Agregador principal ───────────────────────────────────────────────────────
 
 def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
@@ -641,6 +680,38 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
         filtrados = [c for c in todos if c["m2"] and abs(c["m2"] - m2_target) <= margen]
         if len(filtrados) >= 6:
             todos = filtrados
+
+    # ── Ampliar a zonas similares si hay pocos comparables creíbles ──────────
+    barrio_slug = _slug(barrio)
+    zonas_fb    = _ZONAS_SIMILARES_GBA.get(barrio_slug, [])
+    comp_con_m2 = [c for c in todos if c.get("m2")]
+
+    if zonas_fb and len(comp_con_m2) < MIN_COMP_CREIBLES:
+        _cb(f"🔎 Pocos comparables similares en {barrio.title()} — ampliando búsqueda a zonas cercanas...")
+        extras = []
+        for barrio_fb in zonas_fb[:2]:   # max 2 barrios adicionales
+            _cb(f"   ↳ Buscando en **{barrio_fb.replace('-', ' ').title()}**...")
+            try:
+                with ThreadPoolExecutor(max_workers=3) as ex2:
+                    f1 = ex2.submit(_buscar_zonaprop, barrio_fb, tipo, _crear_session(), 1)
+                    f2 = ex2.submit(_buscar_ml, barrio_fb, tipo, m2_target, ambientes_target)
+                    f3 = ex2.submit(_buscar_argenprop, barrio_fb, tipo, _crear_session(), 1)
+                    for fut in [f1, f2, f3]:
+                        try:
+                            extras.extend(fut.result(timeout=30))
+                        except Exception:
+                            pass
+            except Exception as e:
+                print(f"[ACM] Fallback {barrio_fb}: {e}")
+
+        if extras:
+            # Filtrar por m² también los del barrio de respaldo
+            if m2_target:
+                margen = max(25, int(m2_target * 0.30))
+                extras = [c for c in extras if c["m2"] and abs(c["m2"] - m2_target) <= margen] or extras
+            todos = todos + extras
+            barrios_extra = ", ".join(b.replace("-", " ").title() for b in zonas_fb[:2])
+            _cb(f"✓ Se agregaron {len(extras)} comparables de zonas similares ({barrios_extra})")
 
     # Filtrar por ambientes si hay suficientes
     if ambientes_target and len(todos) > 8:
