@@ -1593,20 +1593,30 @@ PASO 2 — Descartá outliers obvios: propiedades con precio/m² más de 2 veces
 
 PASO 3 — Calculá el precio/m² promedio de TODOS los comparables filtrados (no solo los más baratos). Ese es tu precio/m² de mercado.
 
-PASO 4 — Aplicá ajustes si la propiedad tiene características distintivas respecto a los comparables:
+PASO 4 — Calculá el precio total de la propiedad según la superficie disponible:
+
+   SI hay superficie cubierta Y superficie descubierta/semicubierta:
+     Precio = (m²_cubiertos × precio/m²) + (m²_descubiertos × precio/m² × 0.40)
+     Los m² descubiertos o semicubiertos (galería, jardín, patio, quincho parcial) valen el 40% del precio/m² cubierto.
+
+   SI solo hay superficie total (sin desglose):
+     Precio = m²_totales × precio/m²
+
+   SI los comparables se midieron en m² totales pero la propiedad tiene desglose:
+     Usá el m² cubierto como referencia principal para el precio/m², luego sumá el valor de los descubiertos.
+
+PASO 5 — Ajustes adicionales por características distintivas:
    - Antigüedad > 50 años sin renovación: restar 8%
    - Antigüedad entre 30-50 años sin renovación: restar 4%
-   - Planta baja o primer piso sin ascensor: restar 5%
-   - Superficie < 40m²: restar 4%
-   - Sin amenities en zona donde la mayoría tiene (pileta, gym, SUM): restar 4%
+   - Sin amenities en zona donde la mayoría tiene (pileta, SUM): restar 4%
    - Con amenities cuando la mayoría de comparables no tienen: sumar 6%
-   - m² descubiertos (balcón, terraza, patio): valuarlos al 40% del precio/m² cubierto.
+   - Planta baja sin acceso independiente: restar 5%
    Solo aplicá ajustes que correspondan con los datos disponibles.
 
-PASO 5 — Precio de publicación sugerido = precio/m² ajustado × m² de la propiedad.
-   Este es el precio al que el agente recomienda publicar la propiedad en los portales. Es un precio de lista competitivo, ya alineado con el mercado actual.
+PASO 6 — Precio de publicación sugerido = resultado del PASO 4 con ajustes del PASO 5.
+   Es el precio de lista competitivo para publicar en portales.
 
-PASO 6 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
+PASO 7 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
 
 {premium_nota}Los datos de comparables son los siguientes:
 
@@ -1614,13 +1624,13 @@ PASO 6 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
 
 ═══ ESTRUCTURA DEL INFORME ═══
 
-1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m², tipo, ambientes.
+1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m² cubiertos / m² semicubiertos si aplica, tipo, ambientes.
 
 2. **Comparables del mercado** — mostrá TODOS los comparables seleccionados (los 8-12 filtrados), ordenados de menor a mayor precio/m². Tabla con columnas: Dirección/Zona | m² | Amb. | Precio USD | USD/m² | Fuente.
    Al final: "Precio/m² promedio del mercado: USD X/m²".
 
 3. **Precio recomendado**:
-   - *Publicación sugerida*: USD [número concreto]. Una línea con el cálculo.
+   - *Publicación sugerida*: USD [número concreto]. Mostrá el cálculo: ej. "170 m² cub × USD 1.400/m² + 150 m² semicub × USD 560/m² = USD 322.000".
    - *Cierre estimado*: USD [rango] (5-8% por debajo de publicación).
 
 4. **Próximos pasos** — 3 ítems concretos (firmar mandato, fotos profesionales, publicación).
