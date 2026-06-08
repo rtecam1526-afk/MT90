@@ -1595,9 +1595,9 @@ PASO 1 — Filtrá los comparables más similares a la propiedad objetivo en m²
 
 PASO 2 — Ordenalos por precio/m² de menor a mayor.
 
-PASO 3 — Tomá el tercio más barato (33% inferior). Esas son las propiedades que están generando consultas reales en el mercado actual. Si tenés 9 comparables, usá los 3 más baratos; si tenés 12, usá los 4 más baratos.
+PASO 3 — Tomá la mitad más barata (50% inferior, por debajo de la mediana). Si tenés 10 comparables, usá los 5 más baratos; si tenés 8, usá los 4 más baratos.
 
-PASO 4 — Calculá el precio/m² promedio de ese tercio más barato. Ese es tu precio/m² base.
+PASO 4 — Calculá el precio/m² promedio de esa mitad más barata. Ese es tu precio/m² base.
 
 PASO 5 — Aplicá ajustes si la propiedad tiene características distintivas:
    - Antigüedad > 50 años sin renovación: restar 8%
@@ -1622,8 +1622,8 @@ Los datos de comparables son los siguientes:
 1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m², tipo, ambientes.
 
 2. **Comparables del mercado** — mostrá TODOS los comparables seleccionados (los 8-12 filtrados), ordenados de menor a mayor precio/m². Tabla con columnas: Dirección/Zona | m² | Amb. | Precio USD | USD/m² | Fuente.
-   Marcá con ★ los del tercio más barato (los usados para calcular el precio base).
-   Al final: "Precio/m² base (tercio más competitivo): USD X/m²".
+   Marcá con ★ los de la mitad más barata (los usados para calcular el precio base).
+   Al final: "Precio/m² base (mediana del mercado): USD X/m²".
 
 3. **Precio recomendado**:
    - *Publicación sugerida*: USD [número concreto]. Una línea con el cálculo.
