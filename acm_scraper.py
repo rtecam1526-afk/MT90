@@ -10,6 +10,22 @@ from concurrent.futures import ThreadPoolExecutor
 BASE_ZP      = "https://www.zonaprop.com.ar"
 _SCRAPER_KEY = os.environ.get("SCRAPER_API_KEY", "").strip()
 
+# Localidades GBA → partido para armar URL de Zonaprop (barrio-partido)
+_GBA_PARTIDOS = {
+    "wilde": "avellaneda", "dock-sud": "avellaneda", "sarandi": "avellaneda",
+    "quilmes": "quilmes", "bernal": "quilmes", "berazategui": "berazategui",
+    "lanus": "lanus", "valentin-alsina": "lanus",
+    "lomas-de-zamora": "lomas-de-zamora", "temperley": "lomas-de-zamora", "banfield": "lomas-de-zamora",
+    "san-justo": "la-matanza", "ramos-mejia": "la-matanza", "ciudadela": "tres-de-febrero",
+    "san-isidro": "san-isidro", "martinez": "san-isidro", "beccar": "san-isidro",
+    "olivos": "vicente-lopez", "florida": "vicente-lopez", "munro": "vicente-lopez",
+    "tigre": "tigre", "san-fernando": "san-fernando",
+    "moron": "moron", "haedo": "moron", "castelar": "moron",
+    "san-martin": "general-san-martin", "villa-lynch": "general-san-martin",
+    "caseros": "tres-de-febrero", "el-palomar": "moron",
+    "adroguer": "almirante-brown", "burzaco": "almirante-brown",
+}
+
 TIPO_URL_ZP = {
     "departamento": "departamentos",
     "casa":         "casas",
@@ -170,6 +186,12 @@ def _buscar_zonaprop(barrio: str, tipo: str, session, paginas: int = 2) -> list:
     tipo_url   = TIPO_URL_ZP.get(tipo.lower(), tipo.lower() + "s")
     resultados = []
 
+    # Si el barrio no incluye ya el partido y es GBA conocido, agregarlo
+    barrio_base = barrio_url.split("-")[0] if "-" in barrio_url else barrio_url
+    if "-" not in barrio_url and barrio_url in _GBA_PARTIDOS:
+        barrio_url = f"{barrio_url}-{_GBA_PARTIDOS[barrio_url]}"
+        print(f"[ACM-ZP] Barrio GBA detectado, usando slug: {barrio_url}")
+
     for pag in range(1, paginas + 1):
         if pag == 1:
             url = f"{BASE_ZP}/{tipo_url}-venta-{barrio_url}.html"
@@ -183,10 +205,26 @@ def _buscar_zonaprop(barrio: str, tipo: str, session, paginas: int = 2) -> list:
         state = _extraer_state_zp(html)
         if not state:
             print(f"[ACM-ZP] Sin PRELOADED_STATE en: {url}")
+            # Si falla la primera página y el barrio es GBA simple, intentar con partido
+            if pag == 1 and barrio_url in _GBA_PARTIDOS:
+                barrio_url = f"{barrio_url}-{_GBA_PARTIDOS[barrio_url]}"
+                print(f"[ACM-ZP] Reintentando con partido: {barrio_url}")
             continue
 
         postings = state.get("listStore", {}).get("listPostings", [])
         print(f"[ACM-ZP] Página {pag}: {len(postings)} postings")
+
+        # Si página 1 retorna 0 resultados y es barrio GBA simple, probar con partido
+        if pag == 1 and len(postings) == 0 and barrio_base in _GBA_PARTIDOS and barrio_url == barrio_base:
+            barrio_url = f"{barrio_base}-{_GBA_PARTIDOS[barrio_base]}"
+            url2 = f"{BASE_ZP}/{tipo_url}-venta-{barrio_url}.html"
+            print(f"[ACM-ZP] Sin resultados, reintentando con: {url2}")
+            html2 = _fetch(session, url2)
+            if html2:
+                state2 = _extraer_state_zp(html2)
+                if state2:
+                    postings = state2.get("listStore", {}).get("listPostings", [])
+                    print(f"[ACM-ZP] Reintento con partido: {len(postings)} postings")
 
         for p in postings:
             try:
@@ -349,6 +387,8 @@ def _buscar_argenprop(barrio: str, tipo: str, session, paginas: int = 1) -> list
     """
     tipo_ap    = TIPO_URL_AP.get(tipo.lower(), tipo.lower())
     barrio_url = barrio.strip().lower().replace(" ", "-")
+    # Argenprop GBA usa solo el nombre sin partido en la URL
+    barrio_ap  = barrio_url.split("-")[0] if barrio_url in _GBA_PARTIDOS.values() else barrio_url
     resultados = []
 
     for pag in range(1, paginas + 1):
