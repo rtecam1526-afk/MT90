@@ -1587,30 +1587,31 @@ IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el in
 
 ═══ CONTEXTO DEL MERCADO — LEER ANTES DE CALCULAR ═══
 
-Los datos son PRECIOS DE PUBLICACIÓN de Zonaprop y otros portales. Los precios publicados incluyen margen de negociación; el precio de cierre real suele ser un 3-6% menor que la publicación.
+Los datos son PRECIOS DE PUBLICACIÓN de Zonaprop, MercadoLibre y Argenprop. Los precios publicados en CABA suelen estar 20-30% por encima del precio al que finalmente se cierra una operación, porque el mercado es lento y los propietarios publican aspiracionalmente. Las propiedades que generan consultas reales son las más competitivas en precio, no las más caras.
 
 ═══ CÓMO CALCULAR EL PRECIO — SEGUÍ ESTOS PASOS ═══
 
-PASO 1 — De todos los comparables recibidos, filtrá los más similares a la propiedad objetivo en m² (±20%) y ambientes (±1). Quedate con los 6-10 más parecidos.
+PASO 1 — Filtrá los comparables más similares a la propiedad objetivo en m² (±25%) y ambientes (±1). Quedate con los 8-12 más parecidos.
 
-PASO 2 — Calculá el precio/m² de cada uno. Descartá outliers claros (propiedades con precio/m² más de 40% alejado del resto).
+PASO 2 — Ordenalos por precio/m² de menor a mayor.
 
-PASO 3 — Calculá el precio/m² PROMEDIO de los comparables seleccionados. Ese es tu precio/m² base.
+PASO 3 — Tomá el tercio más barato (33% inferior). Esas son las propiedades que están generando consultas reales en el mercado actual. Si tenés 9 comparables, usá los 3 más baratos; si tenés 12, usá los 4 más baratos.
 
-PASO 4 — Aplicá ajustes según las características específicas de la propiedad objetivo:
+PASO 4 — Calculá el precio/m² promedio de ese tercio más barato. Ese es tu precio/m² base.
+
+PASO 5 — Aplicá ajustes si la propiedad tiene características distintivas:
    - Antigüedad > 50 años sin renovación: restar 8%
-   - Antigüedad > 40 años sin renovación: restar 5%
+   - Antigüedad entre 30-50 años sin renovación: restar 4%
    - Planta baja o primer piso sin ascensor: restar 5%
    - Superficie < 40m²: restar 4%
    - Sin amenities en zona donde la mayoría tiene (pileta, gym, SUM): restar 4%
    - Con amenities cuando la mayoría de comparables no tienen: sumar 5%
-   - Muy buena iluminación / orientación / vistas: sumar 3%
    - m² descubiertos (balcón, terraza, patio): valuarlos al 40% del precio/m² cubierto.
-   Solo aplicá los ajustes que correspondan según los datos recibidos. Si no hay datos suficientes, no ajustés.
+   Solo aplicá ajustes que correspondan con los datos disponibles.
 
-PASO 5 — Precio de publicación sugerido = precio/m² ajustado × m² totales de la propiedad.
+PASO 6 — Precio de publicación sugerido = precio/m² ajustado × m² de la propiedad.
 
-PASO 6 — Precio de cierre estimado = precio de publicación menos 3 a 6%.
+PASO 7 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
 
 Los datos de comparables son los siguientes:
 
@@ -1620,16 +1621,17 @@ Los datos de comparables son los siguientes:
 
 1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m², tipo, ambientes.
 
-2. **Comparables del mercado** — mostrá TODOS los comparables seleccionados (los 6-10 filtrados). Tabla con columnas: Dirección/Zona | m² | Amb. | Precio USD | USD/m² | Fuente/Link.
-   Al final de la tabla: una línea con el promedio: "Promedio del mercado: USD X/m²".
+2. **Comparables del mercado** — mostrá TODOS los comparables seleccionados (los 8-12 filtrados), ordenados de menor a mayor precio/m². Tabla con columnas: Dirección/Zona | m² | Amb. | Precio USD | USD/m² | Fuente.
+   Marcá con ★ los del tercio más barato (los usados para calcular el precio base).
+   Al final: "Precio/m² base (tercio más competitivo): USD X/m²".
 
 3. **Precio recomendado**:
-   - *Publicación sugerida*: USD [número concreto]. Una línea explicando el cálculo.
-   - *Cierre estimado*: USD [rango] (3-6% por debajo de publicación).
+   - *Publicación sugerida*: USD [número concreto]. Una línea con el cálculo.
+   - *Cierre estimado*: USD [rango] (5-8% por debajo de publicación).
 
 4. **Próximos pasos** — 3 ítems concretos (firmar mandato, fotos profesionales, publicación).
 
-Tono: profesional, datos concretos, sin rodeos. El informe tiene que transmitir solidez técnica.
+Tono: profesional, datos concretos, directo. El informe tiene que transmitir solidez técnica y darle confianza al agente para defender el precio ante el propietario.
 """
 
 @app.route("/acm", methods=["POST"])
