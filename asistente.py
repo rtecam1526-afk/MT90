@@ -1587,54 +1587,49 @@ IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el in
 
 ═══ CONTEXTO DEL MERCADO — LEER ANTES DE CALCULAR ═══
 
-Los datos son PRECIOS DE PUBLICACIÓN de Zonaprop, NO precios de cierre.
-Los precios publicados en Zonaprop son aspiracionales y en muchos barrios de CABA están un 25-35% por encima del precio al que realmente se cierra una operación. Esto significa que incluso la mitad más barata de Zonaprop puede estar por encima del mercado real.
+Los datos son PRECIOS DE PUBLICACIÓN de Zonaprop y otros portales. Los precios publicados incluyen margen de negociación; el precio de cierre real suele ser un 3-6% menor que la publicación.
 
 ═══ CÓMO CALCULAR EL PRECIO — SEGUÍ ESTOS PASOS ═══
 
-PASO 1 — Filtrá los comparables más similares a la propiedad objetivo en m² y ambientes. Quedate con los 8-12 más parecidos.
+PASO 1 — De todos los comparables recibidos, filtrá los más similares a la propiedad objetivo en m² (±20%) y ambientes (±1). Quedate con los 6-10 más parecidos.
 
-PASO 2 — Ordenalos por precio/m² de menor a mayor.
+PASO 2 — Calculá el precio/m² de cada uno. Descartá outliers claros (propiedades con precio/m² más de 40% alejado del resto).
 
-PASO 3 — Tomá solo el 20% más barato (quintil inferior). Si tenés 10 comparables, usá los 2 más baratos. Si tenés 50, usá los 10 más baratos. Esos son los únicos que están generando consultas reales hoy.
+PASO 3 — Calculá el precio/m² PROMEDIO de los comparables seleccionados. Ese es tu precio/m² base.
 
-PASO 4 — Calculá el precio/m² promedio de ese 20% más barato. Ese es tu precio/m² base.
+PASO 4 — Aplicá ajustes según las características específicas de la propiedad objetivo:
+   - Antigüedad > 50 años sin renovación: restar 8%
+   - Antigüedad > 40 años sin renovación: restar 5%
+   - Planta baja o primer piso sin ascensor: restar 5%
+   - Superficie < 40m²: restar 4%
+   - Sin amenities en zona donde la mayoría tiene (pileta, gym, SUM): restar 4%
+   - Con amenities cuando la mayoría de comparables no tienen: sumar 5%
+   - Muy buena iluminación / orientación / vistas: sumar 3%
+   - m² descubiertos (balcón, terraza, patio): valuarlos al 40% del precio/m² cubierto.
+   Solo aplicá los ajustes que correspondan según los datos recibidos. Si no hay datos suficientes, no ajustés.
 
-PASO 5 — Aplicá descuentos adicionales si la propiedad tiene características que la posicionan por debajo del promedio de ese grupo:
-   - Antigüedad > 40 años: restar 8% adicional
-   - Antigüedad > 50 años: restar 12% adicional
-   - Planta baja o primer piso sin ascensor: restar 6% adicional
-   - Superficie cubierta < 40m²: restar 5% adicional
-   - Sin amenities en zona donde la mayoría tiene (pileta, gym, SUM): restar 5% adicional
-   - Si tiene amenities y la mayoría de comparables no: sumar 5% al precio base
-   - m² descubiertos (patio, terraza, balcón grande): suman valor pero menos que los cubiertos. Consideralos a un 40% del valor del m² cubierto.
-   Solo aplicá los ajustes que correspondan según los datos recibidos.
+PASO 5 — Precio de publicación sugerido = precio/m² ajustado × m² totales de la propiedad.
 
-PASO 6 — Precio de publicación sugerido = precio/m² base ajustado × m² de la propiedad.
+PASO 6 — Precio de cierre estimado = precio de publicación menos 3 a 6%.
 
-PASO 7 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
-
-IMPORTANTE: Si el precio resultante parece bajo comparado con lo que el propietario espera, eso es correcto. Significa que el mercado está por debajo de las expectativas. Es mejor mostrarlo con datos ahora que en 3 meses de propiedad sin consultas.
-
-Los datos de comparables activos en Zonaprop son los siguientes:
+Los datos de comparables son los siguientes:
 
 {datos}
 
-═══ ESTRUCTURA DEL INFORME — BREVE Y DIRECTA ═══
+═══ ESTRUCTURA DEL INFORME ═══
 
-El informe debe ser CORTO. El propietario lo va a leer en la reunión. Máximo 1 página. No pongas números altos al principio — generan ancla psicológica y después cuesta bajar al precio real.
+1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m², tipo, ambientes.
 
-1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m², tipo.
+2. **Comparables del mercado** — mostrá TODOS los comparables seleccionados (los 6-10 filtrados). Tabla con columnas: Dirección/Zona | m² | Amb. | Precio USD | USD/m² | Fuente/Link.
+   Al final de la tabla: una línea con el promedio: "Promedio del mercado: USD X/m²".
 
-2. **La competencia real** — solo las 4-5 propiedades más baratas y similares (las que SÍ generan visitas). Tabla simple: m², ambientes, precio, precio/m², link. NO incluyas las propiedades caras. Una línea al final: "Promedio de la competencia activa: USD X/m²".
+3. **Precio recomendado**:
+   - *Publicación sugerida*: USD [número concreto]. Una línea explicando el cálculo.
+   - *Cierre estimado*: USD [rango] (3-6% por debajo de publicación).
 
-3. **Precio recomendado** — directo al número:
-   - *Publicación sugerida*: USD [número concreto, no rango]. Calculado como promedio/m² de la competencia activa × m² de la propiedad. Una sola línea de justificación.
-   - *Cierre estimado*: USD [número] – USD [número] (5-8% menos que publicación).
+4. **Próximos pasos** — 3 ítems concretos (firmar mandato, fotos profesionales, publicación).
 
-4. **Próximos pasos** — 3 ítems concretos (firmar mandato, fotos, publicación).
-
-Tono: directo, sin rodeos, datos concretos. El propietario tiene que llegar al precio recomendado por su propio razonamiento antes de que el agente lo diga.
+Tono: profesional, datos concretos, sin rodeos. El informe tiene que transmitir solidez técnica.
 """
 
 @app.route("/acm", methods=["POST"])
