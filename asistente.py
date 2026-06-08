@@ -1585,33 +1585,28 @@ ACM_PROMPT = """Generá un ACM (Análisis Comparativo de Mercado) profesional en
 
 IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el informe como fecha del relevamiento.
 
-═══ CONTEXTO DEL MERCADO — LEER ANTES DE CALCULAR ═══
-
-Los datos son PRECIOS DE PUBLICACIÓN de Zonaprop, MercadoLibre y Argenprop. Los precios publicados en CABA suelen estar 20-30% por encima del precio al que finalmente se cierra una operación, porque el mercado es lento y los propietarios publican aspiracionalmente. Las propiedades que generan consultas reales son las más competitivas en precio, no las más caras.
-
 ═══ CÓMO CALCULAR EL PRECIO — SEGUÍ ESTOS PASOS ═══
 
-PASO 1 — Filtrá los comparables más similares a la propiedad objetivo en m² (±25%) y ambientes (±1). Quedate con los 8-12 más parecidos.
+PASO 1 — Filtrá los comparables más similares a la propiedad objetivo en m² (±25%) y ambientes (±1). Quedate con los 8-12 más parecidos. Si hay pocos comparables con esas restricciones, ampliá a ±35% en m².
 
-PASO 2 — Ordenalos por precio/m² de menor a mayor.
+PASO 2 — Descartá outliers obvios: propiedades con precio/m² más de 2 veces el promedio del grupo o menos de la mitad. Quedarte con el rango razonable del mercado.
 
-PASO 3 — Tomá la mitad más barata (50% inferior, por debajo de la mediana). Si tenés 10 comparables, usá los 5 más baratos; si tenés 8, usá los 4 más baratos.
+PASO 3 — Calculá el precio/m² promedio de TODOS los comparables filtrados (no solo los más baratos). Ese es tu precio/m² de mercado.
 
-PASO 4 — Calculá el precio/m² promedio de esa mitad más barata. Ese es tu precio/m² base.
-
-PASO 5 — Aplicá ajustes si la propiedad tiene características distintivas:
+PASO 4 — Aplicá ajustes si la propiedad tiene características distintivas respecto a los comparables:
    - Antigüedad > 50 años sin renovación: restar 8%
    - Antigüedad entre 30-50 años sin renovación: restar 4%
    - Planta baja o primer piso sin ascensor: restar 5%
    - Superficie < 40m²: restar 4%
    - Sin amenities en zona donde la mayoría tiene (pileta, gym, SUM): restar 4%
-   - Con amenities cuando la mayoría de comparables no tienen: sumar 5%
+   - Con amenities cuando la mayoría de comparables no tienen: sumar 6%
    - m² descubiertos (balcón, terraza, patio): valuarlos al 40% del precio/m² cubierto.
    Solo aplicá ajustes que correspondan con los datos disponibles.
 
-PASO 6 — Precio de publicación sugerido = precio/m² ajustado × m² de la propiedad.
+PASO 5 — Precio de publicación sugerido = precio/m² ajustado × m² de la propiedad.
+   Este es el precio al que el agente recomienda publicar la propiedad en los portales. Es un precio de lista competitivo, ya alineado con el mercado actual.
 
-PASO 7 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
+PASO 6 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
 
 Los datos de comparables son los siguientes:
 
@@ -1622,8 +1617,7 @@ Los datos de comparables son los siguientes:
 1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m², tipo, ambientes.
 
 2. **Comparables del mercado** — mostrá TODOS los comparables seleccionados (los 8-12 filtrados), ordenados de menor a mayor precio/m². Tabla con columnas: Dirección/Zona | m² | Amb. | Precio USD | USD/m² | Fuente.
-   Marcá con ★ los de la mitad más barata (los usados para calcular el precio base).
-   Al final: "Precio/m² base (mediana del mercado): USD X/m²".
+   Al final: "Precio/m² promedio del mercado: USD X/m²".
 
 3. **Precio recomendado**:
    - *Publicación sugerida*: USD [número concreto]. Una línea con el cálculo.
