@@ -1630,12 +1630,19 @@ PASO 7 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
    Al final: "Precio/m² promedio del mercado: USD X/m²".
 
 3. **Precio recomendado**:
-   - *Publicación sugerida*: USD [número concreto]. Mostrá el cálculo: ej. "170 m² cub × USD 1.400/m² + 150 m² semicub × USD 560/m² = USD 322.000".
+   - *Publicación sugerida*: USD [número concreto]. Mostrá el cálculo explícito paso a paso.
    - *Cierre estimado*: USD [rango] (5-8% por debajo de publicación).
 
-4. **Próximos pasos** — 3 ítems concretos (firmar mandato, fotos profesionales, publicación).
+4. **Por qué esta propiedad está por encima del promedio** — esta sección es clave para que el agente defienda el precio ante el propietario. Analizá:
+   - **Escasez**: si la propiedad es más grande o tiene más ambientes que la mayoría de los comparables, decilo con datos ("Solo X de los Y comparables tienen más de Z m²").
+   - **Superficie semicubierta**: si tiene galería, quincho, cochera techada u otros m² semicubiertos significativos, cuantificá el valor que aportan.
+   - **Demanda acotada**: propiedades de 6-7+ ambientes tienen menos oferta y apuntan a un comprador específico que paga diferencial.
+   - **Posición en el rango**: mostrá en qué percentil del mercado está el precio sugerido ("está en el 25% más alto del rango relevado, justificado por...").
+   Máximo 4 bullets concretos, con números cuando sea posible.
 
-Tono: profesional, datos concretos, directo. El informe tiene que transmitir solidez técnica y darle confianza al agente para defender el precio ante el propietario.
+5. **Próximos pasos** — 3 ítems concretos (firmar mandato, fotos profesionales, publicación).
+
+Tono: profesional, datos concretos, directo. El informe tiene que transmitir solidez técnica y darle confianza al agente para defender el precio ante el propietario. La sección "Por qué esta propiedad está por encima del promedio" es lo que convierte un ACM en una herramienta de captación real.
 """
 
 @app.route("/acm", methods=["POST"])
