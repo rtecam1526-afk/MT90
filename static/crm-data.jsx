@@ -42,7 +42,8 @@ function mapEtapa(e) {
 
 function urgencia(c) {
   const w = { caliente: 100, media: 60, fria: 20, sin: 0 };
-  return (w[c.etapa] || 0) + Math.min((c.diasSinContacto || 0) * 0.5, 80);
+  const accion = c.proximaAccion ? 50 : 0;
+  return (w[c.etapa] || 0) + Math.min((c.diasSinContacto || 0) * 0.5, 80) + accion;
 }
 
 function genMensaje(c, agente) {
@@ -166,6 +167,11 @@ window.buildCrmData = function(contacts, done) {
   // carteraQueue: todos los contactos con teléfono, para cola de campañas
   const carteraQueue = all.filter(c => c.telefono && c.telefono.trim()).slice(0, 30);
 
+  // Contactos con próxima acción definida, ordenados por urgencia
+  const conAccion = all
+    .filter(c => c.proximaAccion && c.proximaAccion.trim())
+    .slice(0, 15);
+
   return {
     agente,
     totalContactos: all.length,
@@ -183,6 +189,7 @@ window.buildCrmData = function(contacts, done) {
       revisados:     all.length,
       oportunidades: opors,
       enfriando,
+      conAccion,
       cierre: {
         hablados:  Object.values(done || {}).filter(Boolean).length,
         objetivo:  Math.min(hoy.length, 20),

@@ -49,6 +49,30 @@ function MiSemana({ data, done, onWhatsapp, onToggleDone, onOpen, onIrHoy, onRev
         <button className="rev-launch-btn" onClick={onRevision}>Empezar revisión <Icon.arrow /></button>
       </div>
 
+      {/* Próximas acciones */}
+      {sem.conAccion && sem.conAccion.length > 0 && (
+        <section className="sem-section">
+          <div className="sem-sec-head">
+            <h2><span className="sem-num" style={{ background: "var(--primary)" }}>{sem.conAccion.length}</span> Con acción pendiente</h2>
+          </div>
+          <div className="sem-rows">
+            {sem.conAccion.map((p) => (
+              <div className={"sem-row" + (done[p.id] ? " is-done" : "")} key={p.id} onClick={() => onOpen(p)}>
+                <Avatar iniciales={p.iniciales} />
+                <div className="sem-row-id">
+                  <div className="sem-row-name">{p.nombre} {done[p.id] && <span className="sem-tick"><Icon.check /> hablado</span>}</div>
+                  <div className="sem-row-need" style={{ color: "var(--primary)", fontWeight: 600 }}>→ {p.proximaAccion}</div>
+                </div>
+                <StageTag etapa={p.etapa} />
+                <button className="sem-wa" onClick={(e) => { e.stopPropagation(); onWhatsapp(esCumpleHoy(p.cumple) ? { ...p, mensaje: mensajeCumple(p.nombre) } : p); }} aria-label="WhatsApp">
+                  <Icon.wa />
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Para contactar */}
       <section className="sem-section">
         <div className="sem-sec-head">
@@ -61,7 +85,11 @@ function MiSemana({ data, done, onWhatsapp, onToggleDone, onOpen, onIrHoy, onRev
               <Avatar iniciales={p.iniciales} />
               <div className="sem-row-id">
                 <div className="sem-row-name">{p.nombre} {done[p.id] && <span className="sem-tick"><Icon.check /> hablado</span>}</div>
-                <div className="sem-row-need">{p.necesidad}</div>
+                <div className="sem-row-need">
+                  {p.proximaAccion
+                    ? <span style={{ color: "var(--primary)", fontWeight: 600 }}>→ {p.proximaAccion}</span>
+                    : p.necesidad}
+                </div>
               </div>
               <StageTag etapa={p.etapa} />
               <button className="sem-wa" onClick={(e) => { e.stopPropagation(); onWhatsapp(esCumpleHoy(p.cumple) ? { ...p, mensaje: mensajeCumple(p.nombre) } : p); }} aria-label="WhatsApp">
