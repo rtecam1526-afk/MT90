@@ -42,8 +42,19 @@ function mapEtapa(e) {
 
 function urgencia(c) {
   const w = { caliente: 100, media: 60, fria: 20, sin: 0 };
-  const accion = c.proximaAccion ? 50 : 0;
-  return (w[c.etapa] || 0) + Math.min((c.diasSinContacto || 0) * 0.5, 80) + accion;
+  let accionBonus = 0;
+  if (c.proximaAccion) {
+    accionBonus = 50;
+    if (c.proximaFechaAccion) {
+      const dias = diasDesde(c.proximaFechaAccion);
+      if (dias !== null) {
+        if (dias >= 0)       accionBonus = 120;  // vencida o es hoy
+        else if (dias >= -3) accionBonus = 90;   // próximos 3 días
+        else if (dias >= -7) accionBonus = 70;   // esta semana
+      }
+    }
+  }
+  return (w[c.etapa] || 0) + Math.min((c.diasSinContacto || 0) * 0.5, 80) + accionBonus;
 }
 
 function genMensaje(c, agente) {
@@ -122,7 +133,8 @@ window.buildCrmData = function(contacts, done) {
       telefono:         c.telefono || '',
       necesidad:        c.necesidad || '',
       antecedente:      c.antecedente || '',
-      proximaAccion:    c.proxima_accion || '',
+      proximaAccion:        c.proxima_accion || '',
+      proximaFechaAccion:   c.fecha_proxima_accion || '',
       diasSinContacto,
       dias:             diasSinContacto,
       cumple,

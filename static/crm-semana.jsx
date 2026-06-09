@@ -61,7 +61,14 @@ function MiSemana({ data, done, onWhatsapp, onToggleDone, onOpen, onIrHoy, onRev
                 <Avatar iniciales={p.iniciales} />
                 <div className="sem-row-id">
                   <div className="sem-row-name">{p.nombre} {done[p.id] && <span className="sem-tick"><Icon.check /> hablado</span>}</div>
-                  <div className="sem-row-need" style={{ color: "var(--primary)", fontWeight: 600 }}>→ {p.proximaAccion}</div>
+                  <div className="sem-row-need" style={{ color: "var(--primary)", fontWeight: 600 }}>
+                    → {p.proximaAccion}
+                    {p.proximaFechaAccion && (
+                      <span style={{ fontWeight: 400, color: "var(--muted)", marginLeft: 6 }}>
+                        · {formatoCumple(p.proximaFechaAccion)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <StageTag etapa={p.etapa} />
                 <button className="sem-wa" onClick={(e) => { e.stopPropagation(); onWhatsapp(esCumpleHoy(p.cumple) ? { ...p, mensaje: mensajeCumple(p.nombre) } : p); }} aria-label="WhatsApp">
@@ -87,7 +94,14 @@ function MiSemana({ data, done, onWhatsapp, onToggleDone, onOpen, onIrHoy, onRev
                 <div className="sem-row-name">{p.nombre} {done[p.id] && <span className="sem-tick"><Icon.check /> hablado</span>}</div>
                 <div className="sem-row-need">
                   {p.proximaAccion
-                    ? <span style={{ color: "var(--primary)", fontWeight: 600 }}>→ {p.proximaAccion}</span>
+                    ? <span style={{ color: "var(--primary)", fontWeight: 600 }}>
+                        → {p.proximaAccion}
+                        {p.proximaFechaAccion && (
+                          <span style={{ fontWeight: 400, color: "var(--muted)", marginLeft: 6 }}>
+                            · {formatoCumple(p.proximaFechaAccion)}
+                          </span>
+                        )}
+                      </span>
                     : p.necesidad}
                 </div>
               </div>

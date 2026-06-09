@@ -2,12 +2,14 @@
 const { useState: useStateE } = React;
 
 function EditarContacto({ contacto, onClose, onSave }) {
-  const [nombre,    setNombre]    = useStateE(contacto.nombre || '');
-  const [tel,       setTel]       = useStateE(contacto.telefono || '');
-  const [necesidad, setNecesidad] = useStateE(contacto.necesidad || '');
-  const [cumple,    setCumple]    = useStateE(contacto.cumple || '');
-  const [saving,    setSaving]    = useStateE(false);
-  const [error,     setError]     = useStateE('');
+  const [nombre,       setNombre]       = useStateE(contacto.nombre || '');
+  const [tel,          setTel]          = useStateE(contacto.telefono || '');
+  const [necesidad,    setNecesidad]    = useStateE(contacto.necesidad || '');
+  const [cumple,       setCumple]       = useStateE(contacto.cumple || '');
+  const [accion,       setAccion]       = useStateE(contacto.proximaAccion || '');
+  const [fechaAccion,  setFechaAccion]  = useStateE(contacto.proximaFechaAccion || contacto.fecha_proxima_accion || '');
+  const [saving,       setSaving]       = useStateE(false);
+  const [error,        setError]        = useStateE('');
 
   async function guardar() {
     if (!nombre.trim()) { setError('El nombre es requerido'); return; }
@@ -16,11 +18,13 @@ function EditarContacto({ contacto, onClose, onSave }) {
     try {
       const digits = tel.replace(/\D/g, '');
       await window.CRM_API.put('/contactos/' + contacto.id, {
-        nombre:           nombre.trim(),
-        telefono:         digits,
-        whatsapp_link:    digits ? 'https://wa.me/54' + digits : '',
-        necesidad:        necesidad.trim(),
-        fecha_cumpleanos: cumple || null,
+        nombre:                nombre.trim(),
+        telefono:              digits,
+        whatsapp_link:         digits ? 'https://wa.me/54' + digits : '',
+        necesidad:             necesidad.trim(),
+        fecha_cumpleanos:      cumple || null,
+        proxima_accion:        accion.trim() || null,
+        fecha_proxima_accion:  fechaAccion || null,
       });
       onSave();
     } catch(e) {
@@ -55,6 +59,20 @@ function EditarContacto({ contacto, onClose, onSave }) {
         <div className="field">
           <label>¿Qué necesita? <span className="opt">· opcional</span></label>
           <input value={necesidad} onChange={e => setNecesidad(e.target.value)} placeholder="Vender, comprar, alquilar…" />
+        </div>
+
+        <div className="field">
+          <label>Próxima acción <span className="opt">· opcional</span></label>
+          <input
+            value={accion}
+            onChange={e => setAccion(e.target.value)}
+            placeholder="Llamar, enviar info, coordinar visita…"
+          />
+        </div>
+
+        <div className="field">
+          <label>Fecha de la próxima acción <span className="opt">· opcional</span></label>
+          <input type="date" value={fechaAccion} onChange={e => setFechaAccion(e.target.value)} />
         </div>
 
         {error && <p style={{ color:'var(--caliente)', fontSize:'calc(13px * var(--fs-scale))', margin:'0 0 12px' }}>{error}</p>}
