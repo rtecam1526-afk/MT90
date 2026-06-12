@@ -9,15 +9,23 @@ function fechaCampana(iso) {
   return parseInt(d, 10) + " de " + MESES_C[parseInt(m, 10) - 1];
 }
 
+function primerNombre(nombre) { return (nombre || '').split(' ')[0] || 'amigo/a'; }
+
+function getMensaje(campana, nombre) {
+  return (campana.mensaje || '').replace('NOMBRE', primerNombre(nombre));
+}
+
 function Campanas({ data, onWhatsapp }) {
   const camp = data.campanas;
-  const [enviando, setEnviando] = useStateC(null); // campaign object being sent
+  const [enviando, setEnviando] = useStateC(null);
 
   if (enviando) {
     return <ColaEnvio data={data} campana={enviando} onWhatsapp={onWhatsapp} onSalir={() => setEnviando(null)} />;
   }
 
   const prox = camp.proxima;
+  const agente = data.agente || 'Gabriela';
+
   return (
     <div className="camp fade-in">
       <div className="camp-head">
@@ -33,7 +41,7 @@ function Campanas({ data, onWhatsapp }) {
         </div>
         <div className="camp-msg-block">
           <div className="camp-msg-label">Saludo sugerido</div>
-          <div className="camp-msg">{prox.mensaje}</div>
+          <div className="camp-msg">{getMensaje(prox, '[nombre]')}</div>
         </div>
         <div className="camp-feature-foot">
           <div className="camp-reach">
@@ -60,7 +68,7 @@ function Campanas({ data, onWhatsapp }) {
                 <div className="camp-agenda-title">{a.titulo}</div>
                 <div className="camp-agenda-sub">En {a.enDias} días</div>
               </div>
-              <button className="camp-agenda-btn" onClick={() => setEnviando({ ...a, alcance: data.campanas.proxima.alcance, mensaje: "¡Feliz " + a.titulo + "! Te mando un saludo grande. — Gabriela" })}>
+              <button className="camp-agenda-btn" onClick={() => setEnviando({ ...a, alcance: prox.alcance })}>
                 Preparar
               </button>
             </div>
@@ -81,7 +89,8 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
   const p = queue[idx];
 
   function enviarYSeguir() {
-    onWhatsapp({ nombre: p.nombre, telefono: p.telefono, mensaje: campana.mensaje });
+    const msg = getMensaje(campana, p.nombre);
+    onWhatsapp({ nombre: p.nombre, telefono: p.telefono, mensaje: msg });
     setEnviados((e) => ({ ...e, [p.id]: true }));
     setTimeout(() => { if (idx < queue.length - 1) setIdx(idx + 1); }, 250);
   }
@@ -121,7 +130,7 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
           </div>
 
           <div className="cola-msg-label">Se enviará</div>
-          <div className="cola-msg">{campana.mensaje}</div>
+          <div className="cola-msg">{getMensaje(campana, p.nombre)}</div>
 
           <div className="cola-actions">
             <button className="cola-skip" onClick={saltar}>Saltar</button>

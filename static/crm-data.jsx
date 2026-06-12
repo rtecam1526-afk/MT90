@@ -99,14 +99,14 @@ function buildCampanas(contacts, agente) {
   ]
     .map(f => {
       const diff = Math.round((new Date(f.fecha) - now) / 86400000);
-      return { ...f, enDias: diff, mensaje: `¡Feliz ${f.titulo}, ${'{nombre}'}! Un saludo grande de mi parte. — ${agente}` };
+      return { ...f, enDias: diff, mensaje: `¡Feliz ${f.titulo}, NOMBRE! Un saludo grande de mi parte. — ${agente}` };
     })
     .filter(f => f.enDias >= 0)
     .sort((a, b) => a.enDias - b.enDias);
 
   const proxima = fechas[0] || {
     id: 'generic', titulo: 'Año Nuevo', fecha: `${year+1}-01-01`, enDias: 30,
-    mensaje: `¡Feliz {titulo}! Un saludo de ${agente}.`,
+    mensaje: `¡Feliz Año Nuevo, NOMBRE! Un saludo de ${agente}.`,
   };
 
   proxima.alcance = contacts.length;

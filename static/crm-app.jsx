@@ -119,10 +119,12 @@ function App() {
   function onWhatsapp(p) {
     const digits = (p.telefono || "").replace(/\D/g, "");
     const phone = digits ? "549" + digits : "";
-    const text = p.mensaje ? "?text=" + encodeURIComponent(p.mensaje) : "";
+    const primerNombre = (p.nombre || '').split(' ')[0];
+    const mensaje = (p.mensaje || '').replace('NOMBRE', primerNombre);
+    const text = mensaje ? "?text=" + encodeURIComponent(mensaje) : "";
     const url = "https://wa.me/" + phone + text;
     window.open(url, "_blank", "noopener");
-    showToast("Abriendo WhatsApp con " + (p.nombre||'').split(" ")[0] + "…");
+    showToast("Abriendo WhatsApp con " + primerNombre + "…");
   }
 
   async function saveContact(nombre) {

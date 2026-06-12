@@ -354,6 +354,10 @@
         <input id="acm-m2cub" type="number" placeholder="ej: 45" min="5" max="1000" />
       </div>
       <div class="acm-field">
+        <label>m² semicubiertos</label>
+        <input id="acm-m2semi" type="number" placeholder="ej: 20" min="0" max="500" />
+      </div>
+      <div class="acm-field">
         <label>m² descubiertos</label>
         <input id="acm-m2desc" type="number" placeholder="ej: 12" min="0" max="500" />
       </div>
@@ -610,6 +614,7 @@
     const m2          = document.getElementById("acm-m2").value;
     const ambientes   = document.getElementById("acm-ambientes").value;
     const m2cub       = document.getElementById("acm-m2cub").value;
+    const m2semi      = document.getElementById("acm-m2semi").value;
     const m2desc      = document.getElementById("acm-m2desc").value;
     const antiguedad  = document.getElementById("acm-antiguedad").value;
     const amenities   = document.getElementById("acm-amenities").value.trim();
@@ -635,7 +640,7 @@
     await streamRespuesta("/acm", {
       barrio, tipo, direccion: direccion||null,
       m2: m2||null, ambientes: ambientes||null,
-      m2cub: m2cub||null, m2desc: m2desc||null,
+      m2cub: m2cub||null, m2semi: m2semi||null, m2desc: m2desc||null,
       antiguedad: antiguedad||null, amenities: amenities||null,
       premium: premium||false
     });

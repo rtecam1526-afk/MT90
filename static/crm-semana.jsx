@@ -65,7 +65,7 @@ function MiSemana({ data, done, onWhatsapp, onToggleDone, onOpen, onIrHoy, onRev
                     → {p.proximaAccion}
                     {p.proximaFechaAccion && (
                       <span style={{ fontWeight: 400, color: "var(--muted)", marginLeft: 6 }}>
-                        · {formatoCumple(p.proximaFechaAccion)}
+                        · {formatoAccion(p.proximaFechaAccion)}
                       </span>
                     )}
                   </div>
@@ -98,7 +98,7 @@ function MiSemana({ data, done, onWhatsapp, onToggleDone, onOpen, onIrHoy, onRev
                         → {p.proximaAccion}
                         {p.proximaFechaAccion && (
                           <span style={{ fontWeight: 400, color: "var(--muted)", marginLeft: 6 }}>
-                            · {formatoCumple(p.proximaFechaAccion)}
+                            · {formatoAccion(p.proximaFechaAccion)}
                           </span>
                         )}
                       </span>

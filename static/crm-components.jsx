@@ -24,6 +24,12 @@ function formatoCumple(cumple) {
   if (!cumple) return "";
   const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
   const [y, m, d] = cumple.split("-");
+  return parseInt(d, 10) + " " + meses[parseInt(m, 10) - 1] + " " + y;
+}
+function formatoAccion(fecha) {
+  if (!fecha) return "";
+  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const [, m, d] = fecha.split("-");
   return parseInt(d, 10) + " " + meses[parseInt(m, 10) - 1];
 }
 function mensajeCumple(nombre) {
@@ -236,6 +242,6 @@ const Icon = {
 };
 
 Object.assign(window, {
-  tiempoSinHablar, esUrgente, esCumpleHoy, formatoCumple, mensajeCumple,
+  tiempoSinHablar, esUrgente, esCumpleHoy, formatoCumple, formatoAccion, mensajeCumple,
   lunesDeEstaSemana, fechaCorta, fechaLarga, STAGE, avatarColor, Avatar, StageTag, Icon,
 });

@@ -16,6 +16,19 @@
 </head>
 <body>
 <div id="root"></div>
+<div id="debug-msg" style="padding:20px;font-size:16px;color:#333">Cargando CRM...</div>
+<script>
+  setTimeout(function(){
+    var r = document.getElementById('root');
+    var d = document.getElementById('debug-msg');
+    if(r && r.children.length === 0) {
+      d.innerHTML = '<b>Error:</b> React no montó. Abrí F12 → Console y compartí los errores.';
+      d.style.color = 'red';
+    } else if(d) {
+      d.style.display = 'none';
+    }
+  }, 4000);
+</script>
 
 <script>
 // Inyectado por Flask: agente activo
@@ -45,23 +58,39 @@ window.CRM_API = {
 };
 </script>
 
+<!-- Parche: localStorage mock para cuando Edge Tracking Prevention lo bloquea -->
+<script>
+try { localStorage.setItem('_t','1'); localStorage.removeItem('_t'); }
+catch(e) {
+  var _ls = {};
+  Object.defineProperty(window, 'localStorage', { value: {
+    getItem: function(k){ return _ls[k]||null; },
+    setItem: function(k,v){ _ls[k]=v; },
+    removeItem: function(k){ delete _ls[k]; },
+    clear: function(){ _ls={}; },
+    key: function(i){ return Object.keys(_ls)[i]||null; },
+    get length(){ return Object.keys(_ls).length; }
+  }, writable:true });
+}
+</script>
+
 <!-- React 18 + Babel in-browser (CDN) -->
 <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <!-- Componentes CRM (orden importa) -->
-<script type="text/babel" src="/static/crm-components.jsx"></script>
-<script type="text/babel" src="/static/crm-data.jsx"></script>
-<script type="text/babel" src="/static/crm-views.jsx"></script>
-<script type="text/babel" src="/static/crm-semana.jsx"></script>
-<script type="text/babel" src="/static/crm-extras.jsx"></script>
-<script type="text/babel" src="/static/crm-agente.jsx"></script>
-<script type="text/babel" src="/static/crm-campanas.jsx"></script>
-<script type="text/babel" src="/static/crm-revision.jsx"></script>
-<script type="text/babel" src="/static/crm-cartera.jsx"></script>
-<script type="text/babel" src="/static/crm-editar.jsx"></script>
-<script type="text/babel" src="/static/crm-tweaks.jsx"></script>
-<script type="text/babel" src="/static/crm-app.jsx"></script>
+<script type="text/babel" src="/static/crm-components.jsx?v=3"></script>
+<script type="text/babel" src="/static/crm-data.jsx?v=6"></script>
+<script type="text/babel" src="/static/crm-views.jsx?v=3"></script>
+<script type="text/babel" src="/static/crm-semana.jsx?v=3"></script>
+<script type="text/babel" src="/static/crm-extras.jsx?v=3"></script>
+<script type="text/babel" src="/static/crm-agente.jsx?v=3"></script>
+<script type="text/babel" src="/static/crm-campanas.jsx?v=6"></script>
+<script type="text/babel" src="/static/crm-revision.jsx?v=3"></script>
+<script type="text/babel" src="/static/crm-cartera.jsx?v=3"></script>
+<script type="text/babel" src="/static/crm-editar.jsx?v=3"></script>
+<script type="text/babel" src="/static/crm-tweaks.jsx?v=3"></script>
+<script type="text/babel" src="/static/crm-app.jsx?v=6"></script>
 </body>
 </html>
