@@ -6,6 +6,8 @@ Asistente de captación para agentes Remax
 
 import os, json, glob, uuid, re, time, datetime
 from functools import wraps
+from dotenv import load_dotenv
+load_dotenv()
 from flask import Flask, request, Response, render_template, session, redirect, url_for
 import anthropic
 import requests as _req
@@ -26,6 +28,7 @@ def _supa_hdrs():
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mt90_traccion_secret_2024")
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY, max_retries=3)
 
@@ -1595,15 +1598,16 @@ PASO 3 — Calculá el precio/m² promedio de TODOS los comparables filtrados (n
 
 PASO 4 — Calculá el precio total de la propiedad según la superficie disponible:
 
-   SI hay superficie cubierta Y superficie descubierta/semicubierta:
-     Precio = (m²_cubiertos × precio/m²) + (m²_descubiertos × precio/m² × 0.40)
-     Los m² descubiertos o semicubiertos (galería, jardín, patio, quincho parcial) valen el 40% del precio/m² cubierto.
+   SI hay superficie cubierta Y semicubierta Y/O descubierta:
+     Precio = (m²_cubiertos × precio/m²) + (m²_semicubiertos × precio/m² × 0.50) + (m²_descubiertos × precio/m² × 0.30)
+     - Semicubiertos (galería techada, quincho cubierto, cochera techada): 50% del precio/m² cubierto.
+     - Descubiertos (patio, jardín, terraza sin techo): 30% del precio/m² cubierto.
 
    SI solo hay superficie total (sin desglose):
      Precio = m²_totales × precio/m²
 
    SI los comparables se midieron en m² totales pero la propiedad tiene desglose:
-     Usá el m² cubierto como referencia principal para el precio/m², luego sumá el valor de los descubiertos.
+     Usá el m² cubierto como referencia principal para el precio/m², luego sumá el valor de semicubiertos y descubiertos.
 
 PASO 5 — Ajustes adicionales por características distintivas:
    - Antigüedad > 50 años sin renovación: restar 8%
@@ -1657,6 +1661,7 @@ def acm():
     ambientes   = data.get("ambientes")
     direccion   = (data.get("direccion")  or "").strip() or None
     m2cub       = data.get("m2cub")
+    m2semi      = data.get("m2semi")
     m2desc      = data.get("m2desc")
     antiguedad  = data.get("antiguedad")
     amenities   = (data.get("amenities")  or "").strip() or None
@@ -1669,10 +1674,11 @@ def acm():
         m2_int    = int(m2)         if m2         else None
         amb_int   = int(ambientes)  if ambientes  else None
         m2cub_int = int(m2cub)      if m2cub      else None
+        m2semi_int= int(m2semi)     if m2semi     else None
         m2desc_int= int(m2desc)     if m2desc     else None
         antig_int = int(antiguedad) if antiguedad else None
     except (ValueError, TypeError):
-        m2_int = amb_int = m2cub_int = m2desc_int = antig_int = None
+        m2_int = amb_int = m2cub_int = m2semi_int = m2desc_int = antig_int = None
 
     agente_key  = _agentes.get(sid, "gabriela")
     agente_info = cfg.AGENTES.get(agente_key, cfg.AGENTES["gabriela"])
@@ -1736,6 +1742,7 @@ def acm():
         # Agregar datos específicos de la propiedad objetivo
         prop_extra = []
         if m2cub_int:   prop_extra.append(f"m² cubiertos: {m2cub_int}")
+        if m2semi_int:  prop_extra.append(f"m² semicubiertos: {m2semi_int}")
         if m2desc_int:  prop_extra.append(f"m² descubiertos: {m2desc_int}")
         if antig_int is not None: prop_extra.append(f"Antigüedad: {antig_int} años")
         if amenities:   prop_extra.append(f"Amenities: {amenities}")
@@ -1758,7 +1765,8 @@ def acm():
         dir_txt  = f", Dirección: {direccion}" if direccion else ""
         antig_txt = f", {antig_int} años" if antig_int else ""
         am_txt   = f", {amenities}" if amenities else ""
-        history.append({"role": "user", "content": f"[ACM solicitado] Barrio: {barrio.title()}, Tipo: {tipo}, m²: {m2_int or 'n/d'}, Cub: {m2cub_int or 'n/d'}, Desc: {m2desc_int or 'n/d'}, Amb: {amb_int or 'n/d'}{antig_txt}{am_txt}{dir_txt}"})
+        semi_txt = f", Semi: {m2semi_int}" if m2semi_int else ""
+        history.append({"role": "user", "content": f"[ACM solicitado] Barrio: {barrio.title()}, Tipo: {tipo}, m²: {m2_int or 'n/d'}, Cub: {m2cub_int or 'n/d'}{semi_txt}, Desc: {m2desc_int or 'n/d'}, Amb: {amb_int or 'n/d'}{antig_txt}{am_txt}{dir_txt}"})
 
         respuesta_completa = ""
         try:
