@@ -17,10 +17,19 @@ function getMensaje(campana, nombre) {
 
 function Campanas({ data, onWhatsapp }) {
   const camp = data.campanas;
-  const [enviando,   setEnviando]   = useStateC(null);
-  const [nuevaOpen,  setNuevaOpen]  = useStateC(false);
+  const [enviando,    setEnviando]    = useStateC(null);
+  const [nuevaOpen,   setNuevaOpen]   = useStateC(false);
   const [nuevaTitulo, setNuevaTitulo] = useStateC('');
-  const [nuevaMensaje, setNuevaMensaje] = useStateC('');
+  const [nuevaMensaje,setNuevaMensaje]= useStateC('');
+  const [nuevaImagen, setNuevaImagen] = useStateC(null);
+
+  function onImagenSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setNuevaImagen(ev.target.result);
+    reader.readAsDataURL(file);
+  }
 
   if (enviando) {
     return <ColaEnvio data={data} campana={enviando} onWhatsapp={onWhatsapp} onSalir={() => setEnviando(null)} />;
@@ -32,6 +41,7 @@ function Campanas({ data, onWhatsapp }) {
       id: 'custom',
       titulo: nuevaTitulo.trim(),
       mensaje: nuevaMensaje.trim(),
+      imagen: nuevaImagen || null,
       alcance: data.carteraQueue.length,
     });
   }
@@ -66,6 +76,18 @@ function Campanas({ data, onWhatsapp }) {
               onChange={e => setNuevaMensaje(e.target.value)}
               rows={3}
             />
+            <div className="camp-nueva-img-row">
+              <label className="camp-nueva-img-label">
+                {nuevaImagen
+                  ? <img src={nuevaImagen} className="camp-nueva-img-preview" alt="flyer" />
+                  : <span>+ Agregar imagen <span style={{fontWeight:400,opacity:.6}}>(opcional)</span></span>
+                }
+                <input type="file" accept="image/*" style={{display:'none'}} onChange={onImagenSelect} />
+              </label>
+              {nuevaImagen && (
+                <button className="camp-nueva-img-remove" onClick={() => setNuevaImagen(null)}>✕ Quitar</button>
+              )}
+            </div>
             <button
               className="camp-start"
               style={{ marginTop: 8 }}
@@ -173,6 +195,13 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
             </div>
             <span className="cola-pos">{idx + 1} / {queue.length}</span>
           </div>
+
+          {campana.imagen && (
+            <div className="cola-img-wrap">
+              <img src={campana.imagen} className="cola-img" alt="flyer" />
+              <div className="cola-img-hint">Adjuntá esta imagen en WhatsApp</div>
+            </div>
+          )}
 
           <div className="cola-msg-label">Se enviará</div>
           <div className="cola-msg">{getMensaje(campana, p.nombre)}</div>
