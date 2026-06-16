@@ -17,10 +17,23 @@ function getMensaje(campana, nombre) {
 
 function Campanas({ data, onWhatsapp }) {
   const camp = data.campanas;
-  const [enviando, setEnviando] = useStateC(null);
+  const [enviando,   setEnviando]   = useStateC(null);
+  const [nuevaOpen,  setNuevaOpen]  = useStateC(false);
+  const [nuevaTitulo, setNuevaTitulo] = useStateC('');
+  const [nuevaMensaje, setNuevaMensaje] = useStateC('');
 
   if (enviando) {
     return <ColaEnvio data={data} campana={enviando} onWhatsapp={onWhatsapp} onSalir={() => setEnviando(null)} />;
+  }
+
+  function lanzarNueva() {
+    if (!nuevaTitulo.trim() || !nuevaMensaje.trim()) return;
+    setEnviando({
+      id: 'custom',
+      titulo: nuevaTitulo.trim(),
+      mensaje: nuevaMensaje.trim(),
+      alcance: data.carteraQueue.length,
+    });
   }
 
   const prox = camp.proxima;
@@ -31,6 +44,38 @@ function Campanas({ data, onWhatsapp }) {
       <div className="camp-head">
         <h1>Fechas especiales</h1>
         <p>Un saludo a tiempo mantiene viva la relación. Yo te preparo el mensaje y te guío para enviarlo a tu cartera, uno por uno.</p>
+      </div>
+
+      {/* Nueva campaña personalizada */}
+      <div className="camp-nueva">
+        <button className="camp-nueva-btn" onClick={() => setNuevaOpen(!nuevaOpen)}>
+          {nuevaOpen ? '✕ Cancelar' : '+ Nueva campaña'}
+        </button>
+        {nuevaOpen && (
+          <div className="camp-nueva-form">
+            <input
+              className="camp-nueva-input"
+              placeholder="Título · ej: Mundial 2026"
+              value={nuevaTitulo}
+              onChange={e => setNuevaTitulo(e.target.value)}
+            />
+            <textarea
+              className="camp-nueva-textarea"
+              placeholder={"Mensaje · usá NOMBRE para personalizar\nej: ¡Hola NOMBRE! ¿Ya tenés listo para ver los partidos? — " + agente}
+              value={nuevaMensaje}
+              onChange={e => setNuevaMensaje(e.target.value)}
+              rows={3}
+            />
+            <button
+              className="camp-start"
+              style={{ marginTop: 8 }}
+              disabled={!nuevaTitulo.trim() || !nuevaMensaje.trim()}
+              onClick={lanzarNueva}
+            >
+              Empezar a enviar <Icon.arrow />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Próxima campaña destacada */}

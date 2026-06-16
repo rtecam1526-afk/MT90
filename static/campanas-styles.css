@@ -1,3 +1,48 @@
+/* Nueva campaña personalizada */
+.camp-nueva { display: flex; flex-direction: column; gap: 12px; }
+.camp-nueva-btn {
+  align-self: flex-start;
+  background: none;
+  border: 1.5px dashed var(--primary);
+  color: var(--primary);
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: calc(14px * var(--fs-scale));
+  font-weight: 600;
+  cursor: pointer;
+}
+.camp-nueva-btn:hover { background: var(--primary-soft, #fff8f0); }
+.camp-nueva-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface-2, #f5f5f5);
+  border-radius: 14px;
+  padding: 16px;
+}
+.camp-nueva-input {
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: calc(14px * var(--fs-scale));
+  font-family: var(--font-body);
+  background: white;
+}
+.camp-nueva-textarea {
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: calc(14px * var(--fs-scale));
+  font-family: var(--font-body);
+  resize: vertical;
+  background: white;
+  line-height: 1.5;
+}
+.camp-nueva-input:focus, .camp-nueva-textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
 /* CAMPAÑAS / FECHAS ESPECIALES */
 .camp { display: flex; flex-direction: column; gap: 24px; }
 .camp-head h1 {
