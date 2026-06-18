@@ -34,6 +34,14 @@ ML_CAT = {
     "oficina":      "MLA1471",
 }
 
+TIPO_URL_ML = {
+    "departamento": "departamentos",
+    "casa":         "casas",
+    "ph":           "departamentos",
+    "local":        "locales-y-oficinas",
+    "oficina":      "locales-y-oficinas",
+}
+
 
 def _crear_session():
     s = cloudscraper.create_scraper(
@@ -307,90 +315,146 @@ def _buscar_zonaprop(barrio: str, tipo: str, session, paginas: int = 2) -> list:
 # ── MercadoLibre ──────────────────────────────────────────────────────────────
 
 def _buscar_ml(barrio: str, tipo: str, m2_target=None, ambientes_target=None) -> list:
-    """Busca comparables en MercadoLibre Inmuebles vía su API pública."""
-    categoria = ML_CAT.get(tipo.lower(), "MLA1459")
-    query     = urllib.parse.quote(f"{tipo} venta {barrio} Buenos Aires")
-    url = (
-        f"https://api.mercadolibre.com/sites/MLA/search"
-        f"?category={categoria}&q={query}&limit=50"
-    )
-    if _SCRAPER_KEY:
-        fetch_url = f"http://api.scraperapi.com?api_key={_SCRAPER_KEY}&url={urllib.parse.quote(url, safe='')}"
-    else:
-        fetch_url = url
-    try:
-        session = _crear_session()
-        r = session.get(fetch_url, timeout=15,
-                        headers={"Accept": "application/json",
-                                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
-        if r.status_code != 200:
-            print(f"[ACM-ML] HTTP {r.status_code}")
-            return []
-        data = r.json()
-    except Exception as e:
-        print(f"[ACM-ML] Error: {e}")
-        return []
-
+    """
+    Busca comparables en MercadoLibre Inmuebles.
+    Estrategia 1: portal inmuebles.mercadolibre.com.ar (HTML con __NEXT_DATA__).
+    Estrategia 2: API pública con filtro USD como respaldo.
+    """
+    tipo_ml    = TIPO_URL_ML.get(tipo.lower(), "departamentos")
+    categoria  = ML_CAT.get(tipo.lower(), "MLA1459")
+    barrio_url = _slug(barrio)
+    session    = _crear_session()
     resultados = []
-    for item in data.get("results", []):
+
+    # ── Estrategia 1: portal HTML ──────────────────────────────────────────
+    url_html = f"https://inmuebles.mercadolibre.com.ar/{tipo_ml}/venta/{barrio_url}/"
+    html = _fetch(session, url_html)
+    if html:
+        # Buscar __NEXT_DATA__ u otros bloques JSON
+        for pat in [
+            r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>',
+            r'window\.__PRELOADED_STATE__\s*=\s*(\{.*?\});',
+            r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});',
+        ]:
+            m_json = re.search(pat, html, re.DOTALL)
+            if not m_json:
+                continue
+            try:
+                blob = json.loads(m_json.group(1))
+
+                def _find_ml_items(obj, depth=0):
+                    if depth > 8:
+                        return []
+                    if isinstance(obj, list) and len(obj) > 1:
+                        sample = obj[0] if obj else {}
+                        if isinstance(sample, dict) and any(
+                            k in sample for k in ["price", "precio", "currency_id", "sale_price"]
+                        ):
+                            return obj
+                    if isinstance(obj, dict):
+                        for v in obj.values():
+                            r = _find_ml_items(v, depth + 1)
+                            if r:
+                                return r
+                    return []
+
+                items = _find_ml_items(blob)
+                for item in items:
+                    try:
+                        moneda = (item.get("currency_id") or
+                                  (item.get("sale_price") or {}).get("currency_id") or "")
+                        monto  = (item.get("price") or
+                                  (item.get("sale_price") or {}).get("amount") or 0)
+                        if not monto or str(moneda).upper() != "USD":
+                            continue
+                        precio_usd = float(monto)
+                        precio_str = f"USD {precio_usd:,.0f}"
+
+                        m2_v = amb_v = None
+                        titulo = str(item.get("title") or "")
+                        for attr in (item.get("attributes") or []):
+                            aid = str(attr.get("id") or "").upper()
+                            val = str(attr.get("value_name") or attr.get("value") or "")
+                            if any(x in aid for x in ["TOTAL_AREA","COVERED_AREA","SUPERFICIE"]):
+                                mo = re.search(r'(\d+)', val)
+                                if mo: m2_v = int(mo.group(1))
+                            elif "ROOMS" in aid or "BEDROOMS" in aid:
+                                mo = re.search(r'(\d+)', val)
+                                if mo: amb_v = int(mo.group(1))
+                        if not m2_v:
+                            mo = re.search(r'(\d+)\s*m[²2]', titulo, re.IGNORECASE)
+                            if mo: m2_v = int(mo.group(1))
+                        if not amb_v:
+                            mo = re.search(r'(\d+)\s*amb', titulo, re.IGNORECASE)
+                            if mo: amb_v = int(mo.group(1))
+
+                        loc  = item.get("location") or {}
+                        addr = (loc.get("address_line") or
+                                (loc.get("neighborhood") or {}).get("name") or
+                                barrio.title())
+
+                        resultados.append({
+                            "titulo": titulo, "precio": precio_str,
+                            "precio_usd": precio_usd, "m2": m2_v, "ambientes": amb_v,
+                            "tipo_pub": "inmobiliaria", "rebaja": None,
+                            "url": item.get("permalink") or url_html,
+                            "addr": str(addr), "distancia_km": None,
+                            "lat": None, "lng": None, "fuente": "MercadoLibre",
+                        })
+                    except Exception:
+                        continue
+                if resultados:
+                    break
+            except Exception:
+                continue
+
+    # ── Estrategia 2: API pública (respaldo) ───────────────────────────────
+    if not resultados:
         try:
-            moneda = item.get("currency_id", "")
-            monto  = item.get("price")
-            precio_usd = None
-            precio_str = "Consultar"
-            if monto:
-                if moneda == "USD":
-                    precio_usd = float(monto)
-                    precio_str = f"USD {monto:,.0f}"
-                else:
-                    precio_str = f"{moneda} {monto:,.0f}"
-
-            m2        = None
-            ambientes = None
-            for attr in item.get("attributes", []):
-                attr_id = attr.get("id", "").upper()
-                val     = attr.get("value_name") or ""
-                if "TOTAL_AREA" in attr_id or "COVERED_AREA" in attr_id:
-                    mo = re.search(r'(\d+)', str(val))
-                    if mo:
-                        m2 = int(mo.group(1))
-                elif "ROOMS" in attr_id:
-                    mo = re.search(r'(\d+)', str(val))
-                    if mo:
-                        ambientes = int(mo.group(1))
-
-            titulo = item.get("title", "")
-            if not m2:
-                mo = re.search(r'(\d+)\s*m[²2]', titulo, re.IGNORECASE)
-                if mo:
-                    m2 = int(mo.group(1))
-            if not ambientes:
-                mo = re.search(r'(\d+)\s*amb', titulo, re.IGNORECASE)
-                if mo:
-                    ambientes = int(mo.group(1))
-
-            location = item.get("location") or {}
-            addr_str = (location.get("address_line") or
-                        (location.get("neighborhood") or {}).get("name") or
-                        barrio.title())
-
-            resultados.append({
-                "titulo":       titulo,
-                "precio":       precio_str,
-                "precio_usd":   precio_usd,
-                "m2":           m2,
-                "ambientes":    ambientes,
-                "tipo_pub":     "ml",
-                "rebaja":       None,
-                "url":          item.get("permalink", ""),
-                "addr":         addr_str,
-                "distancia_km": None,
-                "lat":          None,
-                "lng":          None,
-                "fuente":       "MercadoLibre",
-            })
-        except Exception:
-            continue
+            q   = urllib.parse.quote(barrio)
+            url_api = (
+                f"https://api.mercadolibre.com/sites/MLA/search"
+                f"?category={categoria}&q={q}&currency_id=USD&state=AR-C&limit=50"
+            )
+            r = session.get(url_api, timeout=12,
+                            headers={"Accept": "application/json"})
+            if r.status_code == 200:
+                for item in r.json().get("results", []):
+                    try:
+                        if str(item.get("currency_id","")).upper() != "USD":
+                            continue
+                        monto = item.get("price")
+                        if not monto:
+                            continue
+                        precio_usd = float(monto)
+                        titulo     = item.get("title", "")
+                        m2_v = amb_v = None
+                        for attr in item.get("attributes", []):
+                            aid = attr.get("id","").upper()
+                            val = str(attr.get("value_name") or "")
+                            if "TOTAL_AREA" in aid or "COVERED_AREA" in aid:
+                                mo = re.search(r'(\d+)', val)
+                                if mo: m2_v = int(mo.group(1))
+                            elif "ROOMS" in aid:
+                                mo = re.search(r'(\d+)', val)
+                                if mo: amb_v = int(mo.group(1))
+                        if not m2_v:
+                            mo = re.search(r'(\d+)\s*m[²2]', titulo, re.IGNORECASE)
+                            if mo: m2_v = int(mo.group(1))
+                        loc  = item.get("location") or {}
+                        addr = ((loc.get("neighborhood") or {}).get("name") or barrio.title())
+                        resultados.append({
+                            "titulo": titulo, "precio": f"USD {precio_usd:,.0f}",
+                            "precio_usd": precio_usd, "m2": m2_v, "ambientes": amb_v,
+                            "tipo_pub": "inmobiliaria", "rebaja": None,
+                            "url": item.get("permalink",""), "addr": addr,
+                            "distancia_km": None, "lat": None, "lng": None,
+                            "fuente": "MercadoLibre",
+                        })
+                    except Exception:
+                        continue
+        except Exception as e:
+            print(f"[ACM-ML] API fallback error: {e}")
 
     print(f"[ACM-ML] {len(resultados)} listings encontrados")
     return resultados
