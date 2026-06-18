@@ -1590,11 +1590,20 @@ IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el in
 
 ═══ CÓMO CALCULAR EL PRECIO — SEGUÍ ESTOS PASOS ═══
 
-PASO 1 — Filtrá los comparables más similares a la propiedad objetivo en m² (±25%) y ambientes (±1). Quedate con los 8-12 más parecidos. Si hay pocos comparables con esas restricciones, ampliá a ±35% en m².
+⚠️ PASO 0 — FILTRO DE BARRIO (CRÍTICO — hacé esto antes que nada):
+El barrio objetivo es el que figura en los datos. DESCARTÁ cualquier comparable que esté en un barrio claramente distinto. Por ejemplo: si la propiedad es de Caballito, son inválidos los comparables de Palermo, San Telmo, Belgrano, Villa del Parque, etc.
+   - Comparables válidos: mismo barrio, o barrios limítrofes con valores de mercado equivalentes (ej: Caballito ↔ Almagro, Flores).
+   - Comparables inválidos: barrios con nivel de precios notoriamente distinto.
+   - Si tras el filtro quedan menos de 4 comparables, podés incluir barrios vecinos similares, pero indicalo explícitamente y aplicá un ajuste: +10% si el barrio del comparable es más caro, -10% si es más barato.
+   - NUNCA promedies comparables de barrios con precio/m² estructuralmente diferentes: distorsiona todo el análisis.
+
+PASO 1 — Filtrá los comparables válidos por superficie: priorizá los más cercanos en m² (±25% del objetivo). Si hay pocos, ampliá a ±35%. Quedate con los 8-12 más similares.
+   Nota especial para unidades chicas (≤ 40 m²): el precio/m² suele ser mayor que en unidades más grandes por la demanda inversora, pero el precio ABSOLUTO tiene un techo natural dado por la barrera de entrada de los compradores. Si el precio calculado supera significativamente al de los comparables directos del mismo barrio, alinealo hacia abajo.
 
 PASO 2 — Descartá outliers obvios: propiedades con precio/m² más de 2 veces el promedio del grupo o menos de la mitad. Quedarte con el rango razonable del mercado.
 
-PASO 3 — Calculá el precio/m² promedio de TODOS los comparables filtrados (no solo los más baratos). Ese es tu precio/m² de mercado.
+PASO 3 — Calculá el precio/m² promedio de TODOS los comparables filtrados válidos. Ese es tu precio/m² de mercado.
+   Verificación: si el precio final calculado difiere en más de 25% del comparable más similar en m² y barrio, revisá si no estás mezclando barrios o tamaños muy distintos.
 
 PASO 4 — Calculá el precio total de la propiedad según la superficie disponible:
 
@@ -1645,7 +1654,8 @@ PASO 8 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
 
 1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m² cubiertos / m² semicubiertos si aplica, tipo, ambientes.
 
-2. **Comparables del mercado** — mostrá TODOS los comparables seleccionados (los 8-12 filtrados), ordenados de menor a mayor precio/m². Tabla con columnas: Dirección/Zona | m² | Amb. | Precio USD | USD/m² | Fuente.
+2. **Comparables del mercado** — mostrá TODOS los comparables seleccionados (los 8-12 filtrados), ordenados de menor a mayor precio/m². Tabla con columnas: Dirección/Barrio | m² | Amb. | Precio USD | USD/m² | Fuente.
+   Antes de la tabla, indicá cuántos comparables fueron descartados por ser de barrios distintos al objetivo y cuáles (ej: "Se descartaron 2 comparables de Palermo y San Telmo por no corresponder al barrio objetivo").
    Al final: "Precio/m² promedio del mercado: USD X/m²".
 
 3. **Precio recomendado**:
