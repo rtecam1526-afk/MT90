@@ -813,7 +813,7 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
                 c["distancia_km"] = _distancia_km(target_lat, target_lng, c["lat"], c["lng"])
 
     # Unificar
-    todos = todos_zp + todos_ml + todos_ap + todos_ri
+    todos = todos_zp + todos_ml + todos_ap
 
     # Filtrar por radio si tenemos coordenadas (solo para los que tienen distancia)
     if target_lat and target_lng:
