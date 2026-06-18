@@ -1602,8 +1602,13 @@ PASO 1 — Filtrá los comparables válidos por superficie: priorizá los más c
 
 PASO 2 — Descartá outliers obvios: propiedades con precio/m² más de 2 veces el promedio del grupo o menos de la mitad. Quedarte con el rango razonable del mercado.
 
-PASO 3 — Calculá el precio/m² promedio de TODOS los comparables filtrados válidos. Ese es tu precio/m² de mercado.
-   Verificación: si el precio final calculado difiere en más de 25% del comparable más similar en m² y barrio, revisá si no estás mezclando barrios o tamaños muy distintos.
+PASO 3 — Calculá el precio/m² promedio de los comparables filtrados válidos (precio publicado promedio).
+   Luego aplicá la corrección de brecha portal/transacción:
+   - Precio/m² de mercado real = precio/m² promedio publicado × 0.90
+   - Fundamento: en el mercado actual de CABA, las propiedades cierran en promedio un 10% por debajo del precio de publicación en portales. Los comparables que tenés son precios de lista, no de cierre.
+   - Excepción: si la propiedad es PREMIUM (flag activo), usá × 0.95 en lugar de × 0.90, ya que las propiedades premium tienen menor margen de negociación.
+   - En el informe, mostrá los dos números: "Precio/m² publicado: USD X/m² → Precio/m² de mercado real (−10%): USD Y/m²".
+   Verificación: si el precio final calculado difiere en más de 20% del comparable más similar en m² y barrio, revisá si no estás mezclando barrios o tamaños muy distintos.
 
 PASO 4 — Calculá el precio total de la propiedad según la superficie disponible:
 
@@ -1633,11 +1638,13 @@ PASO 5 — Ajustes por ESTADO y UBICACIÓN dentro del edificio (aplicá SIEMPRE 
    - Lateral / Interno: sin ajuste
 
 PASO 6 — Ajustes adicionales por otras características distintivas:
-   - Antigüedad > 50 años sin renovación: restar 8%
-   - Antigüedad entre 30-50 años sin renovación: restar 4%
-   - Sin amenities en zona donde la mayoría tiene (pileta, SUM): restar 4%
-   - Con amenities cuando la mayoría de comparables no tienen: sumar 6%
+   - Antigüedad > 50 años sin renovación: restar 10%
+   - Antigüedad entre 30-50 años sin renovación: restar 6%
+   - Antigüedad entre 15-30 años sin renovación: restar 3%
+   - Sin amenities en zona donde la mayoría tiene (pileta, SUM): restar 5%
+   - Con amenities premium cuando la mayoría de comparables no tienen: sumar 6%
    - Planta baja sin acceso independiente: restar 5%
+   - Sin cochera en zona donde la mayoría de comparables sí tiene: restar 3%
    Solo aplicá ajustes que correspondan con los datos disponibles.
    En el informe, listá TODOS los ajustes aplicados con su porcentaje y el monto resultante.
 
