@@ -1584,104 +1584,56 @@ def chat():
                     headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
 
-ACM_PROMPT = """Generá un ACM (Análisis Comparativo de Mercado) profesional en español para presentar a un propietario en una reunión de captación.
+ACM_PROMPT = """Generá un ACM profesional en español. Fecha: {fecha_hoy}.
 
-IMPORTANTE: La fecha de hoy es {fecha_hoy}. Usá EXACTAMENTE esta fecha en el informe como fecha del relevamiento.
-
-═══ CÓMO CALCULAR EL PRECIO — SEGUÍ ESTOS PASOS ═══
-
-⚠️ PASO 0 — FILTRO DE BARRIO (CRÍTICO — hacé esto antes que nada):
-El barrio objetivo es el que figura en los datos. DESCARTÁ cualquier comparable que esté en un barrio claramente distinto. Por ejemplo: si la propiedad es de Caballito, son inválidos los comparables de Palermo, San Telmo, Belgrano, Villa del Parque, etc.
-   - Comparables válidos: mismo barrio, o barrios limítrofes con valores de mercado equivalentes (ej: Caballito ↔ Almagro, Flores).
-   - Comparables inválidos: barrios con nivel de precios notoriamente distinto.
-   - Si tras el filtro quedan menos de 4 comparables, podés incluir barrios vecinos similares, pero indicalo explícitamente y aplicá un ajuste: +10% si el barrio del comparable es más caro, -10% si es más barato.
-   - NUNCA promedies comparables de barrios con precio/m² estructuralmente diferentes: distorsiona todo el análisis.
-
-PASO 1 — Filtrá los comparables válidos por superficie: priorizá los más cercanos en m² (±25% del objetivo). Si hay pocos, ampliá a ±35%. Quedate con los 8-12 más similares.
-   Nota especial para unidades chicas (≤ 40 m²): el precio/m² suele ser mayor que en unidades más grandes por la demanda inversora, pero el precio ABSOLUTO tiene un techo natural dado por la barrera de entrada de los compradores. Si el precio calculado supera significativamente al de los comparables directos del mismo barrio, alinealo hacia abajo.
-
-PASO 2 — Descartá outliers obvios: propiedades con precio/m² más de 2 veces el promedio del grupo o menos de la mitad. Quedarte con el rango razonable del mercado.
-
-PASO 3 — Calculá el precio/m² promedio de los comparables filtrados válidos.
-   Luego aplicá la corrección de brecha portal/transacción:
-   - Precio/m² de mercado real = precio/m² promedio publicado × 0.95
-   - Fundamento: en el mercado actual de CABA, las propiedades cierran en promedio un 5% por debajo del precio de publicación. Los comparables son precios de lista, no de cierre.
-   - Excepción: si la propiedad es PREMIUM (flag activo), no aplicar corrección (× 1.0), ya que las propiedades premium tienen menor margen de negociación.
-   - En el informe, mostrá: "Precio/m² publicado: USD X/m² → Precio/m² corregido (−5%): USD Y/m²".
-   Verificación: si el precio final calculado difiere en más de 20% del comparable más similar en m² y barrio, revisá si no estás mezclando barrios o tamaños muy distintos.
-
-PASO 4 — Calculá el precio total de la propiedad según la superficie disponible:
-
-   SI hay superficie cubierta Y semicubierta Y/O descubierta:
-     Precio = (m²_cubiertos × precio/m²) + (m²_semicubiertos × precio/m² × 0.50) + (m²_descubiertos × precio/m² × 0.30)
-     - Semicubiertos (galería techada, quincho cubierto, cochera techada): 50% del precio/m² cubierto.
-     - Descubiertos (patio, jardín, terraza sin techo): 30% del precio/m² cubierto.
-
-   SI solo hay superficie total (sin desglose):
-     Precio = m²_totales × precio/m²
-
-   SI los comparables se midieron en m² totales pero la propiedad tiene desglose:
-     Usá el m² cubierto como referencia principal para el precio/m², luego sumá el valor de semicubiertos y descubiertos.
-
-PASO 5 — Ajustes por ESTADO y UBICACIÓN dentro del edificio (aplicá SIEMPRE que se informen):
-
-   Estado del inmueble:
-   - A estrenar (0-2 años, nunca habitado): sumar 8%
-   - Muy bueno (reformado o mantenido impecable): sumar 4%
-   - Bueno (standard, sin reformas recientes): sin ajuste (línea base)
-   - Regular (necesita pintura, mantenimiento, detalles): restar 8%
-   - A refaccionar (necesita trabajo significativo): restar 15%
-
-   Ubicación dentro del edificio:
-   - Frente (da a la calle, más luminoso y ventilado): sumar 5%
-   - Contrafrente (da al interior del edificio o patio interno): restar 5%
-   - Lateral / Interno: sin ajuste
-
-PASO 6 — Ajustes adicionales por otras características distintivas:
-   - Antigüedad > 50 años sin renovación: restar 10%
-   - Antigüedad entre 30-50 años sin renovación: restar 6%
-   - Antigüedad entre 15-30 años sin renovación: restar 3%
-   - Sin amenities en zona donde la mayoría tiene (pileta, SUM): restar 5%
-   - Con amenities premium cuando la mayoría de comparables no tienen: sumar 6%
-   - Planta baja sin acceso independiente: restar 5%
-   - Sin cochera en zona donde la mayoría de comparables sí tiene: restar 3%
-   Solo aplicá ajustes que correspondan con los datos disponibles.
-   En el informe, listá TODOS los ajustes aplicados con su porcentaje y el monto resultante.
-
-PASO 7 — Precio de publicación sugerido = resultado del PASO 4 con todos los ajustes.
-   Es el precio de lista competitivo para publicar en portales.
-
-PASO 8 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
-
-{premium_nota}Los datos de comparables son los siguientes:
-
+{premium_nota}
+DATOS DE COMPARABLES:
 {datos}
 
-═══ ESTRUCTURA DEL INFORME ═══
+═══ CÁLCULO DEL PRECIO ═══
 
-1. **Relevamiento al {fecha_hoy}** — una línea: propiedad objetivo, barrio, m² cubiertos / m² semicubiertos si aplica, tipo, ambientes.
+1. FILTRO DE BARRIO: descartá comparables de barrios con precio/m² estructuralmente distinto al objetivo. Solo usá barrios limítrofes equivalentes si quedan menos de 4 válidos.
 
-2. **Comparables del mercado** — mostrá TODOS los comparables seleccionados (los 8-12 filtrados), ordenados de menor a mayor precio/m². Tabla con columnas: Dirección/Barrio | m² | Amb. | Precio USD | USD/m² | Fuente.
-   Antes de la tabla, indicá cuántos comparables fueron descartados por ser de barrios distintos al objetivo y cuáles (ej: "Se descartaron 2 comparables de Palermo y San Telmo por no corresponder al barrio objetivo").
-   Al final: "Precio/m² promedio del mercado: USD X/m²".
+2. FILTRO DE SUPERFICIE: quedate con los 8-12 comparables más cercanos en m² (±25%, ampliable a ±35%). Descartá outliers con precio/m² más de 2× o menos de 0.5× el promedio.
 
-3. **Precio recomendado**:
-   - *Publicación sugerida*: USD [número concreto]. Mostrá el cálculo explícito paso a paso: precio/m² base × m² cubiertos, + semicubiertos al 50%, + descubiertos al 30%, luego cada ajuste de estado/ubicación/antigüedad/amenities con su porcentaje y monto.
-   - *Cierre estimado*: USD [rango] (5-8% por debajo de publicación).
+3. PRECIO/M²: promedio de comparables válidos × 0.95 (corrección portal→cierre; si es PREMIUM no aplicar).
 
-4. **Por qué esta propiedad está por encima del promedio** — esta sección es clave para que el agente defienda el precio ante el propietario. Analizá:
-   - **Escasez**: si la propiedad es más grande o tiene más ambientes que la mayoría de los comparables, decilo con datos ("Solo X de los Y comparables tienen más de Z m²").
-   - **Superficie semicubierta**: si tiene galería, quincho, cochera techada u otros m² semicubiertos significativos, cuantificá el valor que aportan.
-   - **Demanda acotada**: propiedades de 6-7+ ambientes tienen menos oferta y apuntan a un comprador específico que paga diferencial.
-   - **Posición en el rango**: mostrá en qué percentil del mercado está el precio sugerido ("está en el 25% más alto del rango relevado, justificado por...").
-   Máximo 4 bullets concretos, con números cuando sea posible.
+4. PRECIO BASE:
+   - Solo cubiertos: m²_cub × precio/m²
+   - Con semi/desc: (m²_cub × P) + (m²_semi × P × 0.50) + (m²_desc × P × 0.30)
 
-5. **Próximos pasos** — 3 ítems concretos (firmar mandato, fotos profesionales, publicación).
+5. AJUSTES (solo los que aplican con datos disponibles):
+   Estado: a estrenar +8% · muy bueno +4% · bueno 0% · regular −8% · a refaccionar −15%
+   Ubicación: frente +5% · contrafrente −5% · lateral 0%
+   Antigüedad: >50 años −10% · 30-50 años −6% · 15-30 años −3%
+   Otros: sin amenities donde mayoría tiene −5% · con amenities premium +6% · sin cochera donde mayoría tiene −3%
 
-6. **Nota metodológica** (al pie del informe, una sola línea):
-   "Comparables obtenidos de Zonaprop, MercadoLibre y Argenprop. Valores de referencia de mercado validados con índices de Reporte Inmobiliario. Precios de publicación corregidos −5% para reflejar valores de cierre reales en el mercado actual de CABA."
+6. Precio publicación = base + ajustes. Precio cierre = publicación × 0.92–0.95.
 
-Tono: profesional, datos concretos, directo. El informe tiene que transmitir solidez técnica y darle confianza al agente para defender el precio ante el propietario. La sección "Por qué esta propiedad está por encima del promedio" es lo que convierte un ACM en una herramienta de captación real.
+═══ ESTRUCTURA DEL INFORME (conciso, para reunión de captación) ═══
+
+**1. Relevamiento al {fecha_hoy}**
+Una línea con los datos clave de la propiedad objetivo.
+
+**2. Comparables del mercado**
+Si se descartaron comparables por barrio distinto, indicalo en una línea antes de la tabla.
+Tabla: Dirección/Barrio | m² | Amb. | Precio USD | USD/m² | Fuente
+Al final: Precio/m² publicado promedio: USD X · Corregido (−5%): USD Y
+
+**3. Precio recomendado**
+Cálculo paso a paso (3-4 líneas máximo). Mostrá precio base, cada ajuste con % y monto, total.
+💰 Publicación sugerida: USD [número]
+🟡 Cierre estimado: USD [rango]
+
+**4. Por qué defender este precio**
+Máximo 3 bullets concretos con números: escasez, posición en el rango, demanda del segmento.
+
+**5. Próximos pasos**
+3 ítems: mandato, fotos, publicación.
+
+*Comparables: Zonaprop · MercadoLibre · Argenprop · Ref. Reporte Inmobiliario · Corrección portal/cierre −5%*
+
+Tono: directo, datos concretos. Sin texto de relleno.
 """
 
 @app.route("/acm", methods=["POST"])
