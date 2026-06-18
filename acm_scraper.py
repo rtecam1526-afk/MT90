@@ -794,22 +794,26 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
         return r
 
     todos_zp = todos_ml = todos_ap = todos_ri = []
-    with ThreadPoolExecutor(max_workers=4) as ex:
+    _TIMEOUTS = {"ZP": 35, "ML": 35, "AP": 35, "RI": 18}
+    _LABELS   = {"ZP": "Zonaprop", "ML": "MercadoLibre", "AP": "Argenprop", "RI": "Reporte Inmobiliario"}
+    ex = ThreadPoolExecutor(max_workers=4)
+    try:
         fut_zp = ex.submit(_run_zp)
         fut_ml = ex.submit(_run_ml)
         fut_ap = ex.submit(_run_ap)
         fut_ri = ex.submit(_run_ri)
         for fut, name in [(fut_zp, "ZP"), (fut_ml, "ML"), (fut_ap, "AP"), (fut_ri, "RI")]:
             try:
-                result = fut.result(timeout=35)
+                result = fut.result(timeout=_TIMEOUTS[name])
                 if name == "ZP":   todos_zp = result
                 elif name == "ML": todos_ml = result
                 elif name == "AP": todos_ap = result
                 else:              todos_ri = result
             except Exception as e:
                 print(f"[ACM-{name}] Timeout o error: {e}")
-                labels = {"ZP": "Zonaprop", "ML": "MercadoLibre", "AP": "Argenprop", "RI": "Reporte Inmobiliario"}
-                _cb(f"⚠️ {labels.get(name, name)} no respondió a tiempo")
+                _cb(f"⚠️ {_LABELS[name]} no respondió a tiempo")
+    finally:
+        ex.shutdown(wait=False)  # no bloquear si algún hilo quedó colgado
 
     # Calcular distancias para comparables de Zonaprop que tienen coordenadas
     if target_lat and target_lng:
@@ -854,18 +858,20 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
         extras = []
         for barrio_fb in zonas_fb[:2]:   # max 2 barrios adicionales
             _cb(f"   ↳ Buscando en **{barrio_fb.replace('-', ' ').title()}**...")
+            ex2 = ThreadPoolExecutor(max_workers=3)
             try:
-                with ThreadPoolExecutor(max_workers=3) as ex2:
-                    f1 = ex2.submit(_buscar_zonaprop, barrio_fb, tipo, _crear_session(), 1)
-                    f2 = ex2.submit(_buscar_ml, barrio_fb, tipo, m2_target, ambientes_target)
-                    f3 = ex2.submit(_buscar_argenprop, barrio_fb, tipo, _crear_session(), 1)
-                    for fut in [f1, f2, f3]:
-                        try:
-                            extras.extend(fut.result(timeout=30))
-                        except Exception:
-                            pass
+                f1 = ex2.submit(_buscar_zonaprop, barrio_fb, tipo, _crear_session(), 1)
+                f2 = ex2.submit(_buscar_ml, barrio_fb, tipo, m2_target, ambientes_target)
+                f3 = ex2.submit(_buscar_argenprop, barrio_fb, tipo, _crear_session(), 1)
+                for fut in [f1, f2, f3]:
+                    try:
+                        extras.extend(fut.result(timeout=30))
+                    except Exception:
+                        pass
             except Exception as e:
                 print(f"[ACM] Fallback {barrio_fb}: {e}")
+            finally:
+                ex2.shutdown(wait=False)
 
         if extras:
             # Filtrar por m² también los del barrio de respaldo
