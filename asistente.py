@@ -1609,18 +1609,33 @@ PASO 4 — Calculá el precio total de la propiedad según la superficie disponi
    SI los comparables se midieron en m² totales pero la propiedad tiene desglose:
      Usá el m² cubierto como referencia principal para el precio/m², luego sumá el valor de semicubiertos y descubiertos.
 
-PASO 5 — Ajustes adicionales por características distintivas:
+PASO 5 — Ajustes por ESTADO y UBICACIÓN dentro del edificio (aplicá SIEMPRE que se informen):
+
+   Estado del inmueble:
+   - A estrenar (0-2 años, nunca habitado): sumar 8%
+   - Muy bueno (reformado o mantenido impecable): sumar 4%
+   - Bueno (standard, sin reformas recientes): sin ajuste (línea base)
+   - Regular (necesita pintura, mantenimiento, detalles): restar 8%
+   - A refaccionar (necesita trabajo significativo): restar 15%
+
+   Ubicación dentro del edificio:
+   - Frente (da a la calle, más luminoso y ventilado): sumar 5%
+   - Contrafrente (da al interior del edificio o patio interno): restar 5%
+   - Lateral / Interno: sin ajuste
+
+PASO 6 — Ajustes adicionales por otras características distintivas:
    - Antigüedad > 50 años sin renovación: restar 8%
    - Antigüedad entre 30-50 años sin renovación: restar 4%
    - Sin amenities en zona donde la mayoría tiene (pileta, SUM): restar 4%
    - Con amenities cuando la mayoría de comparables no tienen: sumar 6%
    - Planta baja sin acceso independiente: restar 5%
    Solo aplicá ajustes que correspondan con los datos disponibles.
+   En el informe, listá TODOS los ajustes aplicados con su porcentaje y el monto resultante.
 
-PASO 6 — Precio de publicación sugerido = resultado del PASO 4 con ajustes del PASO 5.
+PASO 7 — Precio de publicación sugerido = resultado del PASO 4 con todos los ajustes.
    Es el precio de lista competitivo para publicar en portales.
 
-PASO 7 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
+PASO 8 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
 
 {premium_nota}Los datos de comparables son los siguientes:
 
@@ -1634,7 +1649,7 @@ PASO 7 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
    Al final: "Precio/m² promedio del mercado: USD X/m²".
 
 3. **Precio recomendado**:
-   - *Publicación sugerida*: USD [número concreto]. Mostrá el cálculo explícito paso a paso.
+   - *Publicación sugerida*: USD [número concreto]. Mostrá el cálculo explícito paso a paso: precio/m² base × m² cubiertos, + semicubiertos al 50%, + descubiertos al 30%, luego cada ajuste de estado/ubicación/antigüedad/amenities con su porcentaje y monto.
    - *Cierre estimado*: USD [rango] (5-8% por debajo de publicación).
 
 4. **Por qué esta propiedad está por encima del promedio** — esta sección es clave para que el agente defienda el precio ante el propietario. Analizá:
@@ -1665,6 +1680,8 @@ def acm():
     m2desc      = data.get("m2desc")
     antiguedad  = data.get("antiguedad")
     amenities   = (data.get("amenities")  or "").strip() or None
+    frente      = (data.get("frente")     or "").strip() or None
+    estado      = (data.get("estado")     or "").strip() or None
     premium     = bool(data.get("premium", False))
 
     if not barrio:
@@ -1686,9 +1703,9 @@ def acm():
     def generar():
         import queue as _queue, threading as _threading
         if direccion:
-            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre y Argenprop cerca de **{direccion}** ({barrio.title()})...\n'
+            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre, Argenprop y Reporte Inmobiliario cerca de **{direccion}** ({barrio.title()})...\n'
         else:
-            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre y Argenprop en **{barrio.title()}** ({tipo})...\n'
+            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre, Argenprop y Reporte Inmobiliario en **{barrio.title()}** ({tipo})...\n'
         yield f"data: {json.dumps({'texto': msg_busq})}\n\n"
 
         # Correr scraping en un thread y hacer streaming de progreso vía queue
@@ -1746,6 +1763,8 @@ def acm():
         if m2desc_int:  prop_extra.append(f"m² descubiertos: {m2desc_int}")
         if antig_int is not None: prop_extra.append(f"Antigüedad: {antig_int} años")
         if amenities:   prop_extra.append(f"Amenities: {amenities}")
+        if frente:      prop_extra.append(f"Ubicación en edificio: {frente}")
+        if estado:      prop_extra.append(f"Estado del inmueble: {estado}")
         if prop_extra:
             datos_texto += "\n\nDATOS ESPECÍFICOS DE LA PROPIEDAD OBJETIVO:\n" + "\n".join(prop_extra)
 

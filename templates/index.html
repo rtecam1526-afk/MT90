@@ -369,6 +369,26 @@
         <label>Amenities</label>
         <input id="acm-amenities" type="text" placeholder="pileta, gym, SUM…" style="width:160px" />
       </div>
+      <div class="acm-field">
+        <label>Ubicación</label>
+        <select id="acm-frente">
+          <option value="">— sin info —</option>
+          <option value="frente">Frente</option>
+          <option value="contrafrente">Contrafrente</option>
+          <option value="lateral">Lateral / Interno</option>
+        </select>
+      </div>
+      <div class="acm-field">
+        <label>Estado</label>
+        <select id="acm-estado">
+          <option value="">— sin info —</option>
+          <option value="a-estrenar">A estrenar</option>
+          <option value="muy-bueno">Muy bueno</option>
+          <option value="bueno">Bueno</option>
+          <option value="regular">Regular</option>
+          <option value="a-refaccionar">A refaccionar</option>
+        </select>
+      </div>
       <div class="acm-field" style="justify-content:flex-end">
         <label style="flex-direction:row;align-items:center;gap:6px;cursor:pointer">
           <input id="acm-premium" type="checkbox" style="width:auto;margin:0" />
@@ -618,6 +638,8 @@
     const m2desc      = document.getElementById("acm-m2desc").value;
     const antiguedad  = document.getElementById("acm-antiguedad").value;
     const amenities   = document.getElementById("acm-amenities").value.trim();
+    const frente      = document.getElementById("acm-frente").value;
+    const estado      = document.getElementById("acm-estado").value;
 
     if (!barrio) { document.getElementById("acm-barrio").focus(); return; }
     if (!m2) {
@@ -634,7 +656,7 @@
     document.getElementById("acm-panel").classList.remove("open");
     document.getElementById("acm-btn").classList.remove("activo");
 
-    const resumen = `ACM · ${barrio.charAt(0).toUpperCase()+barrio.slice(1)}${direccion ? ` · ${direccion}` : ""} · ${tipo}${m2 ? ` · ${m2} m²` : ""}${ambientes ? ` · ${ambientes} amb` : ""}${antiguedad ? ` · ${antiguedad} años` : ""}${amenities ? ` · ${amenities}` : ""}${premium ? " · Premium" : ""}`;
+    const resumen = `ACM · ${barrio.charAt(0).toUpperCase()+barrio.slice(1)}${direccion ? ` · ${direccion}` : ""} · ${tipo}${m2 ? ` · ${m2} m²` : ""}${ambientes ? ` · ${ambientes} amb` : ""}${antiguedad ? ` · ${antiguedad} años` : ""}${amenities ? ` · ${amenities}` : ""}${frente ? ` · ${frente}` : ""}${estado ? ` · estado ${estado}` : ""}${premium ? " · Premium" : ""}`;
     agregarMensaje("user", resumen, null);
 
     await streamRespuesta("/acm", {
@@ -642,6 +664,7 @@
       m2: m2||null, ambientes: ambientes||null,
       m2cub: m2cub||null, m2semi: m2semi||null, m2desc: m2desc||null,
       antiguedad: antiguedad||null, amenities: amenities||null,
+      frente: frente||null, estado: estado||null,
       premium: premium||false
     });
 

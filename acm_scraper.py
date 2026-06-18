@@ -396,6 +396,160 @@ def _buscar_ml(barrio: str, tipo: str, m2_target=None, ambientes_target=None) ->
     return resultados
 
 
+# ── Reporte Inmobiliario ──────────────────────────────────────────────────────
+
+TIPO_URL_RI = {
+    "departamento": "departamentos",
+    "casa":         "casas",
+    "ph":           "ph",
+    "local":        "locales",
+    "oficina":      "oficinas",
+}
+
+def _buscar_ri(barrio: str, tipo: str, session) -> list:
+    """Busca comparables en Reporte Inmobiliario."""
+    tipo_ri    = TIPO_URL_RI.get(tipo.lower(), "departamentos")
+    barrio_url = _slug(barrio)
+    resultados = []
+
+    url = f"https://www.reporteinmobiliario.com/inmuebles/venta-{tipo_ri}-en-{barrio_url}"
+    html = _fetch(session, url)
+    if not html:
+        return []
+
+    # Intentar JSON embebido (Next.js / React)
+    for pat in [
+        r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>',
+        r'window\.__PRELOADED_STATE__\s*=\s*(\{.*?\});?\s*</script>',
+        r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});?\s*</script>',
+    ]:
+        m_json = re.search(pat, html, re.DOTALL)
+        if not m_json:
+            continue
+        try:
+            blob = json.loads(m_json.group(1))
+            def _find_listings_ri(obj, depth=0):
+                if depth > 7:
+                    return []
+                if isinstance(obj, list) and len(obj) > 2:
+                    sample = obj[0] if obj else {}
+                    if isinstance(sample, dict) and any(
+                        k in sample for k in ["price", "precio", "priceOperationTypes"]
+                    ):
+                        return obj
+                if isinstance(obj, dict):
+                    for v in obj.values():
+                        r = _find_listings_ri(v, depth + 1)
+                        if r:
+                            return r
+                return []
+            found = _find_listings_ri(blob)
+            for item in found:
+                try:
+                    precio_usd = None
+                    precio_str = "Consultar"
+                    for pk in ["price", "precio"]:
+                        pd = item.get(pk)
+                        if isinstance(pd, (int, float)) and pd > 0:
+                            precio_usd = float(pd)
+                            precio_str = f"USD {precio_usd:,.0f}"
+                            break
+                        if isinstance(pd, dict):
+                            amt = pd.get("amount") or pd.get("value")
+                            cur = str(pd.get("currency") or pd.get("currencyCode") or "")
+                            if amt and "USD" in cur.upper():
+                                precio_usd = float(str(amt).replace(",", ""))
+                                precio_str = f"USD {precio_usd:,.0f}"
+                                break
+
+                    m2_v = None
+                    amb_v = None
+                    titulo = str(item.get("title") or item.get("titulo") or "")
+                    for k in ["surface", "m2", "totalSurface", "coveredSurface", "superficieTotal"]:
+                        v = item.get(k)
+                        if v:
+                            mo = re.search(r'(\d+)', str(v))
+                            if mo:
+                                m2_v = int(mo.group(1))
+                                break
+                    if not m2_v:
+                        mo = re.search(r'(\d+)\s*m[²2]', titulo, re.IGNORECASE)
+                        if mo:
+                            m2_v = int(mo.group(1))
+                    for k in ["rooms", "ambientes", "environments"]:
+                        v = item.get(k)
+                        if v:
+                            mo = re.search(r'(\d+)', str(v))
+                            if mo:
+                                amb_v = int(mo.group(1))
+                                break
+                    if not amb_v:
+                        mo = re.search(r'(\d+)\s*amb', titulo, re.IGNORECASE)
+                        if mo:
+                            amb_v = int(mo.group(1))
+
+                    addr = (item.get("address") or item.get("direccion") or
+                            item.get("location") or barrio.title())
+                    if isinstance(addr, dict):
+                        addr = (addr.get("street") or addr.get("name") or
+                                addr.get("address_line") or barrio.title())
+
+                    if not precio_usd:
+                        continue
+                    resultados.append({
+                        "titulo":       titulo,
+                        "precio":       precio_str,
+                        "precio_usd":   precio_usd,
+                        "m2":           m2_v,
+                        "ambientes":    amb_v,
+                        "tipo_pub":     "inmobiliaria",
+                        "rebaja":       None,
+                        "url":          item.get("url") or item.get("permalink") or url,
+                        "addr":         str(addr),
+                        "distancia_km": None,
+                        "lat":          None,
+                        "lng":          None,
+                        "fuente":       "Reporte Inmobiliario",
+                    })
+                except Exception:
+                    continue
+            if resultados:
+                break
+        except Exception:
+            continue
+
+    # Fallback: extracción directa de HTML si no hubo JSON
+    if not resultados:
+        precios = re.findall(r'USD\s*[\$]?\s*([\d\.,]+)', html)
+        m2s     = re.findall(r'(\d{2,4})\s*m[²2]', html, re.IGNORECASE)
+        ambs    = re.findall(r'(\d)\s*amb', html, re.IGNORECASE)
+        for i, p_str in enumerate(precios[:15]):
+            try:
+                p_val = float(p_str.replace(".", "").replace(",", "."))
+                if p_val < 5000 or p_val > 10_000_000:
+                    continue
+                resultados.append({
+                    "titulo":       f"{tipo.title()} en {barrio.title()}",
+                    "precio":       f"USD {p_val:,.0f}",
+                    "precio_usd":   p_val,
+                    "m2":           int(m2s[i]) if i < len(m2s) else None,
+                    "ambientes":    int(ambs[i]) if i < len(ambs) else None,
+                    "tipo_pub":     "inmobiliaria",
+                    "rebaja":       None,
+                    "url":          url,
+                    "addr":         barrio.title(),
+                    "distancia_km": None,
+                    "lat":          None,
+                    "lng":          None,
+                    "fuente":       "Reporte Inmobiliario",
+                })
+            except Exception:
+                continue
+
+    print(f"[ACM-RI] {len(resultados)} listings encontrados")
+    return resultados
+
+
 # ── Argenprop ─────────────────────────────────────────────────────────────────
 
 def _buscar_argenprop(barrio: str, tipo: str, session, paginas: int = 1) -> list:
@@ -633,20 +787,29 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
         _cb(f"✓ Argenprop: {len(r)} propiedades")
         return r
 
-    todos_zp = todos_ml = todos_ap = []
-    with ThreadPoolExecutor(max_workers=3) as ex:
+    def _run_ri():
+        _cb(f"🔎 Consultando **Reporte Inmobiliario** ({barrio.title()})...")
+        r = _buscar_ri(barrio, tipo, _crear_session())
+        _cb(f"✓ Reporte Inmobiliario: {len(r)} propiedades")
+        return r
+
+    todos_zp = todos_ml = todos_ap = todos_ri = []
+    with ThreadPoolExecutor(max_workers=4) as ex:
         fut_zp = ex.submit(_run_zp)
         fut_ml = ex.submit(_run_ml)
         fut_ap = ex.submit(_run_ap)
-        for fut, name in [(fut_zp, "ZP"), (fut_ml, "ML"), (fut_ap, "AP")]:
+        fut_ri = ex.submit(_run_ri)
+        for fut, name in [(fut_zp, "ZP"), (fut_ml, "ML"), (fut_ap, "AP"), (fut_ri, "RI")]:
             try:
                 result = fut.result(timeout=35)
                 if name == "ZP":   todos_zp = result
                 elif name == "ML": todos_ml = result
-                else:              todos_ap = result
+                elif name == "AP": todos_ap = result
+                else:              todos_ri = result
             except Exception as e:
                 print(f"[ACM-{name}] Timeout o error: {e}")
-                _cb(f"⚠️ {'Zonaprop' if name=='ZP' else 'MercadoLibre' if name=='ML' else 'Argenprop'} no respondió a tiempo")
+                labels = {"ZP": "Zonaprop", "ML": "MercadoLibre", "AP": "Argenprop", "RI": "Reporte Inmobiliario"}
+                _cb(f"⚠️ {labels.get(name, name)} no respondió a tiempo")
 
     # Calcular distancias para comparables de Zonaprop que tienen coordenadas
     if target_lat and target_lng:
@@ -655,7 +818,7 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
                 c["distancia_km"] = _distancia_km(target_lat, target_lng, c["lat"], c["lng"])
 
     # Unificar
-    todos = todos_zp + todos_ml + todos_ap
+    todos = todos_zp + todos_ml + todos_ap + todos_ri
 
     # Filtrar por radio si tenemos coordenadas (solo para los que tienen distancia)
     if target_lat and target_lng:
