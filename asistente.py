@@ -1678,6 +1678,9 @@ PASO 8 — Precio de cierre estimado = precio de publicación menos 5 a 8%.
 
 5. **Próximos pasos** — 3 ítems concretos (firmar mandato, fotos profesionales, publicación).
 
+6. **Nota metodológica** (al pie del informe, una sola línea):
+   "Comparables obtenidos de Zonaprop, MercadoLibre y Argenprop. Valores de referencia de mercado validados con índices de Reporte Inmobiliario. Precios de publicación corregidos −5% para reflejar valores de cierre reales en el mercado actual de CABA."
+
 Tono: profesional, datos concretos, directo. El informe tiene que transmitir solidez técnica y darle confianza al agente para defender el precio ante el propietario. La sección "Por qué esta propiedad está por encima del promedio" es lo que convierte un ACM en una herramienta de captación real.
 """
 
