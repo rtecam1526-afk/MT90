@@ -1606,7 +1606,8 @@ DATOS DE COMPARABLES:
    Estado: a estrenar +8% · muy bueno +4% · bueno 0% · regular −8% · a refaccionar −15%
    Ubicación: frente +5% · contrafrente −5% · lateral 0%
    Antigüedad: >50 años −10% · 30-50 años −6% · 15-30 años −3%
-   Otros: sin amenities donde mayoría tiene −5% · con amenities premium +6% · sin cochera donde mayoría tiene −3%
+   Otros: sin amenities donde mayoría tiene −5% · con amenities premium +6%
+   Cochera: con cochera cuando la mayoría de comparables no tiene +3% · sin cochera cuando la mayoría sí tiene −3%
 
 6. Precio publicación = base + ajustes. Precio cierre = publicación × 0.92–0.95.
 
@@ -1654,6 +1655,7 @@ def acm():
     amenities   = (data.get("amenities")  or "").strip() or None
     frente      = (data.get("frente")     or "").strip() or None
     estado      = (data.get("estado")     or "").strip() or None
+    cochera     = (data.get("cochera")    or "").strip() or None
     premium     = bool(data.get("premium", False))
 
     if not barrio:
@@ -1737,6 +1739,7 @@ def acm():
         if amenities:   prop_extra.append(f"Amenities: {amenities}")
         if frente:      prop_extra.append(f"Ubicación en edificio: {frente}")
         if estado:      prop_extra.append(f"Estado del inmueble: {estado}")
+        if cochera:     prop_extra.append(f"Cochera: {'con cochera' if cochera == 'si' else 'sin cochera'}")
         if prop_extra:
             datos_texto += "\n\nDATOS ESPECÍFICOS DE LA PROPIEDAD OBJETIVO:\n" + "\n".join(prop_extra)
 
