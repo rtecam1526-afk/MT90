@@ -1602,12 +1602,12 @@ PASO 1 — Filtrá los comparables válidos por superficie: priorizá los más c
 
 PASO 2 — Descartá outliers obvios: propiedades con precio/m² más de 2 veces el promedio del grupo o menos de la mitad. Quedarte con el rango razonable del mercado.
 
-PASO 3 — Calculá el precio/m² promedio de los comparables filtrados válidos (precio publicado promedio).
+PASO 3 — Calculá el precio/m² promedio de los comparables filtrados válidos.
    Luego aplicá la corrección de brecha portal/transacción:
-   - Precio/m² de mercado real = precio/m² promedio publicado × 0.90
-   - Fundamento: en el mercado actual de CABA, las propiedades cierran en promedio un 10% por debajo del precio de publicación en portales. Los comparables que tenés son precios de lista, no de cierre.
-   - Excepción: si la propiedad es PREMIUM (flag activo), usá × 0.95 en lugar de × 0.90, ya que las propiedades premium tienen menor margen de negociación.
-   - En el informe, mostrá los dos números: "Precio/m² publicado: USD X/m² → Precio/m² de mercado real (−10%): USD Y/m²".
+   - Precio/m² de mercado real = precio/m² promedio publicado × 0.95
+   - Fundamento: en el mercado actual de CABA, las propiedades cierran en promedio un 5% por debajo del precio de publicación. Los comparables son precios de lista, no de cierre.
+   - Excepción: si la propiedad es PREMIUM (flag activo), no aplicar corrección (× 1.0), ya que las propiedades premium tienen menor margen de negociación.
+   - En el informe, mostrá: "Precio/m² publicado: USD X/m² → Precio/m² corregido (−5%): USD Y/m²".
    Verificación: si el precio final calculado difiere en más de 20% del comparable más similar en m² y barrio, revisá si no estás mezclando barrios o tamaños muy distintos.
 
 PASO 4 — Calculá el precio total de la propiedad según la superficie disponible:
@@ -1720,9 +1720,9 @@ def acm():
     def generar():
         import queue as _queue, threading as _threading
         if direccion:
-            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre, Argenprop y Reporte Inmobiliario cerca de **{direccion}** ({barrio.title()})...\n'
+            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre y Argenprop cerca de **{direccion}** ({barrio.title()})...\n'
         else:
-            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre, Argenprop y Reporte Inmobiliario en **{barrio.title()}** ({tipo})...\n'
+            msg_busq = f'🔍 Consultando Zonaprop, MercadoLibre y Argenprop en **{barrio.title()}** ({tipo})...\n'
         yield f"data: {json.dumps({'texto': msg_busq})}\n\n"
 
         # Correr scraping en un thread y hacer streaming de progreso vía queue

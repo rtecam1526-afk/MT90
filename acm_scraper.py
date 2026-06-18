@@ -787,28 +787,19 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
         _cb(f"✓ Argenprop: {len(r)} propiedades")
         return r
 
-    def _run_ri():
-        _cb(f"🔎 Consultando **Reporte Inmobiliario** ({barrio.title()})...")
-        r = _buscar_ri(barrio, tipo, _crear_session())
-        _cb(f"✓ Reporte Inmobiliario: {len(r)} propiedades")
-        return r
-
-    todos_zp = todos_ml = todos_ap = todos_ri = []
-    _TIMEOUTS = {"ZP": 35, "ML": 35, "AP": 35, "RI": 18}
-    _LABELS   = {"ZP": "Zonaprop", "ML": "MercadoLibre", "AP": "Argenprop", "RI": "Reporte Inmobiliario"}
-    ex = ThreadPoolExecutor(max_workers=4)
+    todos_zp = todos_ml = todos_ap = []
+    _LABELS = {"ZP": "Zonaprop", "ML": "MercadoLibre", "AP": "Argenprop"}
+    ex = ThreadPoolExecutor(max_workers=3)
     try:
         fut_zp = ex.submit(_run_zp)
         fut_ml = ex.submit(_run_ml)
         fut_ap = ex.submit(_run_ap)
-        fut_ri = ex.submit(_run_ri)
-        for fut, name in [(fut_zp, "ZP"), (fut_ml, "ML"), (fut_ap, "AP"), (fut_ri, "RI")]:
+        for fut, name in [(fut_zp, "ZP"), (fut_ml, "ML"), (fut_ap, "AP")]:
             try:
-                result = fut.result(timeout=_TIMEOUTS[name])
+                result = fut.result(timeout=35)
                 if name == "ZP":   todos_zp = result
                 elif name == "ML": todos_ml = result
-                elif name == "AP": todos_ap = result
-                else:              todos_ri = result
+                else:              todos_ap = result
             except Exception as e:
                 print(f"[ACM-{name}] Timeout o error: {e}")
                 _cb(f"⚠️ {_LABELS[name]} no respondió a tiempo")
