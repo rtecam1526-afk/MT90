@@ -151,7 +151,9 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
   const queue = data.carteraQueue;
   const total = campana.alcance;
   const [enviados, setEnviados] = useStateC({});
+  const [saltados, setSaltados] = useStateC({});
   const [idx, setIdx] = useStateC(0);
+  const [busqueda, setBusqueda] = useStateC("");
   const hechos = Object.keys(enviados).length;
   const p = queue[idx];
 
@@ -159,12 +161,25 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
     const msg = getMensaje(campana, p.nombre);
     onWhatsapp({ nombre: p.nombre, telefono: p.telefono, mensaje: msg });
     setEnviados((e) => ({ ...e, [p.id]: true }));
-    setTimeout(() => { if (idx < queue.length - 1) setIdx(idx + 1); }, 250);
+    setSaltados((s) => { if (!s[p.id]) return s; const n = { ...s }; delete n[p.id]; return n; });
+    setIdx((i) => i + 1);
   }
-  function saltar() { if (idx < queue.length - 1) setIdx(idx + 1); }
+  function saltar() {
+    setSaltados((s) => ({ ...s, [p.id]: true }));
+    setIdx((i) => i + 1);
+  }
+  function irA(i) { setIdx(i); setBusqueda(""); }
 
-  const finCola = hechos >= queue.length;
+  const pendientes = queue.filter((c) => saltados[c.id] && !enviados[c.id]);
+  const finCola = idx >= queue.length;
   const pct = Math.round((hechos / queue.length) * 100);
+
+  const resultados = busqueda.trim().length >= 2
+    ? queue
+        .map((c, i) => ({ ...c, _i: i }))
+        .filter((c) => c.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()))
+        .slice(0, 6)
+    : [];
 
   return (
     <div className="cola fade-in">
@@ -179,12 +194,51 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
         <p className="cola-note">Enviás de a uno, sin spam.{queue.length < total ? ` ${total - queue.length} contacto${total - queue.length === 1 ? "" : "s"} de tu cartera no tiene teléfono cargado.` : ""}</p>
       </div>
 
+      <div className="cola-buscar">
+        <input
+          type="text"
+          className="cola-buscar-input"
+          placeholder="¿Se te pasó alguien? Buscalo por nombre…"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+        />
+        {resultados.length > 0 && (
+          <div className="cola-buscar-resultados">
+            {resultados.map((r) => (
+              <button key={r.id} className="cola-buscar-item" onClick={() => irA(r._i)}>
+                <span>{r.nombre}</span>
+                {enviados[r.id] && <span className="cola-buscar-tag">ya enviado</span>}
+                {saltados[r.id] && !enviados[r.id] && <span className="cola-buscar-tag cola-buscar-tag-pend">salteado</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       {finCola ? (
-        <div className="all-done">
-          <h2>Tanda completa</h2>
-          <p>Enviaste el saludo de {campana.titulo} a este grupo. Podés seguir con el resto de tu cartera cuando quieras.</p>
-          <button className="btn-primary-lg" style={{ maxWidth: 280, margin: "0 auto" }} onClick={onSalir}>Volver a Campañas</button>
-        </div>
+        pendientes.length > 0 ? (
+          <div className="cola-pendientes">
+            <h2>Te quedaron {pendientes.length} salteados</h2>
+            <p>Revisalos y enviales el saludo si querés.</p>
+            {pendientes.map((c) => (
+              <div className="cola-pend-item" key={c.id}>
+                <Avatar iniciales={c.iniciales} />
+                <div className="cola-pend-info">
+                  <div className="cola-name">{c.nombre}</div>
+                  <div className="cola-phone">+54 {c.telefono}</div>
+                </div>
+                <button className="cola-pend-btn" onClick={() => irA(queue.findIndex((x) => x.id === c.id))}>Revisar</button>
+              </div>
+            ))}
+            <button className="btn-primary-lg" style={{ maxWidth: 280, margin: "16px auto 0" }} onClick={onSalir}>Volver a Campañas</button>
+          </div>
+        ) : (
+          <div className="all-done">
+            <h2>Tanda completa</h2>
+            <p>Enviaste el saludo de {campana.titulo} a este grupo. Podés seguir con el resto de tu cartera cuando quieras.</p>
+            <button className="btn-primary-lg" style={{ maxWidth: 280, margin: "0 auto" }} onClick={onSalir}>Volver a Campañas</button>
+          </div>
+        )
       ) : (
         <div className="cola-card" key={p.id}>
           <div className="cola-person">

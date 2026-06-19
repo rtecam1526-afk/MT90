@@ -243,6 +243,48 @@
 .cola-send:hover { background: var(--whatsapp-dark); }
 .cola-send:active { transform: scale(.98); }
 
+.cola-buscar { position: relative; }
+.cola-buscar-input {
+  width: 100%; background: var(--surface); border: 1.5px solid var(--line);
+  border-radius: 13px; padding: 13px 16px; font-size: calc(14.5px * var(--fs-scale));
+}
+.cola-buscar-input:focus { border-color: var(--whatsapp); }
+.cola-buscar-resultados {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 5;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.cola-buscar-item {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  padding: 11px 16px; font-size: calc(14px * var(--fs-scale)); text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+.cola-buscar-item:last-child { border-bottom: none; }
+.cola-buscar-item:hover { background: var(--surface-2); }
+.cola-buscar-tag {
+  font-size: calc(11.5px * var(--fs-scale)); color: var(--muted-2); font-weight: 600;
+}
+.cola-buscar-tag-pend { color: #B36B00; }
+
+.cola-pendientes {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: 26px 28px; box-shadow: var(--shadow);
+}
+.cola-pendientes h2 { font-family: var(--font-display); font-size: calc(20px * var(--fs-scale)); margin: 0 0 4px; }
+.cola-pendientes p { color: var(--muted); margin: 0 0 18px; font-size: calc(14.5px * var(--fs-scale)); }
+.cola-pend-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+.cola-pend-item:first-of-type { border-top: none; }
+.cola-pend-info { flex: 1; }
+.cola-pend-btn {
+  background: var(--surface); border: 1.5px solid var(--line-strong);
+  border-radius: 11px; padding: 9px 16px; font-weight: 600; font-size: calc(13.5px * var(--fs-scale));
+  color: var(--whatsapp-dark);
+}
+.cola-pend-btn:hover { background: var(--surface-2); }
+
 /* Rev-launch (Mi semana — revisión con asesor) */
 .rev-launch {
   display: flex; align-items: center; gap: 14px;
