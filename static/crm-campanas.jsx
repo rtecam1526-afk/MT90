@@ -173,10 +173,10 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
       <div className="cola-bar">
         <div className="cola-bar-top">
           <span className="cola-camp">{campana.titulo}</span>
-          <span className="cola-count"><b>{hechos}</b> enviados de {queue.length} de muestra</span>
+          <span className="cola-count"><b>{hechos}</b> enviados de {queue.length}</span>
         </div>
         <div className="cola-track"><div className="cola-fill" style={{ width: pct + "%" }}></div></div>
-        <p className="cola-note">Te muestro los primeros de tu cartera de {total.toLocaleString("es-AR")}. Enviás de a uno, sin spam.</p>
+        <p className="cola-note">Enviás de a uno, sin spam.{queue.length < total ? ` ${total - queue.length} contacto${total - queue.length === 1 ? "" : "s"} de tu cartera no tiene teléfono cargado.` : ""}</p>
       </div>
 
       {finCola ? (

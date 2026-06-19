@@ -177,7 +177,7 @@ window.buildCrmData = function(contacts, done) {
   }));
 
   // carteraQueue: todos los contactos con teléfono, para cola de campañas
-  const carteraQueue = all.filter(c => c.telefono && c.telefono.trim()).slice(0, 30);
+  const carteraQueue = all.filter(c => c.telefono && c.telefono.trim());
 
   // Contactos con próxima acción definida, ordenados por urgencia
   const conAccion = all
