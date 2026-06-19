@@ -1608,6 +1608,7 @@ DATOS DE COMPARABLES:
    Antigüedad: >50 años −10% · 30-50 años −6% · 15-30 años −3%
    Otros: sin amenities donde mayoría tiene −5% · con amenities premium +6%
    Cochera: con cochera cuando la mayoría de comparables no tiene +3% · sin cochera cuando la mayoría sí tiene −3%
+   Ascensor: sin ascensor en edificio de más de 1 piso −6% · sin ascensor en PB o 1er piso sin ajuste · con ascensor sin ajuste (estándar esperado)
 
 6. Precio publicación = base + ajustes. Precio cierre = publicación × 0.92–0.95.
 
@@ -1656,6 +1657,7 @@ def acm():
     frente      = (data.get("frente")     or "").strip() or None
     estado      = (data.get("estado")     or "").strip() or None
     cochera     = (data.get("cochera")    or "").strip() or None
+    ascensor    = (data.get("ascensor")   or "").strip() or None
     premium     = bool(data.get("premium", False))
 
     if not barrio:
@@ -1740,6 +1742,7 @@ def acm():
         if frente:      prop_extra.append(f"Ubicación en edificio: {frente}")
         if estado:      prop_extra.append(f"Estado del inmueble: {estado}")
         if cochera:     prop_extra.append(f"Cochera: {'con cochera' if cochera == 'si' else 'sin cochera'}")
+        if ascensor:    prop_extra.append(f"Ascensor: {'con ascensor' if ascensor == 'si' else 'sin ascensor (escalera)'}")
         if prop_extra:
             datos_texto += "\n\nDATOS ESPECÍFICOS DE LA PROPIEDAD OBJETIVO:\n" + "\n".join(prop_extra)
 

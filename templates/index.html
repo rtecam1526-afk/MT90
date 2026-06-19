@@ -397,6 +397,14 @@
           <option value="no">Sin cochera</option>
         </select>
       </div>
+      <div class="acm-field">
+        <label>Ascensor</label>
+        <select id="acm-ascensor">
+          <option value="">— sin info —</option>
+          <option value="si">Con ascensor</option>
+          <option value="no">Sin ascensor (escalera)</option>
+        </select>
+      </div>
       <div class="acm-field" style="justify-content:flex-end">
         <label style="flex-direction:row;align-items:center;gap:6px;cursor:pointer">
           <input id="acm-premium" type="checkbox" style="width:auto;margin:0" />
@@ -649,6 +657,7 @@
     const frente      = document.getElementById("acm-frente").value;
     const estado      = document.getElementById("acm-estado").value;
     const cochera     = document.getElementById("acm-cochera").value;
+    const ascensor    = document.getElementById("acm-ascensor").value;
 
     if (!barrio) { document.getElementById("acm-barrio").focus(); return; }
     if (!m2) {
@@ -665,7 +674,7 @@
     document.getElementById("acm-panel").classList.remove("open");
     document.getElementById("acm-btn").classList.remove("activo");
 
-    const resumen = `ACM · ${barrio.charAt(0).toUpperCase()+barrio.slice(1)}${direccion ? ` · ${direccion}` : ""} · ${tipo}${m2 ? ` · ${m2} m²` : ""}${ambientes ? ` · ${ambientes} amb` : ""}${antiguedad ? ` · ${antiguedad} años` : ""}${amenities ? ` · ${amenities}` : ""}${frente ? ` · ${frente}` : ""}${estado ? ` · estado ${estado}` : ""}${cochera === "si" ? " · con cochera" : cochera === "no" ? " · sin cochera" : ""}${premium ? " · Premium" : ""}`;
+    const resumen = `ACM · ${barrio.charAt(0).toUpperCase()+barrio.slice(1)}${direccion ? ` · ${direccion}` : ""} · ${tipo}${m2 ? ` · ${m2} m²` : ""}${ambientes ? ` · ${ambientes} amb` : ""}${antiguedad ? ` · ${antiguedad} años` : ""}${amenities ? ` · ${amenities}` : ""}${frente ? ` · ${frente}` : ""}${estado ? ` · estado ${estado}` : ""}${cochera === "si" ? " · con cochera" : cochera === "no" ? " · sin cochera" : ""}${ascensor === "si" ? " · con ascensor" : ascensor === "no" ? " · sin ascensor" : ""}${premium ? " · Premium" : ""}`;
     agregarMensaje("user", resumen, null);
 
     await streamRespuesta("/acm", {
@@ -674,7 +683,7 @@
       m2cub: m2cub||null, m2semi: m2semi||null, m2desc: m2desc||null,
       antiguedad: antiguedad||null, amenities: amenities||null,
       frente: frente||null, estado: estado||null,
-      cochera: cochera||null,
+      cochera: cochera||null, ascensor: ascensor||null,
       premium: premium||false
     });
 
