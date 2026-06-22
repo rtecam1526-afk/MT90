@@ -3,7 +3,7 @@ MT90 Tracción — ACM Scraper
 Obtiene comparables de Zonaprop, MercadoLibre y Argenprop
 """
 
-import cloudscraper, json, re, time, math, urllib.parse, urllib.request, os
+import cloudscraper, json, re, time, math, urllib.parse, urllib.request, os, html as _html
 from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 
@@ -638,127 +638,43 @@ def _buscar_argenprop(barrio: str, tipo: str, session, paginas: int = 1) -> list
 
         extraidos = []
 
-        # Intento 1: cualquier bloque JSON grande embebido en <script>
-        for pat in [
-            r'window\.__PRELOADED_STATE__\s*=\s*(\{.*?\});?\s*</script>',
-            r'window\.__INITIAL_STATE__\s*=\s*(\{.*?\});?\s*</script>',
-            r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>',
-        ]:
-            m_json = re.search(pat, html, re.DOTALL)
-            if not m_json:
-                continue
+        # Cada propiedad está en un bloque <div class="listing__item ...">...</div>
+        # con la ficha (precio, m², dormitorios, link) embebida como HTML, sin JSON.
+        starts = [m.start() for m in re.finditer(r'<div class="listing__item', html)]
+        for i, start in enumerate(starts):
+            end = starts[i + 1] if i + 1 < len(starts) else start + 6000
+            block = html[start:end]
             try:
-                blob = json.loads(m_json.group(1))
-                # Buscar recursivamente arrays con campo 'price' o 'precio'
-                def _find_listings(obj, depth=0):
-                    if depth > 6:
-                        return []
-                    if isinstance(obj, list) and len(obj) > 2:
-                        sample = obj[0] if obj else {}
-                        if isinstance(sample, dict) and any(
-                            k in sample for k in ["price","precio","priceOperationTypes","operationTypes"]
-                        ):
-                            return obj
-                    if isinstance(obj, dict):
-                        for v in obj.values():
-                            r = _find_listings(v, depth+1)
-                            if r:
-                                return r
-                    return []
+                m_price = re.search(r'card__currency">\s*([A-Z]+)\s*</span>\s*([\d.,]+)', block)
+                if not m_price or m_price.group(1).upper() != "USD":
+                    continue
+                precio_usd = float(m_price.group(2).replace(".", "").replace(",", "."))
 
-                found = _find_listings(blob)
-                if found:
-                    for item in found:
-                        try:
-                            precio_usd = None
-                            precio_str = "Consultar"
-                            for pk in ["price","precio","priceOperationTypes","operationTypes"]:
-                                pd = item.get(pk)
-                                if not pd:
-                                    continue
-                                if isinstance(pd, (int,float)):
-                                    precio_usd = float(pd)
-                                    precio_str = f"USD {precio_usd:,.0f}"
-                                    break
-                                if isinstance(pd, dict):
-                                    amt = pd.get("amount") or pd.get("value")
-                                    cur = str(pd.get("currency") or pd.get("currencyCode") or "")
-                                    if amt and "USD" in cur.upper():
-                                        precio_usd = float(str(amt).replace(",",""))
-                                        precio_str = f"USD {precio_usd:,.0f}"
-                                        break
-                                if isinstance(pd, list) and pd:
-                                    p0  = pd[0]
-                                    sub = (p0.get("prices") or [{}])[0] if isinstance(p0,dict) else {}
-                                    amt = sub.get("amount") or (p0.get("amount") if isinstance(p0,dict) else None)
-                                    cur = str((p0.get("currency") or "") if isinstance(p0,dict) else "")
-                                    if amt and "USD" in cur.upper():
-                                        precio_usd = float(str(amt).replace(",",""))
-                                        precio_str = f"USD {precio_usd:,.0f}"
-                                        break
-                            titulo = str(item.get("title") or item.get("generatedTitle") or "")
-                            url_p  = str(item.get("url") or item.get("postingUrl") or item.get("link") or "")
-                            if url_p and not url_p.startswith("http"):
-                                url_p = "https://www.argenprop.com" + url_p
-                            m2 = ambientes = None
-                            for attr in (item.get("attributes") or item.get("features") or []):
-                                aid = str(attr.get("id") or attr.get("key") or "").upper()
-                                val = str(attr.get("value") or attr.get("valueName") or "")
-                                if any(x in aid for x in ["SURFACE","M2","AREA"]):
-                                    mo = re.search(r'(\d+)', val)
-                                    if mo: m2 = int(mo.group(1))
-                                elif any(x in aid for x in ["ROOM","AMBIENT"]):
-                                    mo = re.search(r'(\d+)', val)
-                                    if mo: ambientes = int(mo.group(1))
-                            if not m2:
-                                mo = re.search(r'(\d+)\s*m[²2]', titulo, re.IGNORECASE)
-                                if mo: m2 = int(mo.group(1))
-                            if precio_usd or titulo:
-                                extraidos.append({
-                                    "titulo": titulo, "precio": precio_str,
-                                    "precio_usd": precio_usd, "m2": m2,
-                                    "ambientes": ambientes, "tipo_pub": "inmobiliaria",
-                                    "rebaja": None, "url": url_p, "addr": barrio.title(),
-                                    "distancia_km": None, "lat": None, "lng": None,
-                                    "fuente": "Argenprop",
-                                })
-                        except Exception:
-                            continue
-                    if extraidos:
-                        break
+                m_href = re.search(r'href="(/[^"]+--\d+)"', block)
+                url_p  = "https://www.argenprop.com" + m_href.group(1) if m_href else url
+
+                m_m2 = re.search(r'(\d+)\s*m&#xB2;\s*(?:cubie|tot|semicub)', block)
+                m2   = int(m_m2.group(1)) if m_m2 else None
+
+                m_dorm = re.search(r'(\d+)\s*dorm', block)
+                m_mono = re.search(r'Monoam\.', block)
+                ambientes = 1 if m_mono else (int(m_dorm.group(1)) + 1 if m_dorm else None)
+
+                m_titulo = re.search(r'card__title">([^<]+)<', block)
+                titulo   = _html.unescape(m_titulo.group(1)).strip() if m_titulo else f"{tipo.title()} en {barrio.title()}"
+
+                extraidos.append({
+                    "titulo": titulo, "precio": f"USD {precio_usd:,.0f}",
+                    "precio_usd": precio_usd, "m2": m2,
+                    "ambientes": ambientes, "tipo_pub": "inmobiliaria",
+                    "rebaja": None, "url": url_p, "addr": barrio.title(),
+                    "distancia_km": None, "lat": None, "lng": None,
+                    "fuente": "Argenprop",
+                })
             except Exception:
                 continue
 
-        # Intento 2: parseo directo del HTML (cards de propiedades)
-        if not extraidos:
-            # Buscar precios USD y m² en el texto del HTML
-            precios = re.findall(r'USD\s*([\d\.,]+)', html)
-            m2s     = re.findall(r'(\d{2,4})\s*m[²2]\s*(?:cub|tot|cubie)', html, re.IGNORECASE)
-            urls_ap = re.findall(r'href=["\'](/[^"\']+(?:departamento|casa|ph)[^"\']*)["\']', html)
-            print(f"[ACM-AP] Parseo HTML directo: {len(precios)} precios, {len(m2s)} m², {len(urls_ap)} URLs")
-            seen = set()
-            for i, precio_raw in enumerate(precios[:25]):
-                try:
-                    precio_usd = float(precio_raw.replace(".", "").replace(",", "."))
-                    if precio_usd < 20000 or precio_usd > 5000000:
-                        continue
-                    m2_val = int(m2s[i]) if i < len(m2s) else None
-                    url_p  = "https://www.argenprop.com" + urls_ap[i] if i < len(urls_ap) else ""
-                    if url_p in seen:
-                        continue
-                    seen.add(url_p)
-                    extraidos.append({
-                        "titulo": f"{tipo.title()} en {barrio.title()}",
-                        "precio": f"USD {precio_usd:,.0f}",
-                        "precio_usd": precio_usd, "m2": m2_val,
-                        "ambientes": None, "tipo_pub": "inmobiliaria",
-                        "rebaja": None, "url": url_p, "addr": barrio.title(),
-                        "distancia_km": None, "lat": None, "lng": None,
-                        "fuente": "Argenprop",
-                    })
-                except Exception:
-                    continue
-
+        print(f"[ACM-AP] Parseo de fichas: {len(extraidos)} de {len(starts)} bloques")
         resultados.extend(extraidos)
         time.sleep(0.5)
 
