@@ -12,6 +12,7 @@ AGENTES = {
         "password": "gabriela123",
         "oficina":  "JRC Inmobiliaria",
         "barrios":  ["palermo","belgrano","recoleta","nunez","saavedra","caballito","villa-urquiza"],
+        "activo":   True,
     },
     "adriana": {
         "nombre":   "Adriana",
@@ -19,6 +20,7 @@ AGENTES = {
         "password": "adriana123",
         "oficina":  "Remax",
         "barrios":  ["saavedra","colegiales","chacarita","palermo","belgrano","nunez"],
+        "activo":   True,
     },
     "cecilia": {
         "nombre":   "Cecilia",
@@ -26,6 +28,7 @@ AGENTES = {
         "password": "cecilia123",
         "oficina":  "Remax",
         "barrios":  ["saavedra","colegiales","chacarita","palermo","belgrano","nunez"],
+        "activo":   True,
     },
 }
 

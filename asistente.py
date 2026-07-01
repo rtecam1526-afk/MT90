@@ -55,6 +55,8 @@ def login():
         password = (request.form.get("password") or "").strip()
         for key, ag in cfg.AGENTES.items():
             if ag["email"].lower() == email and ag["password"] == password:
+                if not ag.get("activo", True):
+                    return render_template("login.html", error="Tu cuenta está deshabilitada. Contactá al administrador.")
                 session["loggeado"]   = True
                 session["agente_key"] = key
                 sid = get_sid()
