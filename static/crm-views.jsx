@@ -31,6 +31,27 @@ function HoyLista({ data, done, onToggleDone, onWhatsapp, onOpen }) {
         </p>
       </div>
 
+      {data.semaforo && (
+        <div className="stats-strip">
+          <div className="sstrip-item sstrip-red">
+            <div className="sstrip-num">{total - hechos}</div>
+            <div className="sstrip-lbl">Llamar hoy</div>
+          </div>
+          <div className="sstrip-item sstrip-amber">
+            <div className="sstrip-num">{data.semaforo.atrasados}</div>
+            <div className="sstrip-lbl">Atrasados</div>
+          </div>
+          <div className="sstrip-item sstrip-green">
+            <div className="sstrip-num">{hechos}</div>
+            <div className="sstrip-lbl">Esta semana</div>
+          </div>
+          <div className="sstrip-item">
+            <div className="sstrip-num">{data.totalContactos}</div>
+            <div className="sstrip-lbl">Total</div>
+          </div>
+        </div>
+      )}
+
       {cumpleHoy.length > 0 && (
         <div className="bday-banner" onClick={() => onWhatsapp({ ...cumpleHoy[0], mensaje: mensajeCumple(cumpleHoy[0].nombre) })}>
           <span className="cake"><Icon.gift /></span>

@@ -196,6 +196,12 @@ function App() {
           <button className={tab === "campanas" ? "active" : ""} onClick={() => setTab("campanas")}>
             Campañas
           </button>
+          <button className={tab === "semaforo" ? "active" : ""} onClick={() => setTab("semaforo")}>
+            Semáforo
+          </button>
+          <button className={tab === "evolucion" ? "active" : ""} onClick={() => setTab("evolucion")}>
+            Mi evolución
+          </button>
           {!t.esconderCartera && (
             <button className={tab === "cartera" ? "active" : ""} onClick={() => setTab("cartera")}>
               Cartera
@@ -234,6 +240,8 @@ function App() {
         {tab === "cartera" && recorriendo && window.CarteraRecorrer && React.createElement(window.CarteraRecorrer, { data: data, done: done, onToggleDone: toggleDone, onWhatsapp: onWhatsapp, onSalir: () => setRecorriendo(false) })}
         {tab === "agente" && <AgenteIA data={data} onWhatsapp={onWhatsapp} />}
         {tab === "campanas" && <Campanas data={data} onWhatsapp={onWhatsapp} />}
+        {tab === "semaforo" && window.Semaforo && <Semaforo data={data} done={done} />}
+        {tab === "evolucion" && window.MiEvolucion && <MiEvolucion data={data} />}
       </main>
 
       {detalle && (

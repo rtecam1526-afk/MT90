@@ -179,6 +179,26 @@ window.buildCrmData = function(contacts, done) {
   // carteraQueue: todos los contactos con teléfono, para cola de campañas
   const carteraQueue = all.filter(c => c.telefono && c.telefono.trim());
 
+  // Semáforo & evolución — métricas derivadas de la cartera actual
+  const calAll         = byEtapa('caliente');
+  const atrasados90    = all.filter(c => c.diasSinContacto != null && c.diasSinContacto > 90);
+  const contactados30d = all.filter(c => c.diasSinContacto != null && c.diasSinContacto < 30);
+  const calActivos     = calAll.filter(c => c.diasSinContacto != null && c.diasSinContacto < 30).length;
+  const sinFechaCount  = calAll.filter(c => !c.proximaAccion || !c.proximaAccion.trim()).length;
+  const pctAlDia       = all.length > 0 ? Math.round((contactados30d.length / all.length) * 100) : 0;
+  const hablados       = Object.values(done || {}).filter(Boolean).length;
+  const metaSemanal    = Math.max(10, Math.min(20, Math.ceil(hoy.length * 0.35)));
+  const semaforo = {
+    atrasados:    atrasados90.length,
+    sinFecha:     sinFechaCount,
+    hablados,
+    metaSemanal,
+    pctAlDia,
+    contactados30d: contactados30d.length,
+    calActivos,
+    totalCal:     calAll.length,
+  };
+
   // Contactos con próxima acción definida, ordenados por urgencia
   const conAccion = all
     .filter(c => c.proximaAccion && c.proximaAccion.trim())
@@ -196,6 +216,7 @@ window.buildCrmData = function(contacts, done) {
     },
     campanas:     buildCampanas(all, agente),
     carteraQueue,
+    semaforo,
     semana: {
       servicio:      'Tracción',
       revisados:     all.length,
