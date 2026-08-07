@@ -45,10 +45,7 @@ function App() {
     try { return JSON.parse(localStorage.getItem("mt90_done") || "{}"); } catch { return {}; }
   });
 
-  const data = useMemoA(() => {
-    if (!rawContacts.length) return null;
-    return window.buildCrmData(rawContacts, done);
-  }, [rawContacts, done]);
+  const data = useMemoA(() => window.buildCrmData(rawContacts, done), [rawContacts, done]);
 
   const [tab, setTab] = useStateA("hoy");
   const [recorriendo, setRecorriendo] = useStateA(false);
