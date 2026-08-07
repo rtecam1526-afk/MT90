@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MT90 Tracción — Ingresar</title>
+  <title>MT90 Tracción — Crear cuenta</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -14,6 +14,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 24px 0;
     }
     .card {
       background: #1a2d44;
@@ -37,6 +38,7 @@
       font-size: .95rem; outline: none; margin-bottom: 18px;
     }
     input:focus { border-color: #1877f2; }
+    .hint { color: #64748b; font-size: .75rem; margin: -12px 0 18px; }
     .btn {
       width: 100%; background: #1877f2; color: white; border: none;
       border-radius: 8px; padding: 13px; font-size: 1rem;
@@ -48,6 +50,11 @@
       color: #fca5a5; padding: 10px 14px; border-radius: 8px;
       font-size: .85rem; margin-bottom: 18px;
     }
+    .ok {
+      background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3);
+      color: #86efac; padding: 14px; border-radius: 8px;
+      font-size: .9rem; margin-bottom: 18px; line-height: 1.5;
+    }
     .footer { text-align: center; margin-top: 20px; font-size: .85rem; color: #64748b; }
     .footer a { color: #1877f2; text-decoration: none; font-weight: 600; }
     .footer a:hover { text-decoration: underline; }
@@ -56,18 +63,31 @@
 <body>
   <div class="card">
     <div class="logo">MT90 <span>Tracción</span></div>
-    <div class="subtitle">Asistente de captación inmobiliaria</div>
-    {% if error %}
-    <div class="error">{{ error }}</div>
+    <div class="subtitle">Crear cuenta de agente</div>
+
+    {% if ok %}
+    <div class="ok">Tu cuenta fue creada. Un administrador tiene que aprobarla antes de que puedas ingresar.</div>
+    <div class="footer"><a href="/login">Volver a ingresar</a></div>
+    {% else %}
+      {% if error %}
+      <div class="error">{{ error }}</div>
+      {% endif %}
+      <form method="POST" action="/register">
+        <label>Nombre</label>
+        <input type="text" name="nombre" placeholder="Tu nombre" required autofocus>
+        <label>Email</label>
+        <input type="email" name="email" placeholder="tu@email.com" required>
+        <label>Contraseña</label>
+        <input type="password" name="password" placeholder="Mínimo 6 caracteres" required minlength="6">
+        <label>Oficina / Inmobiliaria</label>
+        <input type="text" name="oficina" placeholder="Ej: Remax" required>
+        <label>Barrios que trabajás</label>
+        <input type="text" name="barrios" placeholder="palermo, belgrano, nunez (separados por coma)">
+        <div class="hint">Podés dejarlo vacío y completarlo después.</div>
+        <button type="submit" class="btn">Crear cuenta →</button>
+      </form>
+      <div class="footer">¿Ya tenés cuenta? <a href="/login">Ingresá</a></div>
     {% endif %}
-    <form method="POST" action="/login">
-      <label>Email</label>
-      <input type="email" name="email" placeholder="tu@email.com" required autofocus>
-      <label>Contraseña</label>
-      <input type="password" name="password" placeholder="••••••••" required>
-      <button type="submit" class="btn">Ingresar →</button>
-    </form>
-    <div class="footer">¿No tenés cuenta? <a href="/register">Registrate</a></div>
   </div>
 </body>
 </html>

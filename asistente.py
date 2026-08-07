@@ -9,6 +9,7 @@ from functools import wraps
 from dotenv import load_dotenv
 load_dotenv()
 from flask import Flask, request, Response, render_template, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
 import anthropic
 import requests as _req
 import config_ia as cfg
@@ -25,6 +26,31 @@ def _supa_hdrs():
         "Content-Type": "application/json",
         "Prefer": "return=representation",
     }
+
+_agentes_cache    = {}
+_agentes_cache_ts = 0
+_AGENTES_CACHE_TTL = 15  # segundos
+
+
+def obtener_agentes(forzar=False):
+    """Devuelve {key: {nombre,email,password_hash,oficina,barrios,activo}} desde Supabase (con cache corta)."""
+    global _agentes_cache, _agentes_cache_ts
+    if not forzar and _agentes_cache and (time.time() - _agentes_cache_ts) < _AGENTES_CACHE_TTL:
+        return _agentes_cache
+    try:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/agentes",
+            headers=_supa_hdrs(),
+            params={"select": "*"},
+            timeout=10,
+        )
+        if r.ok:
+            _agentes_cache = {row["key"]: row for row in r.json()}
+            _agentes_cache_ts = time.time()
+    except Exception as e:
+        print(f"[obtener_agentes] {e}")
+    return _agentes_cache or cfg.AGENTES
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mt90_traccion_secret_2024")
@@ -48,15 +74,24 @@ def login_required(f):
     return decorated
 
 
+def _password_ok(ag, password):
+    """Soporta hash (werkzeug) para cuentas nuevas y password en texto plano para las 3 cuentas históricas."""
+    hashed = ag.get("password_hash")
+    if hashed:
+        return check_password_hash(hashed, password)
+    return ag.get("password") == password
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         email    = (request.form.get("email")    or "").strip().lower()
         password = (request.form.get("password") or "").strip()
-        for key, ag in cfg.AGENTES.items():
-            if ag["email"].lower() == email and ag["password"] == password:
+        agentes = obtener_agentes(forzar=True)
+        for key, ag in agentes.items():
+            if ag["email"].lower() == email and _password_ok(ag, password):
                 if not ag.get("activo", True):
-                    return render_template("login.html", error="Tu cuenta está deshabilitada. Contactá al administrador.")
+                    return render_template("login.html", error="Tu cuenta está pendiente de aprobación. Contactá al administrador.")
                 session["loggeado"]   = True
                 session["agente_key"] = key
                 sid = get_sid()
@@ -66,6 +101,57 @@ def login():
     if session.get("loggeado"):
         return redirect(url_for("index"))
     return render_template("login.html", error=None)
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        nombre      = (request.form.get("nombre")   or "").strip()
+        email       = (request.form.get("email")    or "").strip().lower()
+        password    = (request.form.get("password") or "").strip()
+        oficina     = (request.form.get("oficina")  or "").strip()
+        barrios_raw = (request.form.get("barrios")  or "").strip()
+        barrios     = [b.strip().lower() for b in barrios_raw.split(",") if b.strip()]
+
+        if not (nombre and email and password and oficina):
+            return render_template("register.html", error="Completá todos los campos.")
+        if len(password) < 6:
+            return render_template("register.html", error="La contraseña debe tener al menos 6 caracteres.")
+
+        agentes = obtener_agentes(forzar=True)
+        if any(ag["email"].lower() == email for ag in agentes.values()):
+            return render_template("register.html", error="Ya existe una cuenta con ese email.")
+
+        key = re.sub(r"[^a-z0-9]+", "-", nombre.lower()).strip("-") or "agente"
+        if key in agentes:
+            key = f"{key}-{str(uuid.uuid4())[:4]}"
+
+        row = {
+            "key":           key,
+            "nombre":        nombre,
+            "email":         email,
+            "password_hash": generate_password_hash(password),
+            "oficina":       oficina,
+            "barrios":       barrios,
+            "activo":        False,
+        }
+        try:
+            r = _req.post(
+                f"{SUPABASE_URL}/rest/v1/agentes",
+                headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+                json=row,
+                timeout=10,
+            )
+            if not r.ok:
+                print(f"[REGISTER supabase] {r.status_code} {r.text}")
+                return render_template("register.html", error="No se pudo crear la cuenta. Probá de nuevo.")
+        except Exception as e:
+            print(f"[REGISTER] {e}")
+            return render_template("register.html", error="No se pudo crear la cuenta. Probá de nuevo.")
+
+        obtener_agentes(forzar=True)
+        return render_template("register.html", ok=True)
+    return render_template("register.html", error=None)
 
 
 @app.route("/logout")
@@ -1497,7 +1583,7 @@ body,
 @login_required
 def crm():
     agente_key = session.get("agente_key", "gabriela")
-    agente_data = cfg.AGENTES.get(agente_key, {})
+    agente_data = obtener_agentes().get(agente_key, {})
     agente_nombre = agente_data.get("nombre", agente_key.capitalize())
     return render_template("crm.html", agente_key=agente_key, agente_nombre=agente_nombre)
 
@@ -1508,7 +1594,7 @@ def index():
     sid = get_sid()
     if sid not in _agentes:
         _agentes[sid] = session.get("agente_key", "gabriela")
-    return render_template("index.html", agentes=cfg.AGENTES, agente_activo=_agentes[sid])
+    return render_template("index.html", agentes=obtener_agentes(), agente_activo=_agentes[sid])
 
 
 @app.route("/set_agente", methods=["POST"])
@@ -1541,7 +1627,8 @@ def chat():
         return {"error": "Mensaje vacío"}, 400
 
     agente_key  = _agentes.get(sid, "gabriela")
-    agente_info = cfg.AGENTES.get(agente_key, cfg.AGENTES["gabriela"])
+    _agentes_dict = obtener_agentes()
+    agente_info = _agentes_dict.get(agente_key) or next(iter(_agentes_dict.values()), {})
     history     = _historiales.get(sid, [])
 
     system = cfg.SYSTEM_PROMPT
@@ -1676,7 +1763,8 @@ def acm():
         m2_int = amb_int = m2cub_int = m2semi_int = m2desc_int = antig_int = None
 
     agente_key  = _agentes.get(sid, "gabriela")
-    agente_info = cfg.AGENTES.get(agente_key, cfg.AGENTES["gabriela"])
+    _agentes_dict = obtener_agentes()
+    agente_info = _agentes_dict.get(agente_key) or next(iter(_agentes_dict.values()), {})
 
     def generar():
         import queue as _queue, threading as _threading
@@ -1859,7 +1947,8 @@ def radar_resumen():
     """Carga el radar del día y pide a Claude un resumen accionable."""
     sid         = get_sid()
     agente_key  = _agentes.get(sid, "gabriela")
-    agente_info = cfg.AGENTES.get(agente_key, cfg.AGENTES["gabriela"])
+    _agentes_dict = obtener_agentes()
+    agente_info = _agentes_dict.get(agente_key) or next(iter(_agentes_dict.values()), {})
 
     radar_ctx = cargar_radar_hoy(agente_key)
 
