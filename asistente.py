@@ -15,9 +15,10 @@ import requests as _req
 import config_ia as cfg
 import acm_scraper
 
-SUPABASE_URL  = os.environ.get("SUPABASE_URL", "").strip()
-SUPABASE_KEY  = os.environ.get("SUPABASE_KEY", "").strip()
-RADAR_TOKEN   = os.environ.get("RADAR_TOKEN", "mt90_radar_2024").strip()
+SUPABASE_URL   = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY   = os.environ.get("SUPABASE_KEY", "").strip()
+RADAR_TOKEN    = os.environ.get("RADAR_TOKEN", "mt90_radar_2024").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "").strip()
 
 def _supa_hdrs():
     return {
@@ -158,6 +159,85 @@ def register():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("is_admin"):
+            return redirect(url_for("admin_login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        password = (request.form.get("password") or "").strip()
+        if ADMIN_PASSWORD and password == ADMIN_PASSWORD:
+            session.clear()
+            session["is_admin"] = True
+            return redirect(url_for("admin_panel"))
+        return render_template("admin_login.html", error="Contraseña incorrecta.")
+    if session.get("is_admin"):
+        return redirect(url_for("admin_panel"))
+    return render_template("admin_login.html", error=None)
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("is_admin", None)
+    return redirect(url_for("admin_login"))
+
+
+@app.route("/admin")
+@admin_required
+def admin_panel():
+    agentes = obtener_agentes(forzar=True)
+    pendientes = {k: v for k, v in agentes.items() if not v.get("activo", True)}
+    activos    = {k: v for k, v in agentes.items() if v.get("activo", True)}
+    return render_template("admin.html", pendientes=pendientes, activos=activos)
+
+
+def _admin_patch_agente(key, cambios):
+    _req.patch(
+        f"{SUPABASE_URL}/rest/v1/agentes",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"key": f"eq.{key}"},
+        json=cambios,
+        timeout=10,
+    )
+    obtener_agentes(forzar=True)
+
+
+@app.route("/admin/agentes/<key>/aprobar", methods=["POST"])
+@admin_required
+def admin_aprobar(key):
+    _admin_patch_agente(key, {"activo": True})
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/agentes/<key>/desactivar", methods=["POST"])
+@admin_required
+def admin_desactivar(key):
+    _admin_patch_agente(key, {"activo": False})
+    return redirect(url_for("admin_panel"))
+
+
+@app.route("/admin/agentes/<key>/eliminar", methods=["POST"])
+@admin_required
+def admin_eliminar(key):
+    try:
+        _req.delete(
+            f"{SUPABASE_URL}/rest/v1/agentes",
+            headers=_supa_hdrs(),
+            params={"key": f"eq.{key}"},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"[admin_eliminar] {e}")
+    obtener_agentes(forzar=True)
+    return redirect(url_for("admin_panel"))
 
 
 def get_sid():
