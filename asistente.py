@@ -2329,15 +2329,27 @@ def enviar_acm():
 @login_required
 def get_contactos():
     agente_key = session.get("agente_key", "")
-    r = _req.get(
-        f"{SUPABASE_URL}/rest/v1/contactos",
-        headers=_supa_hdrs(),
-        params={"agente": f"eq.{agente_key}", "select": "*", "order": "nombre.asc"},
-        timeout=10,
-    )
-    if not r.ok:
-        return {"error": r.text}, 500
-    return r.json()
+    # Supabase/PostgREST devuelve como máximo 1000 filas por request.
+    # Paginamos con Range hasta traer la cartera completa (agentes con
+    # más de 1000 contactos, como Julieta, se cortaban a mitad del abecedario).
+    todos = []
+    offset = 0
+    PAGE = 1000
+    while True:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos",
+            headers={**_supa_hdrs(), "Range-Unit": "items", "Range": f"{offset}-{offset + PAGE - 1}"},
+            params={"agente": f"eq.{agente_key}", "select": "*", "order": "nombre.asc"},
+            timeout=15,
+        )
+        if not r.ok:
+            return {"error": r.text}, 500
+        pagina = r.json()
+        todos.extend(pagina)
+        if len(pagina) < PAGE:
+            break
+        offset += PAGE
+    return todos
 
 
 @app.route("/contactos", methods=["POST"])
