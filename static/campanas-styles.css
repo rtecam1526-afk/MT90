@@ -95,6 +95,18 @@
   color: var(--primary);
   font-weight: 600;
 }
+.cola-img-download-btn {
+  margin-top: 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: calc(12.5px * var(--fs-scale));
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.cola-img-download-btn:hover { border-color: var(--primary); color: var(--primary); }
 
 /* CAMPAÑAS / FECHAS ESPECIALES */
 .camp { display: flex; flex-direction: column; gap: 24px; }

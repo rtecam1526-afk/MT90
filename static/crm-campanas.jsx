@@ -15,6 +15,22 @@ function getMensaje(campana, nombre) {
   return (campana.mensaje || '').replace('NOMBRE', primerNombre(nombre));
 }
 
+// WhatsApp (wa.me) solo permite precargar texto, nunca una imagen — no existe
+// forma de que una página web la adjunte sola al chat. Por eso la bajamos al
+// dispositivo del agente: queda en Descargas/Galería, lista para adjuntar en
+// un toque desde el selector de archivos de WhatsApp.
+function descargarImagen(dataUrl, titulo) {
+  if (!dataUrl) return;
+  const ext = (dataUrl.match(/^data:image\/(\w+);/) || [])[1] || 'jpg';
+  const nombre = 'flyer-' + (titulo || 'campana').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '.' + ext;
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 function Campanas({ data, onWhatsapp }) {
   const camp = data.campanas;
   const [enviando,    setEnviando]    = useStateC(null);
@@ -157,6 +173,13 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
   const hechos = Object.keys(enviados).length;
   const p = queue[idx];
 
+  // Al abrir la cola con imagen, la bajamos una vez de entrada: así ya está
+  // en Descargas antes de que el agente llegue al primer "Enviar y seguir".
+  useEffectC(() => {
+    if (campana.imagen) descargarImagen(campana.imagen, campana.titulo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function enviarYSeguir() {
     const msg = getMensaje(campana, p.nombre);
     onWhatsapp({ nombre: p.nombre, telefono: p.telefono, mensaje: msg });
@@ -253,7 +276,10 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
           {campana.imagen && (
             <div className="cola-img-wrap">
               <img src={campana.imagen} className="cola-img" alt="flyer" />
-              <div className="cola-img-hint">Adjuntá esta imagen en WhatsApp</div>
+              <div className="cola-img-hint">Ya la descargamos a tu dispositivo — adjuntala en WhatsApp desde ahí</div>
+              <button className="cola-img-download-btn" onClick={() => descargarImagen(campana.imagen, campana.titulo)}>
+                ⬇ Descargar de nuevo
+              </button>
             </div>
           )}
 
