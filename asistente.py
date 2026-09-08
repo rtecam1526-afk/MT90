@@ -2419,6 +2419,66 @@ def eliminar_contacto(cid):
     return {"ok": True}
 
 
+# ── Campañas guardadas ──────────────────────────────────────────────────
+# Antes, una campaña nueva (título + mensaje + imagen) solo vivía en el
+# estado de React: si el agente no la enviaba en el momento, se perdía al
+# salir o refrescar y había que armarla de nuevo. Ahora se guarda en
+# Supabase apenas se crea, así queda disponible para enviarla cuando quiera.
+
+@app.route("/campanas", methods=["GET"])
+@login_required
+def get_campanas():
+    agente_key = session.get("agente_key", "")
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/campanas",
+        headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "select": "*", "order": "created_at.desc"},
+        timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return r.json()
+
+
+@app.route("/campanas", methods=["POST"])
+@login_required
+def crear_campana():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json()
+    if not data or not data.get("titulo") or not data.get("mensaje"):
+        return {"error": "Falta titulo o mensaje"}, 400
+    row = {
+        "agente":  agente_key,
+        "titulo":  data["titulo"],
+        "mensaje": data["mensaje"],
+        "imagen":  data.get("imagen"),
+    }
+    r = _req.post(
+        f"{SUPABASE_URL}/rest/v1/campanas",
+        headers={**_supa_hdrs(), "Prefer": "return=representation"},
+        json=row,
+        timeout=15,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return r.json()[0]
+
+
+@app.route("/campanas/<int:cid>", methods=["DELETE"])
+@login_required
+def eliminar_campana(cid):
+    agente_key = session.get("agente_key", "")
+    r = _req.delete(
+        f"{SUPABASE_URL}/rest/v1/campanas",
+        headers=_supa_hdrs(),
+        params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"},
+        timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True}
+
+
 if __name__ == "__main__":
     print("=" * 55)
     print("  MT90 Tracción — Agente IA")

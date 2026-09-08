@@ -38,6 +38,15 @@ function Campanas({ data, onWhatsapp }) {
   const [nuevaTitulo, setNuevaTitulo] = useStateC('');
   const [nuevaMensaje,setNuevaMensaje]= useStateC('');
   const [nuevaImagen, setNuevaImagen] = useStateC(null);
+  const [guardando,   setGuardando]   = useStateC(false);
+  // Campañas propias ya guardadas — antes se perdían si no se enviaban en
+  // el momento; ahora quedan acá disponibles hasta que el agente las borre.
+  const [guardadas,   setGuardadas]   = useStateC([]);
+
+  useEffectC(() => {
+    if (!window.CRM_API) return;
+    window.CRM_API.get('/campanas').then(setGuardadas).catch(() => {});
+  }, []);
 
   function onImagenSelect(e) {
     const file = e.target.files[0];
@@ -51,15 +60,31 @@ function Campanas({ data, onWhatsapp }) {
     return <ColaEnvio data={data} campana={enviando} onWhatsapp={onWhatsapp} onSalir={() => setEnviando(null)} />;
   }
 
-  function lanzarNueva() {
-    if (!nuevaTitulo.trim() || !nuevaMensaje.trim()) return;
-    setEnviando({
-      id: 'custom',
-      titulo: nuevaTitulo.trim(),
-      mensaje: nuevaMensaje.trim(),
-      imagen: nuevaImagen || null,
-      alcance: data.carteraQueue.length,
-    });
+  async function lanzarNueva() {
+    const titulo = nuevaTitulo.trim();
+    const mensaje = nuevaMensaje.trim();
+    if (!titulo || !mensaje) return;
+    setGuardando(true);
+    let guardada = { id: 'custom-' + Date.now(), titulo, mensaje, imagen: nuevaImagen || null };
+    try {
+      if (window.CRM_API) {
+        guardada = await window.CRM_API.post('/campanas', { titulo, mensaje, imagen: nuevaImagen || null });
+        setGuardadas(g => [guardada, ...g]);
+      }
+    } catch (e) {
+      console.error('No se pudo guardar la campaña, se envía igual sin guardar:', e);
+    }
+    setGuardando(false);
+    setNuevaOpen(false);
+    setNuevaTitulo('');
+    setNuevaMensaje('');
+    setNuevaImagen(null);
+    setEnviando({ ...guardada, alcance: data.carteraQueue.length });
+  }
+
+  async function borrarGuardada(id) {
+    setGuardadas(g => g.filter(c => c.id !== id));
+    if (window.CRM_API) window.CRM_API.delete('/campanas/' + id).catch(() => {});
   }
 
   const prox = camp.proxima;
@@ -107,14 +132,39 @@ function Campanas({ data, onWhatsapp }) {
             <button
               className="camp-start"
               style={{ marginTop: 8 }}
-              disabled={!nuevaTitulo.trim() || !nuevaMensaje.trim()}
+              disabled={!nuevaTitulo.trim() || !nuevaMensaje.trim() || guardando}
               onClick={lanzarNueva}
             >
-              Empezar a enviar <Icon.arrow />
+              {guardando ? 'Guardando…' : <>Empezar a enviar <Icon.arrow /></>}
             </button>
           </div>
         )}
       </div>
+
+      {/* Campañas guardadas — quedan acá aunque no se hayan enviado en el momento */}
+      {guardadas.length > 0 && (
+        <div className="camp-agenda">
+          <div className="camp-agenda-label">Tus campañas guardadas</div>
+          <div className="camp-agenda-list">
+            {guardadas.map((g) => (
+              <div className="camp-agenda-row" key={g.id}>
+                {g.imagen
+                  ? <img src={g.imagen} className="camp-guardada-thumb" alt="" />
+                  : <div className="camp-cal"><span className="camp-cal-d">✉</span></div>
+                }
+                <div className="camp-agenda-id">
+                  <div className="camp-agenda-title">{g.titulo}</div>
+                  <div className="camp-agenda-sub">{g.mensaje}</div>
+                </div>
+                <button className="camp-agenda-btn" onClick={() => setEnviando({ ...g, alcance: data.carteraQueue.length })}>
+                  Enviar
+                </button>
+                <button className="camp-guardada-del" onClick={() => borrarGuardada(g.id)} title="Eliminar">✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Próxima campaña destacada */}
       <div className="camp-feature">

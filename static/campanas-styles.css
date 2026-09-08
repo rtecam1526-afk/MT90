@@ -190,7 +190,10 @@
 .camp-cal-m { font-size: calc(11px * var(--fs-scale)); color: var(--muted); text-transform: uppercase; font-weight: 600; }
 .camp-agenda-id { flex: 1; min-width: 0; }
 .camp-agenda-title { font-weight: 700; font-size: calc(16px * var(--fs-scale)); }
-.camp-agenda-sub { color: var(--muted); font-size: calc(13.5px * var(--fs-scale)); }
+.camp-agenda-sub {
+  color: var(--muted); font-size: calc(13.5px * var(--fs-scale));
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .camp-agenda-btn {
   background: var(--surface-2);
   border: 1.5px solid var(--line-strong);
@@ -199,6 +202,15 @@
   transition: background .14s ease;
 }
 .camp-agenda-btn:hover { background: var(--line); }
+.camp-guardada-thumb {
+  width: 50px; height: 54px; border-radius: 12px;
+  object-fit: cover; flex-shrink: 0;
+}
+.camp-guardada-del {
+  background: none; border: none; color: var(--muted);
+  font-size: calc(16px * var(--fs-scale)); padding: 4px 6px; cursor: pointer;
+}
+.camp-guardada-del:hover { color: var(--ink); }
 
 /* Cola de envío */
 .cola { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
