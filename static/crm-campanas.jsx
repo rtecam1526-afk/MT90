@@ -222,15 +222,18 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
   const [busqueda, setBusqueda] = useStateC("");
   const hechos = Object.keys(enviados).length;
   const p = queue[idx];
-
-  // Al abrir la cola con imagen, la bajamos una vez de entrada: así ya está
-  // en Descargas antes de que el agente llegue al primer "Enviar y seguir".
-  useEffectC(() => {
-    if (campana.imagen) descargarImagen(campana.imagen, campana.titulo);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Ojo con esto: los navegadores (sobre todo en el celular) solo dejan
+  // disparar una descarga si pasa DENTRO de un click real del usuario — un
+  // useEffect al montar no cuenta como gesto y la bajaba en silencio, sin
+  // avisar. Por eso ahora se descarga recién en el primer "Enviar y seguir"
+  // (una sola vez por campaña, no una por cada contacto).
+  const [imgDescargada, setImgDescargada] = useStateC(false);
 
   function enviarYSeguir() {
+    if (campana.imagen && !imgDescargada) {
+      descargarImagen(campana.imagen, campana.titulo);
+      setImgDescargada(true);
+    }
     const msg = getMensaje(campana, p.nombre);
     onWhatsapp({ nombre: p.nombre, telefono: p.telefono, mensaje: msg });
     setEnviados((e) => ({ ...e, [p.id]: true }));
@@ -326,9 +329,16 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
           {campana.imagen && (
             <div className="cola-img-wrap">
               <img src={campana.imagen} className="cola-img" alt="flyer" />
-              <div className="cola-img-hint">Ya la descargamos a tu dispositivo — adjuntala en WhatsApp desde ahí</div>
-              <button className="cola-img-download-btn" onClick={() => descargarImagen(campana.imagen, campana.titulo)}>
-                ⬇ Descargar de nuevo
+              <div className="cola-img-hint">
+                {imgDescargada
+                  ? "Ya la descargamos a tu dispositivo — adjuntala en WhatsApp desde ahí"
+                  : "WhatsApp no permite adjuntarla sola: descargala una vez y quedá lista para adjuntar en todos los envíos"}
+              </div>
+              <button
+                className={"cola-img-download-btn" + (imgDescargada ? "" : " cola-img-download-btn-pending")}
+                onClick={() => { descargarImagen(campana.imagen, campana.titulo); setImgDescargada(true); }}
+              >
+                ⬇ {imgDescargada ? "Descargar de nuevo" : "Descargar imagen"}
               </button>
             </div>
           )}

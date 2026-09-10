@@ -107,6 +107,10 @@
   cursor: pointer;
 }
 .cola-img-download-btn:hover { border-color: var(--primary); color: var(--primary); }
+.cola-img-download-btn-pending {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+.cola-img-download-btn-pending:hover { opacity: .92; color: #fff; }
 
 /* CAMPAÑAS / FECHAS ESPECIALES */
 .camp { display: flex; flex-direction: column; gap: 24px; }
