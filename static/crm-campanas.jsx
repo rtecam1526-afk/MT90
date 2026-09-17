@@ -42,6 +42,20 @@ function Campanas({ data, onWhatsapp }) {
   // Campañas propias ya guardadas — antes se perdían si no se enviaban en
   // el momento; ahora quedan acá disponibles hasta que el agente las borre.
   const [guardadas,   setGuardadas]   = useStateC([]);
+  // Edición in-line de una campaña guardada — id de la que está en edición
+  // más un borrador separado, así tocar los inputs no toca la lista real
+  // hasta que se confirma "Guardar".
+  // OJO: estos hooks tienen que declararse ACÁ, antes del "if (enviando)
+  // return ..." de más abajo — React exige que todos los hooks de un
+  // componente se llamen siempre en el mismo orden, en cada render. Ponerlos
+  // después de un return condicional (como estaban antes) hacía que, al
+  // entrar a enviar una campaña, se saltearan esos 5 hooks y React tirara
+  // "Rendered fewer hooks than expected" — toda la pantalla se caía en blanco.
+  const [editandoId, setEditandoId] = useStateC(null);
+  const [editTitulo, setEditTitulo] = useStateC('');
+  const [editMensaje,setEditMensaje]= useStateC('');
+  const [editImagen, setEditImagen] = useStateC(null);
+  const [editGuardando, setEditGuardando] = useStateC(false);
 
   useEffectC(() => {
     if (!window.CRM_API) return;
@@ -86,15 +100,6 @@ function Campanas({ data, onWhatsapp }) {
     setGuardadas(g => g.filter(c => c.id !== id));
     if (window.CRM_API) window.CRM_API.delete('/campanas/' + id).catch(() => {});
   }
-
-  // Edición in-line de una campaña guardada — id de la que está en edición
-  // más un borrador separado, así tocar los inputs no toca la lista real
-  // hasta que se confirma "Guardar".
-  const [editandoId, setEditandoId] = useStateC(null);
-  const [editTitulo, setEditTitulo] = useStateC('');
-  const [editMensaje,setEditMensaje]= useStateC('');
-  const [editImagen, setEditImagen] = useStateC(null);
-  const [editGuardando, setEditGuardando] = useStateC(false);
 
   function empezarEdicion(g) {
     setEditandoId(g.id);
