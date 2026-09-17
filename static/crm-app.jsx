@@ -120,7 +120,11 @@ function App() {
     const mensaje = (p.mensaje || '').replace('NOMBRE', primerNombre);
     const text = mensaje ? "?text=" + encodeURIComponent(mensaje) : "";
     const url = "https://wa.me/" + phone + text;
-    window.open(url, "_blank", "noopener");
+    // "_blank" abre una pestaña nueva CADA VEZ — en una campaña de cientos o
+    // miles de contactos (ej. la cartera de Julieta) eso apila pestañas sin
+    // cerrarse nunca y termina colgando el navegador. Con un nombre fijo de
+    // target, el navegador reutiliza la misma pestaña en cada envío.
+    window.open(url, "mt90_whatsapp_send");
     showToast("Abriendo WhatsApp con " + primerNombre + "…");
   }
 
