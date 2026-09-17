@@ -311,10 +311,11 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
   const [imgDescargada, setImgDescargada] = useStateC(false);
 
   function enviarYSeguir() {
-    if (campana.imagen && !imgDescargada) {
-      descargarImagen(campana.imagen, campana.titulo);
-      setImgDescargada(true);
-    }
+    // La descarga del flyer NO va acá adentro: en algunas compus (con
+    // "Preguntar dónde guardar cada archivo" activado en el navegador) dispara
+    // un cuadro nativo de "Guardar como" que bloquea toda la página hasta que
+    // se cierra — y como quedaba atrás de otra ventana, parecía que el botón
+    // de enviar se colgaba. Ahora la descarga es 100% manual, con su botón.
     const msg = getMensaje(campana, p.nombre);
     onWhatsapp({ nombre: p.nombre, telefono: p.telefono, mensaje: msg });
     setEnviados((e) => ({ ...e, [p.id]: true }));
@@ -412,8 +413,8 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
               <img src={campana.imagen} className="cola-img" alt="flyer" />
               <div className="cola-img-hint">
                 {imgDescargada
-                  ? "Ya la descargamos a tu dispositivo — adjuntala en WhatsApp desde ahí"
-                  : "WhatsApp no permite adjuntarla sola: descargala una vez y quedá lista para adjuntar en todos los envíos"}
+                  ? "Ya la descargaste — adjuntala en WhatsApp desde tu carpeta de Descargas"
+                  : "Antes de empezar: tocá \"Descargar imagen\" y adjuntala en WhatsApp con el clip 📎 en cada envío"}
               </div>
               <button
                 className={"cola-img-download-btn" + (imgDescargada ? "" : " cola-img-download-btn-pending")}
