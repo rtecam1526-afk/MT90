@@ -87,6 +87,46 @@ function Campanas({ data, onWhatsapp }) {
     if (window.CRM_API) window.CRM_API.delete('/campanas/' + id).catch(() => {});
   }
 
+  // Edición in-line de una campaña guardada — id de la que está en edición
+  // más un borrador separado, así tocar los inputs no toca la lista real
+  // hasta que se confirma "Guardar".
+  const [editandoId, setEditandoId] = useStateC(null);
+  const [editTitulo, setEditTitulo] = useStateC('');
+  const [editMensaje,setEditMensaje]= useStateC('');
+  const [editImagen, setEditImagen] = useStateC(null);
+  const [editGuardando, setEditGuardando] = useStateC(false);
+
+  function empezarEdicion(g) {
+    setEditandoId(g.id);
+    setEditTitulo(g.titulo);
+    setEditMensaje(g.mensaje);
+    setEditImagen(g.imagen || null);
+  }
+  function cancelarEdicion() { setEditandoId(null); }
+  function onEditImagenSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => setEditImagen(ev.target.result);
+    reader.readAsDataURL(file);
+  }
+  async function guardarEdicion(id) {
+    const titulo = editTitulo.trim();
+    const mensaje = editMensaje.trim();
+    if (!titulo || !mensaje) return;
+    setEditGuardando(true);
+    const cambios = { titulo, mensaje, imagen: editImagen || null };
+    try {
+      if (window.CRM_API) await window.CRM_API.put('/campanas/' + id, cambios);
+      setGuardadas(g => g.map(c => c.id === id ? { ...c, ...cambios } : c));
+      setEditandoId(null);
+    } catch (e) {
+      console.error('No se pudo guardar la edición:', e);
+      alert('No se pudo guardar el cambio. Probá de nuevo.');
+    }
+    setEditGuardando(false);
+  }
+
   const prox = camp.proxima;
   const agente = data.agente || 'Gabriela';
 
@@ -147,20 +187,61 @@ function Campanas({ data, onWhatsapp }) {
           <div className="camp-agenda-label">Tus campañas guardadas</div>
           <div className="camp-agenda-list">
             {guardadas.map((g) => (
-              <div className="camp-agenda-row" key={g.id}>
-                {g.imagen
-                  ? <img src={g.imagen} className="camp-guardada-thumb" alt="" />
-                  : <div className="camp-cal"><span className="camp-cal-d">✉</span></div>
-                }
-                <div className="camp-agenda-id">
-                  <div className="camp-agenda-title">{g.titulo}</div>
-                  <div className="camp-agenda-sub">{g.mensaje}</div>
+              editandoId === g.id ? (
+                <div className="camp-nueva-form camp-guardada-edit" key={g.id}>
+                  <input
+                    className="camp-nueva-input"
+                    placeholder="Título"
+                    value={editTitulo}
+                    onChange={e => setEditTitulo(e.target.value)}
+                  />
+                  <textarea
+                    className="camp-nueva-textarea"
+                    placeholder="Mensaje · usá NOMBRE para personalizar"
+                    value={editMensaje}
+                    onChange={e => setEditMensaje(e.target.value)}
+                    rows={3}
+                  />
+                  <div className="camp-nueva-img-row">
+                    <label className="camp-nueva-img-label">
+                      {editImagen
+                        ? <img src={editImagen} className="camp-nueva-img-preview" alt="flyer" />
+                        : <span>+ Agregar imagen <span style={{fontWeight:400,opacity:.6}}>(opcional)</span></span>
+                      }
+                      <input type="file" accept="image/*" style={{display:'none'}} onChange={onEditImagenSelect} />
+                    </label>
+                    {editImagen && (
+                      <button className="camp-nueva-img-remove" onClick={() => setEditImagen(null)}>✕ Quitar</button>
+                    )}
+                  </div>
+                  <div className="camp-guardada-edit-actions">
+                    <button className="cola-skip" onClick={cancelarEdicion}>Cancelar</button>
+                    <button
+                      className="camp-start"
+                      disabled={!editTitulo.trim() || !editMensaje.trim() || editGuardando}
+                      onClick={() => guardarEdicion(g.id)}
+                    >
+                      {editGuardando ? 'Guardando…' : 'Guardar cambios'}
+                    </button>
+                  </div>
                 </div>
-                <button className="camp-agenda-btn" onClick={() => setEnviando({ ...g, alcance: data.carteraQueue.length })}>
-                  Enviar
-                </button>
-                <button className="camp-guardada-del" onClick={() => borrarGuardada(g.id)} title="Eliminar">✕</button>
-              </div>
+              ) : (
+                <div className="camp-agenda-row" key={g.id}>
+                  {g.imagen
+                    ? <img src={g.imagen} className="camp-guardada-thumb" alt="" />
+                    : <div className="camp-cal"><span className="camp-cal-d">✉</span></div>
+                  }
+                  <div className="camp-agenda-id">
+                    <div className="camp-agenda-title">{g.titulo}</div>
+                    <div className="camp-agenda-sub">{g.mensaje}</div>
+                  </div>
+                  <button className="camp-guardada-edit-btn" onClick={() => empezarEdicion(g)} title="Editar">✏</button>
+                  <button className="camp-agenda-btn" onClick={() => setEnviando({ ...g, alcance: data.carteraQueue.length })}>
+                    Enviar
+                  </button>
+                  <button className="camp-guardada-del" onClick={() => borrarGuardada(g.id)} title="Eliminar">✕</button>
+                </div>
+              )
             ))}
           </div>
         </div>

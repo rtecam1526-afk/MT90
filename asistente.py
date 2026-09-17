@@ -2464,6 +2464,34 @@ def crear_campana():
     return r.json()[0]
 
 
+@app.route("/campanas/<int:cid>", methods=["PUT"])
+@login_required
+def editar_campana(cid):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True)
+    if not data:
+        return {"error": "No data"}, 400
+    cambios = {}
+    for campo in ("titulo", "mensaje", "imagen"):
+        if campo in data:
+            cambios[campo] = data[campo]
+    if not cambios:
+        return {"error": "Nada para actualizar"}, 400
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/campanas",
+        headers={**_supa_hdrs(), "Prefer": "return=representation"},
+        params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"},
+        json=cambios,
+        timeout=15,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    filas = r.json()
+    if not filas:
+        return {"error": "No encontrada"}, 404
+    return filas[0]
+
+
 @app.route("/campanas/<int:cid>", methods=["DELETE"])
 @login_required
 def eliminar_campana(cid):
