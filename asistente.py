@@ -2617,12 +2617,30 @@ def teamquest_resumen():
     xp_en_nivel = xp_total % 500
     pct_nivel = round((xp_en_nivel / 500) * 100)
 
-    hace_7_dias = datetime.datetime.now() - datetime.timedelta(days=7)
-    semana = [e for e in eventos if e.get("created_at") and
-              datetime.datetime.fromisoformat(e["created_at"].replace("Z", "+00:00")).replace(tzinfo=None) >= hace_7_dias]
+    ahora = datetime.datetime.now()
+    hace_7_dias = ahora - datetime.timedelta(days=7)
+    fechas = []
     conteo_semana = {}
-    for e in semana:
-        conteo_semana[e["tipo"]] = conteo_semana.get(e["tipo"], 0) + 1
+    conteo_total = {}
+    for e in eventos:
+        conteo_total[e["tipo"]] = conteo_total.get(e["tipo"], 0) + 1
+        if not e.get("created_at"):
+            continue
+        f = datetime.datetime.fromisoformat(e["created_at"].replace("Z", "+00:00")).replace(tzinfo=None)
+        fechas.append(f.date())
+        if f >= hace_7_dias:
+            conteo_semana[e["tipo"]] = conteo_semana.get(e["tipo"], 0) + 1
+
+    # Racha: días consecutivos con al menos un evento, terminando hoy o ayer
+    # (si hoy todavía no hizo nada, no le cortamos la racha de ayer).
+    racha = 0
+    dias_con_actividad = set(fechas)
+    cursor = ahora.date()
+    if cursor not in dias_con_actividad:
+        cursor = cursor - datetime.timedelta(days=1)
+    while cursor in dias_con_actividad:
+        racha += 1
+        cursor = cursor - datetime.timedelta(days=1)
 
     return {
         "agente": agente_key,
@@ -2630,7 +2648,9 @@ def teamquest_resumen():
         "nivel": nivel,
         "pct_nivel_actual": pct_nivel,
         "eventos_semana": conteo_semana,
+        "conteos_totales": conteo_total,
         "total_eventos": len(eventos),
+        "racha_dias": racha,
     }
 
 
