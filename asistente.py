@@ -2325,6 +2325,35 @@ def enviar_acm():
         return {"error": str(e)}, 500
 
 
+# ── Team Quest — eventos comerciales y XP ────────────────────────────────
+# Cada acción real del agente en MT90 puede valer XP. El valor está acá,
+# en un solo lugar, para no tener que tocar el frontend si cambia.
+XP_VALUES = {
+    "contacto_activado":  10,
+    "conversacion":       20,
+    "reactivacion":       30,
+    "reunion":           100,
+    "nuevo_comprador":   200,
+    "referido":          150,
+    "captacion":         300,
+    "operacion":         500,
+}
+
+def _registrar_evento(agente_key, tipo, contacto_id=None):
+    """Guarda un evento comercial con su XP. No frena el flujo principal si falla:
+    perder un evento de XP no puede tirar abajo la creación/edición de un contacto."""
+    xp = XP_VALUES.get(tipo, 0)
+    try:
+        _req.post(
+            f"{SUPABASE_URL}/rest/v1/eventos_comerciales",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+            json={"agente": agente_key, "contacto_id": contacto_id, "tipo": tipo, "xp": xp},
+            timeout=8,
+        )
+    except Exception as e:
+        print(f"[_registrar_evento] {tipo} para {agente_key}: {e}")
+
+
 @app.route("/contactos", methods=["GET"])
 @login_required
 def get_contactos():
@@ -2360,7 +2389,7 @@ def crear_contacto():
     if not data:
         return {"error": "No data"}, 400
     data["agente"] = agente_key
-    hdrs = {**_supa_hdrs(), "Prefer": "return=minimal"}
+    hdrs = {**_supa_hdrs(), "Prefer": "return=representation"}
     try:
         r = _req.post(
             f"{SUPABASE_URL}/rest/v1/contactos",
@@ -2371,10 +2400,27 @@ def crear_contacto():
         if not r.ok:
             print(f"[SUPA POST error] {r.status_code} {r.text}")
             return {"error": r.text}, 500
+        filas = r.json()
+        nuevo_id = filas[0]["id"] if filas else None
+        _registrar_evento(agente_key, "contacto_activado", nuevo_id)
         return {"ok": True}
     except Exception as e:
         print(f"[POST /contactos] {e}")
         return {"error": str(e)}, 500
+
+
+def _dias_desde(fecha_str):
+    """Parsea dd/mm/aaaa o aaaa-mm-dd; devuelve None si no se puede."""
+    if not fecha_str:
+        return None
+    fecha_str = fecha_str.strip()
+    for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+        try:
+            d = datetime.datetime.strptime(fecha_str[:10], fmt)
+            return (datetime.datetime.now() - d).days
+        except ValueError:
+            continue
+    return None
 
 
 @app.route("/contactos/<int:cid>", methods=["PUT"])
@@ -2386,6 +2432,26 @@ def actualizar_contacto(cid):
         return {"error": "No data"}, 400
     data.pop("id", None)
     data.pop("agente", None)
+
+    # Si se está actualizando fecha_ultimo_contacto, es una conversación real con
+    # el cliente — vale XP. Miramos cuánto tiempo llevaba sin hablarle ANTES de
+    # este PUT: si eran 90+ días (o nunca), es una reactivación, no una charla más.
+    evento_tipo = None
+    if "fecha_ultimo_contacto" in data:
+        try:
+            r_prev = _req.get(
+                f"{SUPABASE_URL}/rest/v1/contactos",
+                headers=_supa_hdrs(),
+                params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}", "select": "fecha_ultimo_contacto"},
+                timeout=8,
+            )
+            prev_fecha = r_prev.json()[0].get("fecha_ultimo_contacto") if r_prev.ok and r_prev.json() else None
+            dias_previos = _dias_desde(prev_fecha)
+            evento_tipo = "reactivacion" if (dias_previos is None or dias_previos >= 90) else "conversacion"
+        except Exception as e:
+            print(f"[actualizar_contacto] no se pudo evaluar reactivacion: {e}")
+            evento_tipo = "conversacion"
+
     try:
         r = _req.patch(
             f"{SUPABASE_URL}/rest/v1/contactos",
@@ -2397,6 +2463,8 @@ def actualizar_contacto(cid):
         if not r.ok:
             print(f"[PUT /contactos/{cid}] Supabase {r.status_code}: {r.text}")
             return {"error": r.text}, 500
+        if evento_tipo:
+            _registrar_evento(agente_key, evento_tipo, cid)
         return {"ok": True}
     except Exception as e:
         print(f"[PUT /contactos/{cid}] {e}")
@@ -2505,6 +2573,65 @@ def eliminar_campana(cid):
     if not r.ok:
         return {"error": r.text}, 500
     return {"ok": True}
+
+
+# ── Team Quest ───────────────────────────────────────────────────────────
+# "Reunión" y "Captación/Operación" son los dos hitos que no se pueden
+# deducir solos de un cambio de campo — el agente los marca a mano, una vez,
+# desde la ficha del contacto. El resto del XP se registra solo.
+
+@app.route("/eventos", methods=["POST"])
+@login_required
+def crear_evento():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    tipo = data.get("tipo")
+    if tipo not in XP_VALUES:
+        return {"error": f"Tipo de evento inválido: {tipo}"}, 400
+    contacto_id = data.get("contacto_id")
+    _registrar_evento(agente_key, tipo, contacto_id)
+    return {"ok": True, "xp": XP_VALUES[tipo]}
+
+
+@app.route("/teamquest/resumen", methods=["GET"])
+@login_required
+def teamquest_resumen():
+    agente_key = session.get("agente_key", "")
+    try:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/eventos_comerciales",
+            headers=_supa_hdrs(),
+            params={"agente": f"eq.{agente_key}", "select": "tipo,xp,created_at"},
+            timeout=15,
+        )
+        if not r.ok:
+            return {"error": r.text}, 500
+        eventos = r.json()
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+    xp_total = sum(e.get("xp", 0) for e in eventos)
+    # Fórmula de nivel: 500 XP por nivel, arrancando en Nivel 1. Ajustable
+    # más adelante sin tocar el frontend (el prototipo la vuelve a pedir acá).
+    nivel = 1 + (xp_total // 500)
+    xp_en_nivel = xp_total % 500
+    pct_nivel = round((xp_en_nivel / 500) * 100)
+
+    hace_7_dias = datetime.datetime.now() - datetime.timedelta(days=7)
+    semana = [e for e in eventos if e.get("created_at") and
+              datetime.datetime.fromisoformat(e["created_at"].replace("Z", "+00:00")).replace(tzinfo=None) >= hace_7_dias]
+    conteo_semana = {}
+    for e in semana:
+        conteo_semana[e["tipo"]] = conteo_semana.get(e["tipo"], 0) + 1
+
+    return {
+        "agente": agente_key,
+        "xp_total": xp_total,
+        "nivel": nivel,
+        "pct_nivel_actual": pct_nivel,
+        "eventos_semana": conteo_semana,
+        "total_eventos": len(eventos),
+    }
 
 
 if __name__ == "__main__":

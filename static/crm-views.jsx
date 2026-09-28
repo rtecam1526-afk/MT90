@@ -461,6 +461,7 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
   const [etapa, setEtapa] = useStateV(c.etapa || "sin");
   const [copied, setCopied] = useStateV(false);
   const [saving, setSaving] = useStateV(false);
+  const [hitoMsg, setHitoMsg] = useStateV("");
   const hecho = !!(done && done[c.id]);
   const urgente = esUrgente(dias);
   const cumpleHoy = esCumpleHoy(c.cumple);
@@ -490,6 +491,13 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
     if (c.id && accion !== c.proximaAccion && window.CRM_API) {
       window.CRM_API.put('/contactos/' + c.id, {proxima_accion: accion}).catch(console.error);
     }
+  }
+
+  function registrarHito(tipo, label) {
+    if (!c.id || !window.CRM_API) return;
+    window.CRM_API.post('/eventos', { tipo, contacto_id: c.id })
+      .then((r) => { setHitoMsg('✓ ' + label + ' · +' + (r.xp || 0) + ' XP'); setTimeout(() => setHitoMsg(''), 2200); })
+      .catch(() => { setHitoMsg('No se pudo registrar, probá de nuevo'); setTimeout(() => setHitoMsg(''), 2200); });
   }
 
   function eliminar() {
@@ -559,6 +567,15 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
                 <div className="dfact"><span className="k">Contexto</span><span className="v"><span className="dchips">{c.contexto.map((x, i) => <span className="chip" key={i}>{x}</span>)}</span></span></div>
               )}
             </div>
+          </div>
+
+          <div className="dsection">
+            <div className="dlabel">Hitos con este contacto <span className="auto">· suma XP en Team Quest</span></div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="dmsg-btn" onClick={() => registrarHito('reunion', 'Reunión registrada')}>📅 Registré una reunión</button>
+              <button className="dmsg-btn" onClick={() => registrarHito('captacion', 'Captación registrada')}>🏠 Cerré una captación/operación</button>
+            </div>
+            {hitoMsg && <div style={{ fontSize: 'calc(12.5px * var(--fs-scale))', color: 'var(--primary, #E0633A)', marginTop: 6, fontWeight: 600 }}>{hitoMsg}</div>}
           </div>
 
           <div className="dsection">
