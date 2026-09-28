@@ -203,6 +203,9 @@ function App() {
           <button className={tab === "evolucion" ? "active" : ""} onClick={() => setTab("evolucion")}>
             Mi evolución
           </button>
+          <button className={tab === "teamquest" ? "active" : ""} onClick={() => setTab("teamquest")}>
+            Team Quest
+          </button>
           {!t.esconderCartera && (
             <button className={tab === "cartera" ? "active" : ""} onClick={() => setTab("cartera")}>
               Cartera
@@ -243,6 +246,7 @@ function App() {
         {tab === "campanas" && <Campanas data={data} onWhatsapp={onWhatsapp} />}
         {tab === "semaforo" && window.Semaforo && <Semaforo data={data} done={done} />}
         {tab === "evolucion" && window.MiEvolucion && <MiEvolucion data={data} />}
+        {tab === "teamquest" && window.TeamQuest && <TeamQuest agenteNombre={data.agente} />}
       </main>
 
       {detalle && (

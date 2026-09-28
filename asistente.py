@@ -2634,6 +2634,72 @@ def teamquest_resumen():
     }
 
 
+def _nivel_de(xp_total):
+    return 1 + (xp_total // 500), round(((xp_total % 500) / 500) * 100)
+
+
+@app.route("/teamquest/oficina", methods=["GET"])
+@login_required
+def teamquest_oficina():
+    """Arma la vista de Broker: todos los agentes activos, agrupados en equipos
+    por 'equipo_lider' (un agente sin lider es su propio equipo de una persona),
+    con el XP real de cada uno sumado desde eventos_comerciales."""
+    try:
+        r_ag = _req.get(
+            f"{SUPABASE_URL}/rest/v1/agentes",
+            headers=_supa_hdrs(),
+            params={"select": "key,nombre,equipo_lider,es_broker", "activo": "eq.true"},
+            timeout=15,
+        )
+        if not r_ag.ok:
+            return {"error": r_ag.text}, 500
+        agentes = r_ag.json()
+
+        r_ev = _req.get(
+            f"{SUPABASE_URL}/rest/v1/eventos_comerciales",
+            headers=_supa_hdrs(),
+            params={"select": "agente,tipo,xp"},
+            timeout=15,
+        )
+        if not r_ev.ok:
+            return {"error": r_ev.text}, 500
+        eventos = r_ev.json()
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+    xp_por_agente = {}
+    conteos_por_agente = {}
+    for e in eventos:
+        ag = e.get("agente")
+        xp_por_agente[ag] = xp_por_agente.get(ag, 0) + (e.get("xp") or 0)
+        c = conteos_por_agente.setdefault(ag, {})
+        c[e["tipo"]] = c.get(e["tipo"], 0) + 1
+
+    equipos = {}  # lider_key -> {leader, agentes: []}
+    por_key = {a["key"]: a for a in agentes}
+    for a in agentes:
+        if a.get("es_broker"):
+            continue
+        lider_key = a.get("equipo_lider") or a["key"]  # sin líder = su propio equipo
+        nivel, pct = _nivel_de(xp_por_agente.get(a["key"], 0))
+        agente_out = {
+            "key": a["key"], "nombre": a["nombre"],
+            "xp_total": xp_por_agente.get(a["key"], 0),
+            "nivel": nivel, "pct_nivel_actual": pct,
+            "conteos": conteos_por_agente.get(a["key"], {}),
+        }
+        if lider_key not in equipos:
+            leader_info = por_key.get(lider_key, {"key": lider_key, "nombre": lider_key})
+            equipos[lider_key] = {"lider_key": lider_key, "lider_nombre": leader_info["nombre"], "agentes": []}
+        equipos[lider_key]["agentes"].append(agente_out)
+
+    for eq in equipos.values():
+        eq["xp_total_equipo"] = sum(x["xp_total"] for x in eq["agentes"])
+        eq["nivel_equipo"], eq["pct_equipo"] = _nivel_de(eq["xp_total_equipo"])
+
+    return {"equipos": list(equipos.values())}
+
+
 if __name__ == "__main__":
     print("=" * 55)
     print("  MT90 Tracción — Agente IA")
