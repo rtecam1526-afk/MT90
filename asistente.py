@@ -1799,7 +1799,20 @@ Cálculo paso a paso (3-4 líneas máximo). Mostrá precio base, cada ajuste con
 **4. Por qué defender este precio**
 Máximo 3 bullets concretos con números: escasez, posición en el rango, demanda del segmento.
 
-**5. Próximos pasos**
+**5. Rentabilidad si se alquila en vez de vender**
+Estimá el alquiler mensual (USD o el equivalente en pesos al tipo de cambio del día) usando el ratio
+alquiler/venta típico de CABA para esa zona y tipo de propiedad (normalmente entre 0.35% y 0.55%
+mensual del valor venta — ajustá según barrio: zonas premium más bajo, zonas más populares más alto).
+Mostrá: 💵 Alquiler estimado mensual · 📈 Rentabilidad bruta anual (%) · una línea aclarando que es una
+estimación de mercado, no un comparable de alquiler real relevado.
+
+**6. Costos de cierre estimados (para el vendedor)**
+Tabla breve con los ítems típicos de CABA/GBA sobre el precio de cierre estimado: comisión inmobiliaria
+(usá la que corresponda, default 4% + IVA), sellos (3.5% CABA / según provincia si se mencionó otra
+jurisdicción), certificados y gastos varios (~0.5%). Mostrá el total estimado en USD y en % del precio.
+Aclará que son valores de referencia y pueden variar según el caso.
+
+**7. Próximos pasos**
 3 ítems: mandato, fotos, publicación.
 
 *Comparables: Zonaprop · MercadoLibre · Argenprop · Ref. Reporte Inmobiliario · Corrección portal/cierre −5%*
@@ -2074,12 +2087,43 @@ def radar_resumen():
                     headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
 
+def _md_fila_tabla(linea: str) -> list:
+    """Parsea una fila '| a | b | c |' en celdas, ignorando pipes escapados."""
+    celdas = [c.strip() for c in linea.strip().strip("|").split("|")]
+    return celdas
+
+def _es_separador_tabla(linea: str) -> bool:
+    # fila tipo "| --- | :--- | ---: |"
+    return bool(re.fullmatch(r'\|?[\s:|-]+\|?', linea.strip())) and "-" in linea
+
 def _md_a_html(texto: str) -> str:
-    """Convierte markdown básico a HTML para el reporte imprimible."""
+    """Convierte markdown básico a HTML para el reporte imprimible — incluye
+    tablas, que es justo el formato que usa el ACM para los comparables."""
     lineas = texto.split("\n")
     html = ""
-    for l in lineas:
-        l_esc = l.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+    i = 0
+    n = len(lineas)
+    while i < n:
+        l = lineas[i]
+        l_esc = l.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        # Tabla: línea con pipes seguida de una línea separadora "---"
+        if "|" in l and i + 1 < n and _es_separador_tabla(lineas[i + 1]):
+            encabezado = _md_fila_tabla(l_esc)
+            i += 2  # saltar encabezado + separador
+            filas = []
+            while i < n and "|" in lineas[i] and lineas[i].strip():
+                fila_esc = lineas[i].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                filas.append(_md_fila_tabla(fila_esc))
+                i += 1
+            html += '<table class="acm-tabla"><thead><tr>'
+            html += "".join(f"<th>{c}</th>" for c in encabezado)
+            html += "</tr></thead><tbody>"
+            for fila in filas:
+                html += "<tr>" + "".join(f"<td>{c}</td>" for c in fila) + "</tr>"
+            html += "</tbody></table>\n"
+            continue
+
         if l_esc.startswith("### "):
             html += f'<h3>{l_esc[4:]}</h3>\n'
         elif l_esc.startswith("## "):
@@ -2094,6 +2138,7 @@ def _md_a_html(texto: str) -> str:
             # negrita
             l_esc = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', l_esc)
             html += f'<p>{l_esc}</p>\n'
+        i += 1
     return html
 
 
@@ -2180,6 +2225,21 @@ def exportar_acm():
     p  {{ font-size: .88rem; color: #334155; line-height: 1.7; margin-bottom: 6px; }}
     li {{ font-size: .88rem; color: #334155; line-height: 1.7; margin-left: 20px; margin-bottom: 4px; }}
     strong {{ color: #0f172a; }}
+    .acm-tabla {{
+      width: 100%; border-collapse: collapse; margin: 10px 0 18px;
+      font-size: .82rem; overflow-x: auto; display: block;
+    }}
+    .acm-tabla thead, .acm-tabla tbody {{ display: table; width: 100%; table-layout: fixed; }}
+    .acm-tabla th {{
+      background: #0D1B2A; color: white; text-align: left;
+      padding: 8px 10px; font-weight: 600; font-size: .75rem;
+      text-transform: uppercase; letter-spacing: .03em;
+    }}
+    .acm-tabla td {{
+      padding: 8px 10px; border-bottom: 1px solid #e2e8f0; color: #334155;
+    }}
+    .acm-tabla tbody tr:nth-child(even) {{ background: #f8fafc; }}
+    .acm-tabla tbody tr:hover {{ background: #eff6ff; }}
     .footer {{
       border-top: 1px solid #e2e8f0;
       padding: 16px 36px;
