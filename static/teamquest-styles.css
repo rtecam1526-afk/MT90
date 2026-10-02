@@ -99,6 +99,39 @@
 .tq-meta-frac { font-family: var(--font-display); font-size: 13px; color: var(--ink); flex-shrink: 0; width: 34px; text-align: right; }
 .tq-meta-check { color: #17B892; font-weight: 900; font-size: 15px; flex-shrink: 0; }
 
+.tq-team-list { display: flex; flex-direction: column; gap: 8px; }
+.tq-team-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--line);
+}
+.tq-team-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.tq-team-metas { display: flex; gap: 5px; }
+.tq-meta-chip {
+  width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px;
+  background: var(--surface-2); border: 1px solid var(--line); opacity: .55;
+}
+.tq-meta-chip.tq-meta-chip-ok { background: #E4F5EE; border-color: #17B892; opacity: 1; }
+.tq-team-frac { font-family: var(--font-display); font-size: 12.5px; color: var(--muted); flex-shrink: 0; }
+.tq-team-frac.tq-team-frac-ok { color: #17B892; font-weight: 700; }
+
+.tq-office-list { display: flex; flex-direction: column; gap: 10px; }
+.tq-office-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow-sm);
+}
+.tq-office-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tq-office-nombre { font-weight: 700; font-size: 13.5px; color: var(--ink); }
+.tq-office-pct { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; flex-shrink: 0; }
+.tq-office-pct-ok { background: #E4F5EE; color: #0d6b53; }
+.tq-office-pct-media { background: #FCF3E3; color: #8a5a10; }
+.tq-office-pct-baja { background: var(--caliente-soft); color: #a83c24; }
+.tq-office-agentes { display: flex; flex-wrap: wrap; gap: 6px; }
+.tq-office-agente {
+  font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface-2);
+  padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line);
+}
+.tq-office-agente.tq-office-agente-ok { color: #0d6b53; background: #E4F5EE; border-color: #17B892; }
+
 .tq-mission-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 @media (max-width: 700px) { .tq-mission-grid { grid-template-columns: 1fr; } }
 .tq-mission-card {

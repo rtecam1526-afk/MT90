@@ -2714,29 +2714,13 @@ def crear_evento():
     return {"ok": True, "xp": XP_VALUES[tipo]}
 
 
-@app.route("/teamquest/resumen", methods=["GET"])
-@login_required
-def teamquest_resumen():
-    agente_key = session.get("agente_key", "")
-    try:
-        r = _req.get(
-            f"{SUPABASE_URL}/rest/v1/eventos_comerciales",
-            headers=_supa_hdrs(),
-            params={"agente": f"eq.{agente_key}", "select": "tipo,xp,created_at"},
-            timeout=15,
-        )
-        if not r.ok:
-            return {"error": r.text}, 500
-        eventos = r.json()
-    except Exception as e:
-        return {"error": str(e)}, 500
-
+def _resumen_de_eventos(eventos):
+    """Calcula XP/nivel/racha/metas a partir de la lista de eventos de UN agente
+    (cada uno con tipo, xp, created_at). Usado tanto para 'mi perfil' como para
+    las vistas de equipo/oficina, así el criterio es siempre el mismo en los
+    tres niveles — nada se recalcula distinto según quién lo mire."""
     xp_total = sum(e.get("xp", 0) for e in eventos)
-    # Fórmula de nivel: 500 XP por nivel, arrancando en Nivel 1. Ajustable
-    # más adelante sin tocar el frontend (el prototipo la vuelve a pedir acá).
-    nivel = 1 + (xp_total // 500)
-    xp_en_nivel = xp_total % 500
-    pct_nivel = round((xp_en_nivel / 500) * 100)
+    nivel, pct_nivel = _nivel_de(xp_total)
 
     ahora = datetime.datetime.now()
     hoy_00 = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -2773,7 +2757,6 @@ def teamquest_resumen():
         cursor = cursor - datetime.timedelta(days=1)
 
     return {
-        "agente": agente_key,
         "xp_total": xp_total,
         "nivel": nivel,
         "pct_nivel_actual": pct_nivel,
@@ -2783,6 +2766,27 @@ def teamquest_resumen():
         "racha_dias": racha,
         "metas": metas,
     }
+
+
+@app.route("/teamquest/resumen", methods=["GET"])
+@login_required
+def teamquest_resumen():
+    agente_key = session.get("agente_key", "")
+    try:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/eventos_comerciales",
+            headers=_supa_hdrs(),
+            params={"agente": f"eq.{agente_key}", "select": "tipo,xp,created_at"},
+            timeout=15,
+        )
+        if not r.ok:
+            return {"error": r.text}, 500
+        eventos = r.json()
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+    es_broker = bool(obtener_agentes().get(agente_key, {}).get("es_broker"))
+    return {"agente": agente_key, "es_broker": es_broker, **_resumen_de_eventos(eventos)}
 
 
 def _nivel_de(xp_total):
@@ -2809,7 +2813,7 @@ def teamquest_oficina():
         r_ev = _req.get(
             f"{SUPABASE_URL}/rest/v1/eventos_comerciales",
             headers=_supa_hdrs(),
-            params={"select": "agente,tipo,xp"},
+            params={"select": "agente,tipo,xp,created_at"},
             timeout=15,
         )
         if not r_ev.ok:
@@ -2818,13 +2822,9 @@ def teamquest_oficina():
     except Exception as e:
         return {"error": str(e)}, 500
 
-    xp_por_agente = {}
-    conteos_por_agente = {}
+    eventos_por_agente = {}
     for e in eventos:
-        ag = e.get("agente")
-        xp_por_agente[ag] = xp_por_agente.get(ag, 0) + (e.get("xp") or 0)
-        c = conteos_por_agente.setdefault(ag, {})
-        c[e["tipo"]] = c.get(e["tipo"], 0) + 1
+        eventos_por_agente.setdefault(e.get("agente"), []).append(e)
 
     equipos = {}  # lider_key -> {leader, agentes: []}
     por_key = {a["key"]: a for a in agentes}
@@ -2832,12 +2832,17 @@ def teamquest_oficina():
         if a.get("es_broker"):
             continue
         lider_key = a.get("equipo_lider") or a["key"]  # sin líder = su propio equipo
-        nivel, pct = _nivel_de(xp_por_agente.get(a["key"], 0))
+        resumen = _resumen_de_eventos(eventos_por_agente.get(a["key"], []))
+        metas_diarias = [m for m in resumen["metas"] if m["periodo"] == "diario"]
         agente_out = {
             "key": a["key"], "nombre": a["nombre"],
-            "xp_total": xp_por_agente.get(a["key"], 0),
-            "nivel": nivel, "pct_nivel_actual": pct,
-            "conteos": conteos_por_agente.get(a["key"], {}),
+            "xp_total": resumen["xp_total"],
+            "nivel": resumen["nivel"], "pct_nivel_actual": resumen["pct_nivel_actual"],
+            "conteos": resumen["conteos_totales"],
+            "racha_dias": resumen["racha_dias"],
+            "metas": resumen["metas"],
+            "metas_hoy_cumplidas": sum(1 for m in metas_diarias if m["cumplida"]),
+            "metas_hoy_total": len(metas_diarias),
         }
         if lider_key not in equipos:
             leader_info = por_key.get(lider_key, {"key": lider_key, "nombre": lider_key})
@@ -2847,6 +2852,11 @@ def teamquest_oficina():
     for eq in equipos.values():
         eq["xp_total_equipo"] = sum(x["xp_total"] for x in eq["agentes"])
         eq["nivel_equipo"], eq["pct_equipo"] = _nivel_de(eq["xp_total_equipo"])
+        # Salud del equipo: % de metas diarias cumplidas hoy entre todos sus agentes
+        # (para que el Team Leader / Broker vean de un vistazo quién necesita empuje).
+        total_hoy = sum(x["metas_hoy_total"] for x in eq["agentes"])
+        cumplidas_hoy = sum(x["metas_hoy_cumplidas"] for x in eq["agentes"])
+        eq["pct_cumplimiento_hoy"] = round((cumplidas_hoy / total_hoy) * 100) if total_hoy else 0
 
     return {"equipos": list(equipos.values())}
 

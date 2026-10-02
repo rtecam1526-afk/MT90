@@ -143,6 +143,12 @@ function TeamQuest({ agenteNombre }) {
       <nav className="tq-subnav">
         <button className={sub === 'perfil' ? 'active' : ''} onClick={() => setSub('perfil')}>👤 Mi perfil</button>
         <button className={sub === 'ranking' ? 'active' : ''} onClick={() => setSub('ranking')}>🏅 Ranking</button>
+        {miEquipo && miEquipo.agentes.length > 1 && (
+          <button className={sub === 'equipo' ? 'active' : ''} onClick={() => setSub('equipo')}>👥 Mi equipo</button>
+        )}
+        {mio.es_broker && (
+          <button className={sub === 'oficina' ? 'active' : ''} onClick={() => setSub('oficina')}>🏢 Oficina</button>
+        )}
         <button className={sub === 'misiones' ? 'active' : ''} onClick={() => setSub('misiones')}>🎯 Misiones</button>
         <button className={sub === 'evolucion' ? 'active' : ''} onClick={() => setSub('evolucion')}>✨ Evolución</button>
       </nav>
@@ -218,6 +224,60 @@ function TeamQuest({ agenteNombre }) {
                     <span className="tq-team-tag" style={{ background: tqTeamColorFor(a.equipoKey) + '20', color: tqTeamColorFor(a.equipoKey) }}>{a.equipo}</span>
                   </div>
                   <span className="tq-rank-xp">{a.xp_total.toLocaleString('es-AR')} XP</span>
+                </div>
+              );
+            })}
+          </div>
+        </React.Fragment>
+      )}
+
+      {sub === 'equipo' && miEquipo && (
+        <React.Fragment>
+          <div className="tq-section-title"><h3>Mi equipo — hoy</h3><span className="tq-muted">{miEquipo.lider_nombre}</span></div>
+          <p className="tq-muted" style={{ marginTop: -10 }}>Quién ya cumplió sus metas de hoy (llamadas, visitas, actualizar CRM) y quién todavía no — sin tener que preguntarle.</p>
+          <div className="tq-team-list">
+            {miEquipo.agentes.map((a) => {
+              const metasDiarias = (a.metas || []).filter((m) => m.periodo === 'diario');
+              const todoOk = a.metas_hoy_cumplidas === a.metas_hoy_total;
+              return (
+                <div className="tq-team-row" key={a.key}>
+                  <div className="tq-avatar-slot tq-avatar-slot-sm" dangerouslySetInnerHTML={{ __html: tqAvatarSVG(a.nivel, 36, a.key, { accent: tqTeamColorFor(miEquipo.lider_key) }) }} />
+                  <div className="tq-team-id">
+                    <div className="tq-rank-name">{a.nombre}{a.key === mio.agente ? ' · vos' : ''}</div>
+                    <div className="tq-team-metas">
+                      {metasDiarias.map((m) => (
+                        <span key={m.tipo} className={'tq-meta-chip' + (m.cumplida ? ' tq-meta-chip-ok' : '')} title={m.label + ': ' + m.progreso + '/' + m.objetivo}>{m.icono}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <span className={'tq-team-frac' + (todoOk ? ' tq-team-frac-ok' : '')}>{a.metas_hoy_cumplidas}/{a.metas_hoy_total} hoy</span>
+                </div>
+              );
+            })}
+          </div>
+        </React.Fragment>
+      )}
+
+      {sub === 'oficina' && mio.es_broker && (
+        <React.Fragment>
+          <div className="tq-section-title"><h3>Salud de la oficina — hoy</h3><span className="tq-muted">{oficina.equipos.length} equipos</span></div>
+          <p className="tq-muted" style={{ marginTop: -10 }}>% de metas diarias cumplidas por equipo — ordenado de quien más necesita empuje a quien va mejor.</p>
+          <div className="tq-office-list">
+            {[...oficina.equipos].sort((a, b) => a.pct_cumplimiento_hoy - b.pct_cumplimiento_hoy).map((eq) => {
+              const nivelSalud = eq.pct_cumplimiento_hoy >= 80 ? 'ok' : eq.pct_cumplimiento_hoy >= 40 ? 'media' : 'baja';
+              return (
+                <div className="tq-office-card" key={eq.lider_key}>
+                  <div className="tq-office-top">
+                    <div className="tq-office-nombre">{eq.lider_nombre}</div>
+                    <span className={'tq-office-pct tq-office-pct-' + nivelSalud}>{eq.pct_cumplimiento_hoy}% hoy</span>
+                  </div>
+                  <div className="tq-office-agentes">
+                    {eq.agentes.map((a) => (
+                      <span key={a.key} className={'tq-office-agente' + (a.metas_hoy_cumplidas === a.metas_hoy_total ? ' tq-office-agente-ok' : '')}>
+                        {a.nombre}: {a.metas_hoy_cumplidas}/{a.metas_hoy_total}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               );
             })}
