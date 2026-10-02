@@ -2,35 +2,36 @@
 .sel-wrap { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 .sel-head h1 { font-family: var(--font-display); font-size: calc(26px * var(--fs-scale)); margin: 0 0 4px; }
 
-.sel-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
-.sel-items { display: flex; flex-direction: column; gap: 10px; }
-.sel-item-row { display: flex; gap: 8px; align-items: flex-start; background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px; }
-.sel-item-grid { flex: 1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.sel-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; min-width: 0; }
+.sel-items { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.sel-item-row { display: flex; gap: 8px; align-items: flex-start; background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px; min-width: 0; }
+.sel-item-grid { flex: 1; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sel-item-grid input { min-width: 0; }
 .sel-item-full { grid-column: 1 / -1; }
-@media (max-width: 560px) { .sel-item-grid { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .sel-item-grid { grid-template-columns: minmax(0, 1fr); } }
 
-.sel-link-autocomp { display: flex; gap: 8px; }
-.sel-link-autocomp input { flex: 1; }
+.sel-link-autocomp { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.sel-link-autocomp input { flex: 1; min-width: 120px; }
 .sel-autocomp-btn { flex-shrink: 0; white-space: nowrap; }
 .sel-autocomp-error { font-size: 12px; color: var(--caliente); font-weight: 600; margin-top: -4px; }
 
 .sel-link-nuevo {
   margin-top: 12px; background: #E4F5EE; border: 1px solid #17B892; border-radius: var(--radius-sm);
-  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 700; color: #0d6b53;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 700; color: #0d6b53; min-width: 0;
 }
-.sel-link-row { display: flex; gap: 8px; }
-.sel-link-row input { flex: 1; }
+.sel-link-row { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.sel-link-row input { flex: 1; min-width: 160px; }
 
-.sel-lista { display: flex; flex-direction: column; gap: 12px; }
-.sel-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 10px; }
-.sel-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.sel-lista { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.sel-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.sel-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
 .sel-card-nombre { font-weight: 700; font-size: 14.5px; color: var(--ink); }
 .sel-card-votos { display: flex; gap: 8px; flex-shrink: 0; }
 .sel-tally { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
 .sel-tally-like { background: #E4F5EE; color: #0d6b53; }
 .sel-tally-dislike { background: #FEE4E2; color: #b5480f; }
-.sel-card-items { display: flex; flex-direction: column; gap: 4px; }
-.sel-card-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); }
+.sel-card-items { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sel-card-item { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); min-width: 0; }
 .sel-item-voto { flex-shrink: 0; }
-.sel-item-titulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sel-card-actions { display: flex; gap: 8px; align-items: center; }
+.sel-item-titulo { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sel-card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

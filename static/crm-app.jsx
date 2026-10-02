@@ -191,7 +191,7 @@ function App() {
           <button className={tab === "semana" ? "active" : ""} onClick={() => setTab("semana")}>
             Mi semana
           </button>
-          <button className="" onClick={() => window.open("/", "_blank")}>
+          <button className="" onClick={() => { window.location.href = "/"; }}>
             Agente IA ↗
           </button>
           <button className={tab === "campanas" ? "active" : ""} onClick={() => setTab("campanas")}>

@@ -34,6 +34,7 @@
       display: flex;
       flex-direction: column;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
     /* ── Header ── */
@@ -81,6 +82,14 @@
     }
     .btn-ghost:hover { background: var(--border-soft); }
     .btn-ghost svg { width: 12px; height: 12px; }
+    .btn-volver-crm { text-decoration: none; flex-shrink: 0; }
+
+    @media (max-width: 760px) {
+      header { flex-wrap: wrap; height: auto; padding: 10px 14px; gap: 8px; }
+      .header-right { margin-left: 0; flex-basis: 100%; flex-wrap: wrap; }
+      .agent-select { flex: 1; min-width: 0; }
+      .agent-select select { max-width: 100%; }
+    }
 
     /* ── Chat ── */
     #chat {
@@ -266,6 +275,10 @@
 <body>
 
 <header>
+  <a href="/crm" class="btn-ghost btn-volver-crm">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    Volver al CRM
+  </a>
   <div class="logo">
     <div class="logo-mark">M</div>
     <div class="logo-name">MT90 <span>Tracción</span></div>
