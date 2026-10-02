@@ -1781,6 +1781,17 @@ DATOS DE COMPARABLES:
 
 6. Precio publicación = base + ajustes. Precio cierre = publicación × 0.92–0.95.
 
+7. CONFIABILIDAD — contá cuántos comparables quedaron válidos después de los filtros 1 y 2
+   (antes de descartar outliers):
+   - 1 o 2 válidos: la muestra es demasiado chica para un número puntual. En vez de un precio
+     exacto, dá un RANGO amplio (±15%) y abrí el informe con un banner bien visible:
+     "⚠️ MUESTRA INSUFICIENTE (solo N comparable(s) de zona válido(s)) — este rango es orientativo,
+     no reemplaza una tasación con más datos. Recomendado: ampliar el radio de búsqueda o relevar
+     operaciones cerradas antes de fijar precio de publicación."
+   - 3-4 válidos: precio puntual permitido, pero agregá una línea de advertencia breve antes del
+     precio recomendado avisando que la muestra es chica.
+   - 5+ válidos: sin advertencia, la muestra ya es razonable.
+
 ═══ ESTRUCTURA DEL INFORME (conciso, para reunión de captación) ═══
 
 **1. Relevamiento al {fecha_hoy}**
@@ -1793,7 +1804,7 @@ Al final: Precio/m² publicado promedio: USD X · Corregido (−5%): USD Y
 
 **3. Precio recomendado**
 Cálculo paso a paso (3-4 líneas máximo). Mostrá precio base, cada ajuste con % y monto, total.
-💰 Publicación sugerida: USD [número]
+💰 Publicación sugerida: USD [número, o rango ±15% si la muestra es de 1-2 comparables según el punto 7]
 🟡 Cierre estimado: USD [rango]
 
 **4. Por qué defender este precio**
@@ -2132,6 +2143,11 @@ def _md_a_html(texto: str) -> str:
             html += f'<h1>{l_esc[2:]}</h1>\n'
         elif l_esc.startswith("- ") or l_esc.startswith("* "):
             html += f'<li>{l_esc[2:]}</li>\n'
+        elif l_esc.startswith("&gt; "):
+            # blockquote — Claude los usa para notas/advertencias de confiabilidad
+            contenido_bq = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', l_esc[5:])
+            clase_bq = "acm-aviso-fuerte" if "⚠️" in l_esc else "acm-aviso"
+            html += f'<div class="{clase_bq}">{contenido_bq}</div>\n'
         elif not l_esc.strip():
             html += '<br>\n'
         else:
@@ -2240,6 +2256,15 @@ def exportar_acm():
     }}
     .acm-tabla tbody tr:nth-child(even) {{ background: #f8fafc; }}
     .acm-tabla tbody tr:hover {{ background: #eff6ff; }}
+    .acm-aviso {{
+      background: #eff6ff; border-left: 3px solid #1877f2; border-radius: 6px;
+      padding: 10px 14px; margin: 10px 0; font-size: .82rem; color: #334155;
+    }}
+    .acm-aviso-fuerte {{
+      background: #fffbeb; border: 1.5px solid #f59e0b; border-left-width: 4px;
+      border-radius: 6px; padding: 12px 16px; margin: 14px 0;
+      font-size: .85rem; font-weight: 600; color: #92400e;
+    }}
     .footer {{
       border-top: 1px solid #e2e8f0;
       padding: 16px 36px;

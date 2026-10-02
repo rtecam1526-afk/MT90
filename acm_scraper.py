@@ -115,6 +115,30 @@ def _geocodificar(direccion: str, barrio: str = "") -> Optional[tuple]:
     return None
 
 
+def _geocodificar_inverso(lat: float, lng: float) -> Optional[str]:
+    """Dado lat/lng, devuelve el barrio real (según OpenStreetMap). Existe porque
+    a veces en el campo 'barrio' del ACM se carga por error el nombre de una
+    calle (ej. 'Cuba', que es una calle de Belgrano/Núñez, no un barrio) — eso
+    hace que Zonaprop/MercadoLibre busquen un barrio que no existe y devuelvan
+    0 resultados. Con la dirección geocodificada, se puede recuperar el barrio
+    real y buscar comparables ahí en vez de confiar ciegamente en el texto cargado."""
+    try:
+        req = urllib.request.Request(
+            f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json&addressdetails=1&zoom=16",
+            headers={"User-Agent": "MT90-ACM/1.0 (captacion inmobiliaria)"}
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        addr = data.get("address", {}) or {}
+        barrio_real = addr.get("suburb") or addr.get("neighbourhood") or addr.get("city_district")
+        if barrio_real:
+            print(f"[ACM] Barrio real según geocoding inverso: {barrio_real}")
+            return barrio_real
+    except Exception as e:
+        print(f"[ACM] Error en geocoding inverso: {e}")
+    return None
+
+
 def _slug(texto: str) -> str:
     """Normaliza texto a slug de URL: minúsculas, sin tildes, guiones."""
     trans = str.maketrans("áéíóúüñÁÉÍÓÚÜÑ", "aeiouunAEIOUUN")
@@ -745,6 +769,13 @@ def buscar_comparables(barrio: str, tipo: str, m2_target: Optional[int] = None,
         coords = _geocodificar(direccion, barrio)
         if coords:
             target_lat, target_lng = coords
+            # Si el "barrio" cargado no es en realidad un barrio (ej. se cargó el
+            # nombre de una calle por error), esto lo corrige antes de buscar —
+            # evita que Zonaprop/MercadoLibre busquen un barrio que no existe.
+            barrio_real = _geocodificar_inverso(target_lat, target_lng)
+            if barrio_real and _slug(barrio_real) != _slug(barrio):
+                _cb(f"📍 El barrio real de esa dirección es **{barrio_real}** (no \"{barrio}\") — buscando ahí")
+                barrio = barrio_real
         else:
             _cb("⚠️ No se pudo geocodificar la dirección, usando barrio completo")
 
