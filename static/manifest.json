@@ -1,0 +1,16 @@
+{
+  "name": "MT90 Tracción",
+  "short_name": "MT90",
+  "description": "CRM inmobiliario de MT90 Tracción",
+  "start_url": "/crm",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBF6F0",
+  "theme_color": "#E0633A",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

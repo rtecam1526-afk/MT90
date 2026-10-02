@@ -1659,6 +1659,14 @@ body,
 </script>
 """
 
+@app.route("/sw.js")
+def sw_js():
+    # Servido desde la raíz (no /static/sw.js) a propósito: el scope de un
+    # service worker es por default la carpeta donde vive el archivo, y
+    # necesitamos que cubra /crm para que el navegador lo considere instalable.
+    return app.send_static_file("sw.js")
+
+
 @app.route("/crm")
 @login_required
 def crm():
