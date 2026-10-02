@@ -2872,6 +2872,20 @@ def get_selecciones():
     return r.json()
 
 
+@app.route("/selecciones/previsualizar", methods=["POST"])
+@login_required
+def previsualizar_item_seleccion():
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    if not url:
+        return {"error": "Falta la URL"}, 400
+    try:
+        info = acm_scraper.extraer_propiedad_de_url(url)
+    except Exception as e:
+        return {"error": str(e)}, 500
+    return info
+
+
 @app.route("/selecciones", methods=["POST"])
 @login_required
 def crear_seleccion():

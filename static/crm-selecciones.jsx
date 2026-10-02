@@ -17,6 +17,8 @@ function Selecciones() {
   const [guardando, setGuardando] = useStateS(false);
   const [linkNuevo, setLinkNuevo] = useStateS(null);
   const [copiadoId, setCopiadoId] = useStateS(null);
+  const [buscandoIdx, setBuscandoIdx] = useStateS(null);
+  const [errorBusqueda, setErrorBusqueda] = useStateS(null);
 
   function cargar() {
     if (!window.CRM_API) return;
@@ -30,6 +32,30 @@ function Selecciones() {
   }
   function agregarItem() { setItems((arr) => [...arr, itemVacio()]); }
   function quitarItem(i) { setItems((arr) => arr.length <= 1 ? arr : arr.filter((_, idx) => idx !== i)); }
+
+  async function autocompletar(i) {
+    const url = (items[i].url_original || '').trim();
+    if (!url || !window.CRM_API) return;
+    setBuscandoIdx(i);
+    setErrorBusqueda(null);
+    try {
+      const info = await window.CRM_API.post('/selecciones/previsualizar', { url });
+      setItems((arr) => arr.map((it, idx) => idx === i ? {
+        ...it,
+        titulo: info.titulo || it.titulo,
+        precio: info.precio || it.precio,
+        m2: info.m2 != null ? String(info.m2) : it.m2,
+        ambientes: info.ambientes != null ? String(info.ambientes) : it.ambientes,
+        imagen_url: info.imagen_url || it.imagen_url,
+      } : it));
+      if (!info.titulo && !info.precio && !info.m2) {
+        setErrorBusqueda('No se pudo sacar nada de ese link — completá los campos a mano.');
+      }
+    } catch (e) {
+      setErrorBusqueda('No se pudo autocompletar: ' + e.message + ' — completá los campos a mano.');
+    }
+    setBuscandoIdx(null);
+  }
 
   function resetForm() {
     setClienteNombre(''); setItems([itemVacio()]); setNuevaOpen(false);
@@ -94,18 +120,29 @@ function Selecciones() {
               {items.map((it, i) => (
                 <div className="sel-item-row" key={i}>
                   <div className="sel-item-grid">
+                    <div className="sel-item-full sel-link-autocomp">
+                      <input className="camp-nueva-input" placeholder="Pegá el link de la publicación (Zonaprop, ML, Argenprop…)" value={it.url_original} onChange={(e) => actualizarItem(i, 'url_original', e.target.value)} />
+                      <button
+                        type="button"
+                        className="cola-skip sel-autocomp-btn"
+                        disabled={!it.url_original.trim() || buscandoIdx === i}
+                        onClick={() => autocompletar(i)}
+                      >
+                        {buscandoIdx === i ? 'Buscando…' : '🔍 Autocompletar'}
+                      </button>
+                    </div>
                     <input className="camp-nueva-input" placeholder="Título · ej: 3 amb en Palermo" value={it.titulo} onChange={(e) => actualizarItem(i, 'titulo', e.target.value)} />
                     <input className="camp-nueva-input" placeholder="Precio · ej: USD 189.000" value={it.precio} onChange={(e) => actualizarItem(i, 'precio', e.target.value)} />
                     <input className="camp-nueva-input" placeholder="m²" value={it.m2} onChange={(e) => actualizarItem(i, 'm2', e.target.value)} />
                     <input className="camp-nueva-input" placeholder="Ambientes" value={it.ambientes} onChange={(e) => actualizarItem(i, 'ambientes', e.target.value)} />
                     <input className="camp-nueva-input" placeholder="Barrio" value={it.barrio} onChange={(e) => actualizarItem(i, 'barrio', e.target.value)} />
-                    <input className="camp-nueva-input" placeholder="Link de la publicación (opcional)" value={it.url_original} onChange={(e) => actualizarItem(i, 'url_original', e.target.value)} />
-                    <input className="camp-nueva-input sel-item-full" placeholder="URL de una foto (opcional)" value={it.imagen_url} onChange={(e) => actualizarItem(i, 'imagen_url', e.target.value)} />
+                    <input className="camp-nueva-input sel-item-full" placeholder="URL de una foto (se autocompleta si se encuentra)" value={it.imagen_url} onChange={(e) => actualizarItem(i, 'imagen_url', e.target.value)} />
                   </div>
                   {items.length > 1 && <button className="camp-guardada-del" onClick={() => quitarItem(i)} title="Quitar propiedad">✕</button>}
                 </div>
               ))}
             </div>
+            {errorBusqueda && <div className="sel-autocomp-error">{errorBusqueda}</div>}
             <button className="cola-skip" style={{ alignSelf: 'flex-start' }} onClick={agregarItem}>+ Agregar otra propiedad</button>
             <button
               className="camp-start"

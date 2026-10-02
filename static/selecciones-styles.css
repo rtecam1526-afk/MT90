@@ -9,6 +9,11 @@
 .sel-item-full { grid-column: 1 / -1; }
 @media (max-width: 560px) { .sel-item-grid { grid-template-columns: 1fr; } }
 
+.sel-link-autocomp { display: flex; gap: 8px; }
+.sel-link-autocomp input { flex: 1; }
+.sel-autocomp-btn { flex-shrink: 0; white-space: nowrap; }
+.sel-autocomp-error { font-size: 12px; color: var(--caliente); font-weight: 600; margin-top: -4px; }
+
 .sel-link-nuevo {
   margin-top: 12px; background: #E4F5EE; border: 1px solid #17B892; border-radius: var(--radius-sm);
   padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 700; color: #0d6b53;

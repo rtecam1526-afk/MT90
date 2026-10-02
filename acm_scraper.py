@@ -965,3 +965,44 @@ def formatear_para_claude(barrio, tipo, m2_target, ambientes_target, comparables
         lineas.append(f"   URL: {c['url']}")
 
     return "\n".join(lineas)
+
+
+def extraer_propiedad_de_url(url: str) -> dict:
+    """Dado el link de UNA publicación puntual (Zonaprop, MercadoLibre, Argenprop,
+    o cualquier portal), intenta precargar título/precio/m²/ambientes/foto para
+    'Cliente vota' — una sola búsqueda en el momento, sin caché ni proceso de
+    fondo. Usa Open Graph (meta tags que los portales mantienen a propósito para
+    que el link se vea bien al compartirlo por WhatsApp) como fuente principal,
+    por ser lo más estable ante rediseños del sitio. Si algo no sale, devuelve
+    el campo vacío/None — el agente lo completa a mano, nunca se rompe el flujo."""
+    out = {"titulo": "", "precio": "", "m2": None, "ambientes": None, "imagen_url": ""}
+    try:
+        session = _crear_session()
+        html_txt = _fetch(session, url)
+    except Exception as e:
+        print(f"[extraer_propiedad_de_url] {e}")
+        html_txt = None
+    if not html_txt:
+        return out
+
+    def _meta(prop):
+        m = re.search(r'<meta[^>]+(?:property|name)=["\']' + re.escape(prop) + r'["\'][^>]+content=["\']([^"\']*)["\']', html_txt, re.IGNORECASE)
+        if not m:
+            m = re.search(r'<meta[^>]+content=["\']([^"\']*)["\'][^>]+(?:property|name)=["\']' + re.escape(prop) + r'["\']', html_txt, re.IGNORECASE)
+        return _html.unescape(m.group(1)).strip() if m else None
+
+    out["titulo"] = _meta("og:title") or ""
+    out["imagen_url"] = _meta("og:image") or ""
+    descripcion = _meta("og:description") or ""
+
+    texto = f"{out['titulo']} {descripcion} {html_txt[:30000]}"
+    mp = re.search(r'(?:USD|U\$S|US\$)\s*([\d][\d.,]{2,12})', texto)
+    if mp:
+        out["precio"] = "USD " + mp.group(1)
+    mo = re.search(r'(\d+)\s*m[²2]', texto, re.IGNORECASE)
+    if mo:
+        out["m2"] = int(mo.group(1))
+    mo = re.search(r'(\d+)\s*amb', texto, re.IGNORECASE)
+    if mo:
+        out["ambientes"] = int(mo.group(1))
+    return out
