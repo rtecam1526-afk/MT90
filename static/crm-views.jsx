@@ -572,6 +572,8 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
           <div className="dsection">
             <div className="dlabel">Hitos con este contacto <span className="auto">· suma XP en Team Quest</span></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button className="dmsg-btn" onClick={() => registrarHito('llamada', 'Llamada registrada')}>📞 Registré una llamada</button>
+              <button className="dmsg-btn" onClick={() => registrarHito('visita', 'Visita registrada')}>🚪 Hice una visita a la propiedad</button>
               <button className="dmsg-btn" onClick={() => registrarHito('reunion', 'Reunión registrada')}>📅 Registré una reunión</button>
               <button className="dmsg-btn" onClick={() => registrarHito('captacion', 'Captación registrada')}>🏠 Cerré una captación/operación</button>
             </div>

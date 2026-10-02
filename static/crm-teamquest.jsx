@@ -70,12 +70,13 @@ function tqAvatarSVG(level, size, key, opts) {
 }
 
 var TQ_XP_LABELS = {
-  contacto_activado: 'Contactos activados', conversacion: 'Conversaciones', reactivacion: 'Reactivaciones',
-  reunion: 'Reuniones', referido: 'Referidos', captacion: 'Captaciones/operaciones',
-  nuevo_comprador: 'Nuevos compradores', operacion: 'Operaciones grandes',
+  contacto_activado: 'Contactos activados', llamada: 'Llamadas', conversacion: 'Conversaciones', visita: 'Visitas a propiedades',
+  reactivacion: 'Reactivaciones', tasacion: 'Tasaciones (ACM)', reunion: 'Reuniones', referido: 'Referidos',
+  captacion: 'Captaciones/operaciones', nuevo_comprador: 'Nuevos compradores', operacion: 'Operaciones grandes',
 };
 var TQ_XP_TABLE = [
-  ['Contacto activado', 10], ['Conversación', 20], ['Reactivación de contacto', 30],
+  ['Contacto activado', 10], ['Llamada', 10], ['Conversación', 20], ['Actualizar el CRM (1 vez al día)', 5],
+  ['Reactivación de contacto', 30], ['Visita a propiedad', 40], ['Tasación (ACM)', 20],
   ['Reunión', 100], ['Nuevo comprador', 200], ['Referido', 150],
   ['Captación / operación', 300], ['Operación grande', 500],
 ];
@@ -164,6 +165,26 @@ function TeamQuest({ agenteNombre }) {
           <div className="tq-flair-row">
             <span className="tq-flair-pill tq-streak">🔥 {mio.racha_dias} {mio.racha_dias === 1 ? 'día' : 'días'} de racha</span>
             <span className="tq-flair-pill tq-mood">{mio.total_eventos > 0 ? '😄 En movimiento' : '🌱 Recién arrancando'}</span>
+          </div>
+
+          <div className="tq-section-title"><h3>Metas de hoy</h3></div>
+          <div className="tq-metas-list">
+            {(mio.metas || []).map((m) => (
+              <div className={'tq-meta-row' + (m.cumplida ? ' tq-meta-ok' : '')} key={m.tipo}>
+                <span className="tq-meta-icon">{m.icono}</span>
+                <div className="tq-meta-mid">
+                  <div className="tq-meta-top">
+                    <span className="tq-meta-label">{m.label}</span>
+                    <span className="tq-meta-sub">{m.periodo === 'semanal' ? 'Esta semana' : 'Una vez al día'}</span>
+                  </div>
+                  <div className="tq-bar-track">
+                    <div className="tq-bar-fill" style={{ width: Math.min(100, (m.progreso / m.objetivo) * 100) + '%' }}></div>
+                  </div>
+                </div>
+                <span className="tq-meta-frac">{m.progreso}/{m.objetivo}</span>
+                {m.cumplida && <span className="tq-meta-check">✓</span>}
+              </div>
+            ))}
           </div>
 
           <div className="tq-section-title"><h3>Esta semana</h3></div>
@@ -280,4 +301,46 @@ function TeamQuest({ agenteNombre }) {
   );
 }
 
-Object.assign(window, { TeamQuest });
+// RECORDATORIO DE METAS — banner en la pantalla "Hoy" que se pone más urgente
+// a medida que avanza el día si quedan metas diarias sin cumplir. No hay
+// notificaciones push reales (la app vive en el navegador, no es instalable
+// como app nativa) — esto es la aproximación dentro del CRM: lo ve apenas
+// entra, sin depender de que el celular le muestre algo.
+function MetasRecordatorio() {
+  const [mio, setMio] = useStateTQ(null);
+
+  useEffectTQ(() => {
+    if (!window.CRM_API) return;
+    window.CRM_API.get('/teamquest/resumen').then(setMio).catch(() => {});
+  }, []);
+
+  if (!mio) return null;
+  const diarias = (mio.metas || []).filter((m) => m.periodo === 'diario');
+  if (diarias.length === 0) return null;
+  const faltantes = diarias.filter((m) => !m.cumplida);
+  const hora = new Date().getHours();
+
+  let nivel, icono, texto;
+  if (faltantes.length === 0) {
+    nivel = 'ok'; icono = '✅';
+    texto = 'Completaste todas tus metas de hoy — gran trabajo.';
+  } else if (hora >= 19) {
+    nivel = 'urgente'; icono = '⏰';
+    texto = 'El día se termina y todavía te falta: ' + faltantes.map((m) => m.label.toLowerCase()).join(', ') + '.';
+  } else if (hora >= 13) {
+    nivel = 'media'; icono = '🔔';
+    texto = 'Vas a mitad de día — te faltan ' + faltantes.length + ' meta' + (faltantes.length === 1 ? '' : 's') + ' de hoy: ' + faltantes.map((m) => m.label.toLowerCase()).join(', ') + '.';
+  } else {
+    nivel = 'calma'; icono = '🌱';
+    texto = 'Buen momento para arrancar con tus metas de hoy: ' + faltantes.map((m) => m.label.toLowerCase()).join(', ') + '.';
+  }
+
+  return (
+    <div className={'mb-banner mb-' + nivel}>
+      <span className="mb-icon">{icono}</span>
+      <span className="mb-texto">{texto}</span>
+    </div>
+  );
+}
+
+Object.assign(window, { TeamQuest, MetasRecordatorio });

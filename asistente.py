@@ -1993,6 +1993,7 @@ def acm():
             "agente_email":   agente_info["email"],
             "oficina":        agente_info.get("oficina", ""),
         }
+        _registrar_evento(agente_key, "tasacion")
         yield f"data: {json.dumps({'fin': True, 'mostrar_acciones': True})}\n\n"
 
     return Response(generar(), mimetype="text/event-stream",
@@ -2415,14 +2416,30 @@ def enviar_acm():
 # en un solo lugar, para no tener que tocar el frontend si cambia.
 XP_VALUES = {
     "contacto_activado":  10,
+    "llamada":            10,
     "conversacion":       20,
+    "visita":             40,
     "reactivacion":       30,
+    "actualizar_crm":      5,
+    "tasacion":           20,
     "reunion":           100,
     "nuevo_comprador":   200,
     "referido":          150,
     "captacion":         300,
     "operacion":         500,
 }
+
+# ── Metas de hoy ─────────────────────────────────────────────────────────
+# Checklist diario/semanal por agente (inspirado en apps de productividad
+# tipo "rachas"). Por ahora son las mismas metas para todos; el día que el
+# broker quiera configurarlas por agente, esto pasa a una tabla y listo —
+# el resto del código (cálculo de progreso) no cambia.
+METAS_CONFIG = [
+    {"tipo": "llamada",       "label": "Llamadas a clientes",    "objetivo": 5, "periodo": "diario",  "icono": "📞"},
+    {"tipo": "visita",        "label": "Visitas a propiedades",  "objetivo": 2, "periodo": "diario",  "icono": "🚪"},
+    {"tipo": "actualizar_crm","label": "Actualizar el CRM",      "objetivo": 1, "periodo": "diario",  "icono": "📝"},
+    {"tipo": "tasacion",      "label": "Tasaciones (ACM)",       "objetivo": 4, "periodo": "semanal", "icono": "📊"},
+]
 
 def _registrar_evento(agente_key, tipo, contacto_id=None):
     """Guarda un evento comercial con su XP. No frena el flujo principal si falla:
@@ -2437,6 +2454,24 @@ def _registrar_evento(agente_key, tipo, contacto_id=None):
         )
     except Exception as e:
         print(f"[_registrar_evento] {tipo} para {agente_key}: {e}")
+
+
+def _registrar_evento_una_vez_dia(agente_key, tipo):
+    """Como _registrar_evento, pero solo si no hay ya un evento de ese tipo
+    hoy para este agente — para metas tipo 'una vez al día' (actualizar CRM)
+    que no deben sumar XP cada vez que se toca un campo."""
+    try:
+        hoy = datetime.datetime.now().strftime("%Y-%m-%dT00:00:00")
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/eventos_comerciales",
+            headers=_supa_hdrs(),
+            params={"agente": f"eq.{agente_key}", "tipo": f"eq.{tipo}", "created_at": f"gte.{hoy}", "select": "id", "limit": "1"},
+            timeout=8,
+        )
+        if r.ok and not r.json():
+            _registrar_evento(agente_key, tipo)
+    except Exception as e:
+        print(f"[_registrar_evento_una_vez_dia] {tipo} para {agente_key}: {e}")
 
 
 @app.route("/contactos", methods=["GET"])
@@ -2550,6 +2585,7 @@ def actualizar_contacto(cid):
             return {"error": r.text}, 500
         if evento_tipo:
             _registrar_evento(agente_key, evento_tipo, cid)
+        _registrar_evento_una_vez_dia(agente_key, "actualizar_crm")
         return {"ok": True}
     except Exception as e:
         print(f"[PUT /contactos/{cid}] {e}")
@@ -2703,8 +2739,10 @@ def teamquest_resumen():
     pct_nivel = round((xp_en_nivel / 500) * 100)
 
     ahora = datetime.datetime.now()
+    hoy_00 = ahora.replace(hour=0, minute=0, second=0, microsecond=0)
     hace_7_dias = ahora - datetime.timedelta(days=7)
     fechas = []
+    conteo_hoy = {}
     conteo_semana = {}
     conteo_total = {}
     for e in eventos:
@@ -2715,6 +2753,13 @@ def teamquest_resumen():
         fechas.append(f.date())
         if f >= hace_7_dias:
             conteo_semana[e["tipo"]] = conteo_semana.get(e["tipo"], 0) + 1
+        if f >= hoy_00:
+            conteo_hoy[e["tipo"]] = conteo_hoy.get(e["tipo"], 0) + 1
+
+    metas = []
+    for m in METAS_CONFIG:
+        progreso = conteo_hoy.get(m["tipo"], 0) if m["periodo"] == "diario" else conteo_semana.get(m["tipo"], 0)
+        metas.append({**m, "progreso": progreso, "cumplida": progreso >= m["objetivo"]})
 
     # Racha: días consecutivos con al menos un evento, terminando hoy o ayer
     # (si hoy todavía no hizo nada, no le cortamos la racha de ayer).
@@ -2736,6 +2781,7 @@ def teamquest_resumen():
         "conteos_totales": conteo_total,
         "total_eventos": len(eventos),
         "racha_dias": racha,
+        "metas": metas,
     }
 
 
@@ -2803,6 +2849,223 @@ def teamquest_oficina():
         eq["nivel_equipo"], eq["pct_equipo"] = _nivel_de(eq["xp_total_equipo"])
 
     return {"equipos": list(equipos.values())}
+
+
+# ── Cliente vota propiedades ─────────────────────────────────────────────
+# El agente arma una selección de propiedades para un cliente puntual y le
+# manda un link público (sin login). El cliente vota 👍/👎 cada una desde el
+# celular y el agente ve el resultado en el CRM — así sabe antes de la visita
+# qué le gustó y qué no, sin tener que llamarlo para preguntar una por una.
+
+@app.route("/selecciones", methods=["GET"])
+@login_required
+def get_selecciones():
+    agente_key = session.get("agente_key", "")
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/selecciones_cliente",
+        headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "select": "*,seleccion_items(*)", "order": "created_at.desc", "seleccion_items.order": "orden.asc"},
+        timeout=15,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return r.json()
+
+
+@app.route("/selecciones", methods=["POST"])
+@login_required
+def crear_seleccion():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    cliente_nombre = (data.get("cliente_nombre") or "").strip()
+    items = data.get("items") or []
+    if not cliente_nombre:
+        return {"error": "Falta el nombre del cliente"}, 400
+    if not items:
+        return {"error": "Agregá al menos una propiedad"}, 400
+
+    token = uuid.uuid4().hex[:12]
+    r = _req.post(
+        f"{SUPABASE_URL}/rest/v1/selecciones_cliente",
+        headers={**_supa_hdrs(), "Prefer": "return=representation"},
+        json={"agente": agente_key, "cliente_nombre": cliente_nombre, "token": token},
+        timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    seleccion_id = r.json()[0]["id"]
+
+    filas = []
+    for i, it in enumerate(items):
+        filas.append({
+            "seleccion_id":  seleccion_id,
+            "titulo":        (it.get("titulo") or "").strip() or "Propiedad sin título",
+            "precio":        it.get("precio"),
+            "m2":            it.get("m2"),
+            "ambientes":     it.get("ambientes"),
+            "barrio":        it.get("barrio"),
+            "imagen_url":    it.get("imagen_url"),
+            "url_original":  it.get("url_original"),
+            "orden":         i,
+        })
+    r2 = _req.post(
+        f"{SUPABASE_URL}/rest/v1/seleccion_items",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        json=filas,
+        timeout=10,
+    )
+    if not r2.ok:
+        return {"error": r2.text}, 500
+
+    return {"ok": True, "token": token, "url": request.host_url.rstrip("/") + "/seleccion/" + token}
+
+
+@app.route("/selecciones/<int:sid>", methods=["DELETE"])
+@login_required
+def eliminar_seleccion(sid):
+    agente_key = session.get("agente_key", "")
+    r = _req.delete(
+        f"{SUPABASE_URL}/rest/v1/selecciones_cliente",
+        headers=_supa_hdrs(),
+        params={"id": f"eq.{sid}", "agente": f"eq.{agente_key}"},
+        timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True}
+
+
+def _seleccion_por_token(token):
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/selecciones_cliente",
+        headers=_supa_hdrs(),
+        params={"token": f"eq.{token}", "select": "*,seleccion_items(*)", "limit": "1"},
+        timeout=10,
+    )
+    if not r.ok or not r.json():
+        return None
+    return r.json()[0]
+
+
+@app.route("/seleccion/<token>")
+def ver_seleccion(token):
+    sel = _seleccion_por_token(token)
+    if not sel:
+        return "Esta selección no existe o fue eliminada.", 404
+
+    agente_info = obtener_agentes().get(sel["agente"], {})
+    agente_nombre = agente_info.get("nombre", sel["agente"])
+    items = sorted(sel.get("seleccion_items") or [], key=lambda x: x.get("orden") or 0)
+
+    def _tarjeta(it):
+        img = it.get("imagen_url") or ""
+        img_html = f'<div class="foto" style="background-image:url(\'{img}\')"></div>' if img else '<div class="foto foto-vacia">🏠</div>'
+        detalles = " · ".join(filter(None, [
+            f"{it['m2']:.0f} m²" if it.get("m2") else None,
+            f"{it['ambientes']:.0f} amb" if it.get("ambientes") else None,
+            it.get("barrio"),
+        ]))
+        link_html = f'<a class="link-original" href="{it["url_original"]}" target="_blank" rel="noopener">Ver publicación original</a>' if it.get("url_original") else ""
+        voto = it.get("voto") or "pendiente"
+        return f"""
+        <div class="tarjeta" data-id="{it['id']}" data-voto="{voto}">
+          {img_html}
+          <div class="info">
+            <div class="titulo">{it['titulo']}</div>
+            <div class="detalles">{detalles}</div>
+            {f'<div class="precio">{it["precio"]}</div>' if it.get('precio') else ''}
+            {link_html}
+          </div>
+          <div class="votos">
+            <button class="btn-voto btn-like" onclick="votar({it['id']},'like',this)">👍</button>
+            <button class="btn-voto btn-dislike" onclick="votar({it['id']},'dislike',this)">👎</button>
+          </div>
+        </div>"""
+
+    tarjetas_html = "\n".join(_tarjeta(it) for it in items) if items else "<p class='vacio'>Todavía no hay propiedades en esta selección.</p>"
+
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Selección para {sel['cliente_nombre']} · MT90 Tracción</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+  * {{ box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }}
+  body {{ background: #f8fafc; color: #0f172a; padding: 0 0 40px; }}
+  .header {{ background: #0D1B2A; color: white; padding: 28px 20px 24px; text-align: center; }}
+  .header .marca {{ font-size: .82rem; opacity: .6; font-weight: 700; letter-spacing: .04em; }}
+  .header h1 {{ font-size: 1.3rem; margin-top: 6px; }}
+  .header p {{ font-size: .85rem; opacity: .75; margin-top: 4px; }}
+  .lista {{ max-width: 520px; margin: 20px auto; padding: 0 14px; display: flex; flex-direction: column; gap: 14px; }}
+  .tarjeta {{ background: white; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,.07); transition: opacity .2s ease; }}
+  .tarjeta[data-voto="like"] {{ box-shadow: 0 0 0 2px #17B892; }}
+  .tarjeta[data-voto="dislike"] {{ opacity: .5; }}
+  .foto {{ height: 160px; background-size: cover; background-position: center; background-color: #e2e8f0; }}
+  .foto-vacia {{ display: grid; place-items: center; font-size: 2.4rem; }}
+  .info {{ padding: 14px 16px 10px; }}
+  .titulo {{ font-weight: 700; font-size: 1rem; }}
+  .detalles {{ font-size: .82rem; color: #64748b; margin-top: 2px; }}
+  .precio {{ font-weight: 800; color: #E0633A; margin-top: 6px; font-size: 1.05rem; }}
+  .link-original {{ display: inline-block; margin-top: 8px; font-size: .78rem; color: #1877f2; text-decoration: none; }}
+  .votos {{ display: flex; gap: 10px; padding: 10px 16px 16px; }}
+  .btn-voto {{ flex: 1; padding: 11px; border-radius: 10px; border: 1.5px solid #e2e8f0; background: #f8fafc; font-size: 1.3rem; cursor: pointer; transition: transform .15s ease; }}
+  .btn-voto:active {{ transform: scale(.92); }}
+  .btn-like.activo {{ background: #E4F5EE; border-color: #17B892; }}
+  .btn-dislike.activo {{ background: #FEE4E2; border-color: #E0633A; }}
+  .vacio {{ text-align: center; color: #94a3b8; padding: 40px 0; }}
+  .footer {{ text-align: center; font-size: .75rem; color: #94a3b8; margin-top: 24px; }}
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="marca">MT90 Tracción</div>
+    <h1>Selección para {sel['cliente_nombre']}</h1>
+    <p>Preparada por {agente_nombre} · tocá 👍 o 👎 en cada propiedad</p>
+  </div>
+  <div class="lista">
+    {tarjetas_html}
+  </div>
+  <div class="footer">Tu voto se guarda al toque, no hace falta nada más.</div>
+  <script>
+    function votar(id, voto, btn) {{
+      var tarjeta = btn.closest('.tarjeta');
+      var yaEra = tarjeta.getAttribute('data-voto') === voto;
+      var nuevoVoto = yaEra ? 'pendiente' : voto;
+      tarjeta.setAttribute('data-voto', nuevoVoto);
+      tarjeta.querySelectorAll('.btn-voto').forEach(function(b) {{ b.classList.remove('activo'); }});
+      if (nuevoVoto !== 'pendiente') btn.classList.add('activo');
+      fetch('/seleccion/{token}/item/' + id + '/votar', {{
+        method: 'POST', headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ voto: nuevoVoto }})
+      }});
+    }}
+  </script>
+</body>
+</html>"""
+    return html
+
+
+@app.route("/seleccion/<token>/item/<int:item_id>/votar", methods=["POST"])
+def votar_item(token, item_id):
+    sel = _seleccion_por_token(token)
+    if not sel:
+        return {"error": "No encontrada"}, 404
+    data = request.get_json(silent=True) or {}
+    voto = data.get("voto")
+    if voto not in ("like", "dislike", "pendiente"):
+        return {"error": "Voto inválido"}, 400
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/seleccion_items",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"id": f"eq.{item_id}", "seleccion_id": f"eq.{sel['id']}"},
+        json={"voto": voto},
+        timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True}
 
 
 if __name__ == "__main__":

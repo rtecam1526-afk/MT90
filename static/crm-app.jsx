@@ -174,7 +174,7 @@ function App() {
     }
   }
 
-  const wideMain = tab === "cartera" || tab === "agente" || tab === "campanas";
+  const wideMain = tab === "cartera" || tab === "agente" || tab === "campanas" || tab === "selecciones";
 
   return (
     <div className="app-root">
@@ -206,6 +206,9 @@ function App() {
           <button className={tab === "teamquest" ? "active" : ""} onClick={() => setTab("teamquest")}>
             Team Quest
           </button>
+          <button className={tab === "selecciones" ? "active" : ""} onClick={() => setTab("selecciones")}>
+            Cliente vota
+          </button>
           {!t.esconderCartera && (
             <button className={tab === "cartera" ? "active" : ""} onClick={() => setTab("cartera")}>
               Cartera
@@ -234,6 +237,7 @@ function App() {
         {tab === "hoy" && verCierre && (
           <CierreSemana data={data} onVerSemana={() => { setTab("semana"); setCierreCerrado(true); }} onClose={() => setCierreCerrado(true)} />
         )}
+        {tab === "hoy" && window.MetasRecordatorio && <MetasRecordatorio />}
         {tab === "hoy" && hoyView}
         {tab === "semana" && (
           <MiSemana data={data} done={done} onWhatsapp={onWhatsapp} onToggleDone={toggleDone}
@@ -247,6 +251,7 @@ function App() {
         {tab === "semaforo" && window.Semaforo && <Semaforo data={data} done={done} />}
         {tab === "evolucion" && window.MiEvolucion && <MiEvolucion data={data} />}
         {tab === "teamquest" && window.TeamQuest && <TeamQuest agenteNombre={data.agente} />}
+        {tab === "selecciones" && window.Selecciones && <Selecciones />}
       </main>
 
       {detalle && (
