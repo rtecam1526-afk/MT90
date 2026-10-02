@@ -995,10 +995,14 @@ def extraer_propiedad_de_url(url: str) -> dict:
     out["imagen_url"] = _meta("og:image") or ""
     descripcion = _meta("og:description") or ""
 
-    texto = f"{out['titulo']} {descripcion} {html_txt[:30000]}"
-    mp = re.search(r'(?:USD|U\$S|US\$)\s*([\d][\d.,]{2,12})', texto)
+    # Se busca en la página completa (no solo el principio): en sitios tipo
+    # Zonaprop el precio real vive en el estado preloaded, que aparece recién
+    # después de varios KB de JS — cortar temprano lo dejaba afuera.
+    texto = f"{out['titulo']} {descripcion} {html_txt}"
+    mp = re.search(r'(?:USD|U\$S|US\$)["\s]*([\d][\d.,]{2,12})', texto)
     if mp:
-        out["precio"] = "USD " + mp.group(1)
+        precio_num = mp.group(1).rstrip(".,")
+        out["precio"] = "USD " + precio_num
     mo = re.search(r'(\d+)\s*m[²2]', texto, re.IGNORECASE)
     if mo:
         out["m2"] = int(mo.group(1))
