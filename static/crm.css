@@ -48,6 +48,13 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  /* Red de seguridad: la topbar tiene muchos botones de navegación y en
+     pantallas angostas cualquier elemento que se pase de ancho arrastraba
+     TODA la página hacia el costado (se veía "todo desfazado" en el celular,
+     con vistas enteras corridas fuera de la pantalla). Nada debería necesitar
+     scroll horizontal de la página — lo que necesite desbordar, scrollea
+     adentro suyo (ver .nav más abajo). */
+  overflow-x: hidden;
 }
 
 body {
@@ -1508,4 +1515,49 @@ button {
 .ev-bval {
   font-size: calc(13px * var(--fs-scale)); font-weight: 700;
   color: var(--ink); min-width: 48px; text-align: right;
+}
+
+/* ── TOPBAR MOBILE ─────────────────────────────────────────
+   La topbar tiene ~9 botones de navegación pensados para desktop. En
+   pantallas angostas se reordena en dos filas: marca + acciones arriba,
+   navegación abajo en una tira que scrollea ADENTRO SUYO (no la página
+   entera) — eso es lo que evita el bug de "todo desfazado". También suma
+   el padding de safe-area para cuando el CRM corre instalado como PWA
+   (sin la barra del navegador, el notch/status bar queda expuesto). */
+@media (max-width: 860px) {
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 10px;
+    padding: 12px 14px 10px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  }
+  .topbar-meta { display: none; }
+  .brand .t { display: none; }
+  .topbar-spacer { display: none; }
+  .nav {
+    order: 10;
+    flex-basis: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    justify-content: flex-start;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav button {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: calc(13.5px * var(--fs-scale));
+    white-space: nowrap;
+  }
+  .btn-add span { display: none; }
+  .btn-add { padding: 11px 14px; }
+}
+
+@media (max-width: 480px) {
+  .main { padding-left: 14px; padding-right: 14px; }
+}
+
+.focus-toast {
+  bottom: calc(36px + env(safe-area-inset-bottom, 0px));
 }
