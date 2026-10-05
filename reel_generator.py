@@ -53,8 +53,18 @@ def _duracion_por_foto(n_fotos: int) -> float:
     return max(1.8, min(dur, 4.5))
 
 
-def _run(cmd):
-    r = subprocess.run(cmd, capture_output=True)
+def _run(cmd, timeout=60):
+    # timeout explícito: sin esto, un ffmpeg colgado (CPU débil en el server,
+    # foto corrupta, lo que sea) se comía el límite general del proceso (120s)
+    # y moría TODO el worker de golpe — sin pasar por ningún except nuestro,
+    # el agente veía la página cruda de error de Flask en vez de un mensaje
+    # claro. Con timeout acá, un cuelgue se convierte en un error controlado.
+    try:
+        r = subprocess.run(cmd, capture_output=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("ffmpeg tardó demasiado (posible foto muy pesada o server lento) — probá con menos fotos.")
+    except OSError as e:
+        raise RuntimeError(f"No se pudo ejecutar ffmpeg: {e}")
     if r.returncode != 0:
         raise RuntimeError(f"ffmpeg falló: {r.stderr.decode('utf-8', 'ignore')[-800:]}")
 

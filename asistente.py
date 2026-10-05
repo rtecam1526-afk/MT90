@@ -58,6 +58,22 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "mt90_traccion_secret_2024")
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
+
+@app.errorhandler(Exception)
+def _error_handler_global(e):
+    # Red de seguridad: sin esto, cualquier excepción no prevista en una ruta
+    # (algo que se nos escapó envolver en try/except) le mostraba al agente
+    # la página cruda de Flask ("Internal Server Error", sin pistas) en vez
+    # de un mensaje entendible. No reemplaza arreglar la causa real, pero
+    # evita que una falla puntual se vea como que "se rompió todo el CRM".
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        return e
+    print(f"[ERROR no capturado] {request.method} {request.path}: {e}")
+    if request.path.startswith(("/contactos", "/campanas", "/eventos", "/teamquest", "/selecciones", "/seleccion", "/reel", "/acm", "/chat")):
+        return {"error": "Algo falló de nuestro lado. Probá de nuevo en un momento."}, 500
+    return "Ocurrió un error. Probá de nuevo en un momento.", 500
+
 client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY, max_retries=3)
 
 # Historial en memoria (app local, un solo usuario)
