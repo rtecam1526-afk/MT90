@@ -462,7 +462,6 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
   const [copied, setCopied] = useStateV(false);
   const [saving, setSaving] = useStateV(false);
   const [hitoMsg, setHitoMsg] = useStateV("");
-  const [reelOpen, setReelOpen] = useStateV(false);
   const hecho = !!(done && done[c.id]);
   const urgente = esUrgente(dias);
   const cumpleHoy = esCumpleHoy(c.cumple);
@@ -582,13 +581,6 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
           </div>
 
           <div className="dsection">
-            <div className="dlabel">Marketing <span className="auto">· prototipo</span></div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button className="dmsg-btn" onClick={() => setReelOpen(true)}>🎬 Generar reel de la propiedad</button>
-            </div>
-          </div>
-
-          <div className="dsection">
             <div className="dlabel">Etapa</div>
             <div className="dstage-picker">
               {stageOrder.map((k) => {
@@ -613,7 +605,6 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
           <button onClick={eliminar} style={{background:'transparent',border:'1px solid #fecaca',color:'#dc2626',borderRadius:'11px',padding:'12px 16px',fontWeight:600,fontFamily:'inherit',cursor:'pointer',fontSize:'calc(14px * var(--fs-scale))'}}>Eliminar</button>
         </div>
       </aside>
-      {reelOpen && window.ReelModal && <ReelModal onClose={() => setReelOpen(false)} />}
     </React.Fragment>
   );
 }
