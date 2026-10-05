@@ -25,26 +25,44 @@ import tempfile
 import uuid
 
 import imageio_ffmpeg
+from PIL import Image, ImageDraw, ImageFont
 
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 W, H = 1080, 1920
 FONT_BOLD = os.path.join(os.path.dirname(__file__), "static", "fonts", "DejaVuSans-Bold.ttf")
 
 
-def _escapar_drawtext(texto: str) -> str:
-    """Escapa los caracteres que el parser de filtros de ffmpeg interpreta
-    especial dentro de un valor de drawtext (: ' % \\)."""
-    texto = texto.replace("\\", "\\\\")
-    texto = texto.replace(":", "\\:")
-    texto = texto.replace("%", "\\%")
-    texto = texto.replace("'", "’")  # comilla simple tipográfica, evita romper el filtro
-    return texto
+def _crear_overlay_png(path: str, precio: str, specs: str, pie: str):
+    """Dibuja el precio/specs/firma con Pillow sobre un PNG transparente, que
+    después ffmpeg superpone con el filtro 'overlay'. NO usamos drawtext de
+    ffmpeg: el binario que trae imageio-ffmpeg para Linux (Render) es un build
+    liviano sin libfreetype — drawtext tira 'No such filter' ahí, aunque en
+    Windows (donde se prueba en desarrollo) sí está. overlay es un filtro
+    básico que no depende de freetype, así que es portable entre ambos."""
+    img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
 
+    banda_h = 320
+    for y in range(banda_h):
+        alpha = int(235 * (y / banda_h))
+        draw.line([(0, H - banda_h + y), (W, H - banda_h + y)], fill=(10, 10, 10, alpha))
+    draw.rectangle([0, H - 40, W, H], fill=(10, 10, 10, 235))
 
-def _font_path_ffmpeg(path: str) -> str:
-    """ffmpeg en Windows necesita el ':' de la unidad (C:) escapado dentro
-    del filtro; en Linux no hay ':' en la ruta así que no afecta."""
-    return path.replace("\\", "/").replace(":", "\\:")
+    f_precio = ImageFont.truetype(FONT_BOLD, 76)
+    f_specs = ImageFont.truetype(FONT_BOLD, 40)
+    f_pie = ImageFont.truetype(FONT_BOLD, 28)
+
+    def centrado(texto, font, y):
+        bbox = draw.textbbox((0, 0), texto, font=font)
+        x = (W - (bbox[2] - bbox[0])) / 2 - bbox[0]
+        draw.text((x, y), texto, font=font, fill=(255, 255, 255, 255))
+
+    centrado(precio, f_precio, H - 270)
+    if specs:
+        centrado(specs, f_specs, H - 175)
+    centrado(pie, f_pie, H - 95)
+
+    img.save(path, "PNG")
 
 
 def _duracion_por_foto(n_fotos: int) -> float:
@@ -111,20 +129,17 @@ def generar_reel(fotos_bytes: list, datos: dict) -> bytes:
         concat_path = os.path.join(tmp, "concat.mp4")
         _run([FFMPEG, "-y", "-f", "concat", "-safe", "0", "-i", lista_path, "-c", "copy", concat_path])
 
-        precio = _escapar_drawtext(datos.get("precio") or "Consultar precio")
-        specs = _escapar_drawtext(datos.get("specs") or "")
-        pie = _escapar_drawtext(datos.get("agente_nombre") and f"Preparado por {datos['agente_nombre']} · MT90 Tracción" or "MT90 Tracción")
-        font = _font_path_ffmpeg(FONT_BOLD)
+        precio = datos.get("precio") or "Consultar precio"
+        specs = datos.get("specs") or ""
+        pie = f"Preparado por {datos['agente_nombre']} · MT90 Tracción" if datos.get("agente_nombre") else "MT90 Tracción"
 
-        capas = [f"drawbox=x=0:y=ih-300:w=iw:h=300:color=black@0.48:t=fill"]
-        capas.append(f"drawtext=fontfile='{font}':text='{precio}':fontcolor=white:fontsize=70:x=(w-text_w)/2:y=h-250")
-        if specs:
-            capas.append(f"drawtext=fontfile='{font}':text='{specs}':fontcolor=white:fontsize=38:x=(w-text_w)/2:y=h-155")
-        capas.append(f"drawtext=fontfile='{font}':text='{pie}':fontcolor=white@0.85:fontsize=26:x=(w-text_w)/2:y=h-75")
+        overlay_path = os.path.join(tmp, "overlay.png")
+        _crear_overlay_png(overlay_path, precio, specs, pie)
 
         final_path = os.path.join(tmp, "final.mp4")
         _run([
-            FFMPEG, "-y", "-i", concat_path, "-vf", ",".join(capas),
+            FFMPEG, "-y", "-i", concat_path, "-i", overlay_path,
+            "-filter_complex", "[0:v][1:v]overlay=0:0:format=auto",
             "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", final_path,
         ])
 

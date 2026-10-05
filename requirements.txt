@@ -5,3 +5,4 @@ cloudscraper>=1.2
 requests>=2.31
 python-dotenv>=1.0
 imageio-ffmpeg>=0.6
+Pillow>=10.0
