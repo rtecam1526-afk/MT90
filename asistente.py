@@ -4,7 +4,7 @@ MT90 Tracción — Agente IA
 Asistente de captación para agentes Remax
 """
 
-import os, json, glob, uuid, re, time, datetime
+import os, json, glob, uuid, re, time, datetime, base64
 from functools import wraps
 from dotenv import load_dotenv
 load_dotenv()
@@ -14,6 +14,7 @@ import anthropic
 import requests as _req
 import config_ia as cfg
 import acm_scraper
+import reel_generator
 
 SUPABASE_URL   = os.environ.get("SUPABASE_URL", "").strip()
 SUPABASE_KEY   = os.environ.get("SUPABASE_KEY", "").strip()
@@ -3077,6 +3078,46 @@ def ver_seleccion(token):
 </body>
 </html>"""
     return html
+
+
+@app.route("/reel/generar", methods=["POST"])
+@login_required
+def generar_reel_route():
+    agente_key = session.get("agente_key", "")
+    agente_nombre = obtener_agentes().get(agente_key, {}).get("nombre", agente_key.capitalize())
+    data = request.get_json(silent=True) or {}
+    fotos_b64 = data.get("fotos") or []
+    if not fotos_b64:
+        return {"error": "Necesitás al menos una foto"}, 400
+    if len(fotos_b64) > 8:
+        return {"error": "Máximo 8 fotos por reel"}, 400
+
+    fotos_bytes = []
+    for f in fotos_b64:
+        try:
+            b64data = f.split(",", 1)[1] if "," in f else f
+            fotos_bytes.append(base64.b64decode(b64data))
+        except Exception:
+            return {"error": "No se pudo leer una de las fotos"}, 400
+
+    specs = " · ".join(filter(None, [
+        f"{data['ambientes']} amb" if data.get("ambientes") else None,
+        f"{data['m2']} m²" if data.get("m2") else None,
+        data.get("barrio"),
+    ]))
+
+    try:
+        video_bytes = reel_generator.generar_reel(fotos_bytes, {
+            "precio": (data.get("precio") or "").strip() or "Consultar precio",
+            "specs": specs,
+            "agente_nombre": agente_nombre,
+        })
+    except Exception as e:
+        print(f"[POST /reel/generar] {e}")
+        return {"error": "No se pudo generar el video. Probá de nuevo con menos fotos o fotos más livianas."}, 500
+
+    return Response(video_bytes, mimetype="video/mp4",
+                     headers={"Content-Disposition": 'inline; filename="reel-mt90.mp4"'})
 
 
 @app.route("/seleccion/<token>/item/<int:item_id>/votar", methods=["POST"])
