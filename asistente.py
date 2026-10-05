@@ -3130,7 +3130,10 @@ def generar_reel_route():
         })
     except Exception as e:
         print(f"[POST /reel/generar] {e}")
-        return {"error": "No se pudo generar el video. Probá de nuevo con menos fotos o fotos más livianas."}, 500
+        # TEMPORAL: mostramos el detalle técnico real (no un mensaje genérico)
+        # mientras diagnosticamos el primer fallo en producción sin acceso a
+        # los logs de Render — volver al mensaje genérico una vez resuelto.
+        return {"error": f"No se pudo generar el video — detalle técnico: {e}"}, 500
 
     return Response(video_bytes, mimetype="video/mp4",
                      headers={"Content-Disposition": 'inline; filename="reel-mt90.mp4"'})
