@@ -3,6 +3,51 @@
 // que a su vez leen eventos_comerciales — nada de datos de mentira.
 const { useState: useStateTQ, useEffect: useEffectTQ } = React;
 
+// Confetti liviano, sin librerías — crea unos divs, los anima con CSS y se
+// autodestruye. Se usa para celebrar momentos puntuales (todas las metas del
+// día cumplidas), no para decorar todo — un efecto usado seguido deja de
+// sentirse especial.
+var TQ_CONFETTI_COLORES = ['#E0633A', '#17B892', '#D8922E', '#4C6FFE', '#EF5B96'];
+function dispararConfetti() {
+  var cont = document.createElement('div');
+  cont.className = 'tq-confetti-layer';
+  var n = 26;
+  for (var i = 0; i < n; i++) {
+    var pieza = document.createElement('span');
+    pieza.className = 'tq-confetti-pieza';
+    var left = Math.random() * 100;
+    var delay = Math.random() * 0.25;
+    var dur = 1.6 + Math.random() * 0.9;
+    var color = TQ_CONFETTI_COLORES[i % TQ_CONFETTI_COLORES.length];
+    pieza.style.left = left + '%';
+    pieza.style.background = color;
+    pieza.style.animationDelay = delay + 's';
+    pieza.style.animationDuration = dur + 's';
+    if (Math.random() > 0.5) pieza.style.borderRadius = '50%';
+    cont.appendChild(pieza);
+  }
+  document.body.appendChild(cont);
+  setTimeout(function () { cont.remove(); }, 2700);
+}
+
+// Hook chico: arranca en 0 y pasa al valor real recién después del primer
+// paint, para que la barra se vea "llenar" en vez de aparecer ya completa.
+function useAnimarAlMontar(valorReal, delayMs) {
+  const [mostrado, setMostrado] = useStateTQ(0);
+  useEffectTQ(() => {
+    const t = setTimeout(() => setMostrado(valorReal), delayMs || 80);
+    return () => clearTimeout(t);
+  }, [valorReal]);
+  return mostrado;
+}
+
+// Barra de una meta individual — componente propio porque el hook de arriba
+// no se puede llamar adentro de un .map() (reglas de hooks de React).
+function TQMetaBarFill({ pct }) {
+  const mostrado = useAnimarAlMontar(pct, 150);
+  return <div className="tq-bar-fill" style={{ width: mostrado + '%' }}></div>;
+}
+
 var TQ_TIERS = [
   { level: 1,  icon: 'plain',     name: 'Iniciado' },
   { level: 3,  icon: 'phone',     name: 'Conectado' },
@@ -100,6 +145,12 @@ function TeamQuest({ agenteNombre }) {
   const [oficina, setOficina] = useStateTQ(null);
   const [error, setError] = useStateTQ(null);
   const [sub, setSub] = useStateTQ('perfil');
+  // OJO: este hook tiene que estar ACÁ, antes de los "return" condicionales
+  // de más abajo (mientras carga / si hay error) — React exige que todos los
+  // hooks de un componente se llamen siempre en el mismo orden en cada
+  // render. Ponerlo después de un return condicional ya rompió Campañas una
+  // vez ("Rendered fewer hooks than expected"), no repetir el error acá.
+  const pctHeroAnimado = useAnimarAlMontar(mio ? mio.pct_nivel_actual : 0, 150);
 
   useEffectTQ(() => {
     if (!window.CRM_API) return;
@@ -161,7 +212,7 @@ function TeamQuest({ agenteNombre }) {
               <div className="tq-eyebrow">Nivel {mio.nivel} · {tier.name}</div>
               <h2>{agenteNombre || mio.agente}</h2>
               <div className="tq-bar-row">
-                <div className="tq-bar-track tq-bar-track-hero"><div className="tq-bar-fill tq-bar-fill-hero" style={{ width: mio.pct_nivel_actual + '%' }}></div></div>
+                <div className="tq-bar-track tq-bar-track-hero"><div className="tq-bar-fill tq-bar-fill-hero" style={{ width: pctHeroAnimado + '%' }}></div></div>
                 <span className="tq-pct">{mio.pct_nivel_actual}%</span>
               </div>
               <p className="tq-muted" style={{ marginTop: 4 }}>{mio.xp_total.toLocaleString('es-AR')} XP totales · faltan {(500 - (mio.xp_total % 500))} XP para Nivel {mio.nivel + 1}</p>
@@ -184,7 +235,7 @@ function TeamQuest({ agenteNombre }) {
                     <span className="tq-meta-sub">{m.periodo === 'semanal' ? 'Esta semana' : 'Una vez al día'}</span>
                   </div>
                   <div className="tq-bar-track">
-                    <div className="tq-bar-fill" style={{ width: Math.min(100, (m.progreso / m.objetivo) * 100) + '%' }}></div>
+                    <TQMetaBarFill pct={Math.min(100, (m.progreso / m.objetivo) * 100)} />
                   </div>
                 </div>
                 <span className="tq-meta-frac">{m.progreso}/{m.objetivo}</span>
@@ -374,10 +425,23 @@ function MetasRecordatorio() {
     window.CRM_API.get('/teamquest/resumen').then(setMio).catch(() => {});
   }, []);
 
-  if (!mio) return null;
-  const diarias = (mio.metas || []).filter((m) => m.periodo === 'diario');
-  if (diarias.length === 0) return null;
+  const diarias = (mio && mio.metas || []).filter((m) => m.periodo === 'diario');
   const faltantes = diarias.filter((m) => !m.cumplida);
+  const todoListo = mio && diarias.length > 0 && faltantes.length === 0;
+
+  useEffectTQ(() => {
+    if (!todoListo) return;
+    const hoy = new Date().toISOString().slice(0, 10);
+    const clave = 'mt90_confetti_' + mio.agente + '_' + hoy;
+    try {
+      if (localStorage.getItem(clave)) return;
+      localStorage.setItem(clave, '1');
+    } catch (e) { /* si localStorage falla, igual festejamos esta vez */ }
+    dispararConfetti();
+  }, [todoListo]);
+
+  if (!mio) return null;
+  if (diarias.length === 0) return null;
   const hora = new Date().getHours();
 
   let nivel, icono, texto;

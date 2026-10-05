@@ -215,3 +215,19 @@
   .tq-avatar .tq-body, .tq-avatar .tq-eyes, .tq-avatar .tq-arm-left, .tq-avatar .tq-arm-right,
   .tq-avatar.tq-poke .tq-body, .tq-avatar.tq-poke .tq-mouth, .tq-avatar.tq-poke .tq-arm-right { animation: none !important; }
 }
+
+/* Confetti — festeja "todas las metas de hoy cumplidas", una vez por día */
+.tq-confetti-layer {
+  position: fixed; inset: 0; pointer-events: none; z-index: 200; overflow: hidden;
+}
+.tq-confetti-pieza {
+  position: absolute; top: -5%; width: 9px; height: 14px; opacity: .95;
+  animation-name: tqConfettiFall; animation-timing-function: cubic-bezier(.3,0,.7,1); animation-fill-mode: forwards;
+}
+@keyframes tqConfettiFall {
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(540deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tq-confetti-layer { display: none; }
+}
