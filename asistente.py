@@ -71,7 +71,7 @@ def _error_handler_global(e):
         return e
     print(f"[ERROR no capturado] {request.method} {request.path}: {e}")
     if request.path.startswith(("/contactos", "/campanas", "/eventos", "/teamquest", "/selecciones", "/seleccion", "/reel", "/acm", "/chat")):
-        return {"error": "Algo falló de nuestro lado. Probá de nuevo en un momento."}, 500
+        return {"error": f"DEBUG (global handler): {type(e).__name__}: {e}"}, 500
     return "Ocurrió un error. Probá de nuevo en un momento.", 500
 
 client = anthropic.Anthropic(api_key=cfg.ANTHROPIC_API_KEY, max_retries=3)
@@ -3130,7 +3130,7 @@ def generar_reel_route():
         })
     except Exception as e:
         print(f"[POST /reel/generar] {e}")
-        return {"error": "No se pudo generar el video. Probá de nuevo con menos fotos o fotos más livianas."}, 500
+        return {"error": f"DEBUG detalle técnico: {e}"}, 500
 
     return Response(video_bytes, mimetype="video/mp4",
                      headers={"Content-Disposition": 'inline; filename="reel-mt90.mp4"'})

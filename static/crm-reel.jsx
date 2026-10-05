@@ -100,12 +100,14 @@ function ReelModal({ onClose }) {
         const txt = await r.text();
         let msg = txt;
         try { msg = JSON.parse(txt).error || txt; } catch (e3) {}
-        throw new Error(msg);
+        // DEBUG temporal: si el cuerpo vino vacío o sin "error", mostramos
+        // igual el status HTTP para poder diagnosticar sin acceso a logs.
+        throw new Error((msg && msg.trim()) ? msg : ('HTTP ' + r.status + ' (sin detalle en el cuerpo de la respuesta)'));
       }
       const blob = await r.blob();
       setVideoUrl(URL.createObjectURL(blob));
     } catch (e2) {
-      setError(e2.message || 'No se pudo generar el video. Probá de nuevo.');
+      setError('DEBUG: ' + (e2.message || ('Fallo de red: ' + (e2.name || 'desconocido'))));
     }
     setGenerando(false);
   }
