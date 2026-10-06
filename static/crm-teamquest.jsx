@@ -80,6 +80,29 @@ function tqTierFor(level) {
 function tqHairFor(key) { return TQ_HAIRES[tqHash(key) % TQ_HAIRES.length]; }
 function tqTeamColorFor(key) { return TQ_TEAMCOLORS[tqHash(key) % TQ_TEAMCOLORS.length]; }
 
+// Mismo criterio que el banner de "Hoy" (MetasRecordatorio más abajo), para
+// que el ánimo del avatar y el mensaje del banner cuenten siempre la misma
+// historia — una sola fuente de verdad, no dos lógicas que se puedan
+// desalinear con el tiempo.
+function tqNivelDia(metas) {
+  var diarias = (metas || []).filter((m) => m.periodo === 'diario');
+  if (diarias.length === 0) return { nivel: 'sin-metas', mood: 'neutral', faltantes: [] };
+  var faltantes = diarias.filter((m) => !m.cumplida);
+  var hora = new Date().getHours();
+  if (faltantes.length === 0) return { nivel: 'ok', mood: 'feliz', faltantes: faltantes };
+  if (hora >= 19) return { nivel: 'urgente', mood: 'preocupado', faltantes: faltantes };
+  if (hora >= 13) return { nivel: 'media', mood: 'neutral', faltantes: faltantes };
+  return { nivel: 'calma', mood: 'neutral', faltantes: faltantes };
+}
+
+// Tres variantes de boca — el resto de la cara (ojos, cejas) no cambia, para
+// que siga siendo reconocible como "el mismo" avatar, solo con otro ánimo.
+var TQ_BOCAS = {
+  feliz:      'M35 61 Q50 80 65 61',
+  neutral:    'M38 63 Q50 72 62 63',
+  preocupado: 'M38 65 Q50 58 62 65',
+};
+
 function tqAvatarSVG(level, size, key, opts) {
   opts = opts || {};
   var t = tqTierFor(level);
@@ -88,6 +111,7 @@ function tqAvatarSVG(level, size, key, opts) {
   var skin = '#ffd9ad';
   var ink = '#2A2530';
   var hasBadge = t.icon !== 'plain';
+  var boca = TQ_BOCAS[opts.mood] || TQ_BOCAS.neutral;
   var cls = 'tq-avatar' + (opts.interactive ? ' tq-avatar-live' : '');
   var html = '<svg class="' + cls + '" width="' + size + '" height="' + size + '" viewBox="0 0 100 100">';
   html += '<g class="tq-arm-left"><rect x="11" y="68" width="11" height="24" rx="5.5" fill="' + skin + '"/><circle cx="16.5" cy="92" r="5.5" fill="' + skin + '"/></g>';
@@ -103,7 +127,7 @@ function tqAvatarSVG(level, size, key, opts) {
   html += '<path d="M37 25.5 q4 -2.4 7 -.3" fill="none" stroke="' + ink + '" stroke-width="1.7" stroke-linecap="round"/>';
   html += '<path d="M56 25.2 q4 -2.1 7 .4" fill="none" stroke="' + ink + '" stroke-width="1.7" stroke-linecap="round"/>';
   html += '<g class="tq-eyes"><circle cx="42" cy="31" r="3" fill="' + ink + '"/><circle cx="58" cy="31" r="3" fill="' + ink + '"/></g>';
-  html += '<path class="tq-mouth" d="M38 63 Q50 72 62 63" transform="translate(0,-27)" fill="none" stroke="' + ink + '" stroke-width="2.6" stroke-linecap="round"/>';
+  html += '<path class="tq-mouth" d="' + boca + '" transform="translate(0,-27)" fill="none" stroke="' + ink + '" stroke-width="2.6" stroke-linecap="round"/>';
   html += '</g>';
   if (hasBadge) {
     var sc = 0.42, bx = 78, by = 80;
@@ -207,7 +231,7 @@ function TeamQuest({ agenteNombre }) {
       {sub === 'perfil' && (
         <React.Fragment>
           <div className="tq-card tq-hero">
-            <div className="tq-avatar-slot" dangerouslySetInnerHTML={{ __html: tqAvatarSVG(mio.nivel, 92, mio.agente, { interactive: true }) }} />
+            <div className="tq-avatar-slot" dangerouslySetInnerHTML={{ __html: tqAvatarSVG(mio.nivel, 92, mio.agente, { interactive: true, mood: tqNivelDia(mio.metas).mood }) }} />
             <div className="tq-hero-info">
               <div className="tq-eyebrow">Nivel {mio.nivel} · {tier.name}</div>
               <h2>{agenteNombre || mio.agente}</h2>
@@ -425,9 +449,9 @@ function MetasRecordatorio() {
     window.CRM_API.get('/teamquest/resumen').then(setMio).catch(() => {});
   }, []);
 
+  const { nivel, faltantes } = tqNivelDia(mio && mio.metas);
   const diarias = (mio && mio.metas || []).filter((m) => m.periodo === 'diario');
-  const faltantes = diarias.filter((m) => !m.cumplida);
-  const todoListo = mio && diarias.length > 0 && faltantes.length === 0;
+  const todoListo = mio && diarias.length > 0 && nivel === 'ok';
 
   useEffectTQ(() => {
     if (!todoListo) return;
@@ -442,20 +466,19 @@ function MetasRecordatorio() {
 
   if (!mio) return null;
   if (diarias.length === 0) return null;
-  const hora = new Date().getHours();
 
-  let nivel, icono, texto;
-  if (faltantes.length === 0) {
-    nivel = 'ok'; icono = '✅';
+  let icono, texto;
+  if (nivel === 'ok') {
+    icono = '✅';
     texto = 'Completaste todas tus metas de hoy — gran trabajo.';
-  } else if (hora >= 19) {
-    nivel = 'urgente'; icono = '⏰';
+  } else if (nivel === 'urgente') {
+    icono = '⏰';
     texto = 'El día se termina y todavía te falta: ' + faltantes.map((m) => m.label.toLowerCase()).join(', ') + '.';
-  } else if (hora >= 13) {
-    nivel = 'media'; icono = '🔔';
+  } else if (nivel === 'media') {
+    icono = '🔔';
     texto = 'Vas a mitad de día — te faltan ' + faltantes.length + ' meta' + (faltantes.length === 1 ? '' : 's') + ' de hoy: ' + faltantes.map((m) => m.label.toLowerCase()).join(', ') + '.';
   } else {
-    nivel = 'calma'; icono = '🌱';
+    icono = '🌱';
     texto = 'Buen momento para arrancar con tus metas de hoy: ' + faltantes.map((m) => m.label.toLowerCase()).join(', ') + '.';
   }
 
