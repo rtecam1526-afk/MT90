@@ -2513,7 +2513,7 @@ def get_contactos():
         r = _req.get(
             f"{SUPABASE_URL}/rest/v1/contactos",
             headers={**_supa_hdrs(), "Range-Unit": "items", "Range": f"{offset}-{offset + PAGE - 1}"},
-            params={"agente": f"eq.{agente_key}", "select": "*", "order": "nombre.asc"},
+            params={"agente": f"eq.{agente_key}", "select": "*", "order": "updated_at.desc,nombre.asc"},
             timeout=15,
         )
         if not r.ok:

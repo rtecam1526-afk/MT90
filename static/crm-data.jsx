@@ -139,6 +139,7 @@ window.buildCrmData = function(contacts, done) {
       dias:             diasSinContacto,
       cumple,
       etapa,
+      actualizadoEl:    c.updated_at || c.created_at || null,
       contexto:         [],
       nota:             c.necesidad || c.antecedente || c.proxima_accion || '',
       señales:          [],
@@ -162,6 +163,13 @@ window.buildCrmData = function(contacts, done) {
   }
 
   const byEtapa = k => all.filter(c => c.etapa === k);
+  // Cartera se ordena por actualización más reciente primero (no por
+  // urgencia como "Hoy"/"Mi semana") — así se ve de un vistazo qué se tocó
+  // hace poco, sea quien sea que lo haya actualizado.
+  const byEtapaReciente = k => all
+    .filter(c => c.etapa === k)
+    .slice()
+    .sort((a, b) => new Date(b.actualizadoEl || 0) - new Date(a.actualizadoEl || 0));
 
   const calientes  = byEtapa('caliente');
   const enfriando  = calientes
@@ -209,10 +217,10 @@ window.buildCrmData = function(contacts, done) {
     totalContactos: all.length,
     hoy,
     cartera: {
-      caliente: byEtapa('caliente'),
-      media:    byEtapa('media'),
-      fria:     byEtapa('fria'),
-      sin:      byEtapa('sin'),
+      caliente: byEtapaReciente('caliente'),
+      media:    byEtapaReciente('media'),
+      fria:     byEtapaReciente('fria'),
+      sin:      byEtapaReciente('sin'),
     },
     campanas:     buildCampanas(all, agente),
     carteraQueue,
