@@ -15,6 +15,26 @@ function getMensaje(campana, nombre) {
   return (campana.mensaje || '').replace('NOMBRE', primerNombre(nombre));
 }
 
+// Las fechas automáticas (Día de la Madre/Padre) ya vienen con campana.genero
+// seteado desde buildCampanas. Pero si el agente arma una campaña NUEVA a mano
+// y la titula "Día de la madre" (en vez de usar la que ya viene lista), esa
+// campaña custom no tiene ese campo — se infiere igual por el título, para no
+// depender de que use la automática.
+function inferirGenero(campana) {
+  if (campana.genero) return campana.genero;
+  const t = (campana.titulo || '').toLowerCase();
+  if (/d[ií]a de la madre/.test(t)) return 'mujer';
+  if (/d[ií]a del padre/.test(t)) return 'hombre';
+  return null;
+}
+
+function queuePara(data, campana) {
+  const genero = inferirGenero(campana);
+  return genero === 'mujer' ? data.carteraQueueMujeres
+       : genero === 'hombre' ? data.carteraQueueHombres
+       : data.carteraQueue;
+}
+
 // WhatsApp (wa.me) solo permite precargar texto, nunca una imagen — no existe
 // forma de que una página web la adjunte sola al chat. Por eso la bajamos al
 // dispositivo del agente: queda en Descargas/Galería, lista para adjuntar en
@@ -93,7 +113,7 @@ function Campanas({ data, onWhatsapp }) {
     setNuevaTitulo('');
     setNuevaMensaje('');
     setNuevaImagen(null);
-    setEnviando({ ...guardada, alcance: data.carteraQueue.length });
+    setEnviando({ ...guardada, alcance: queuePara(data, guardada).length });
   }
 
   async function borrarGuardada(id) {
@@ -241,7 +261,7 @@ function Campanas({ data, onWhatsapp }) {
                     <div className="camp-agenda-sub">{g.mensaje}</div>
                   </div>
                   <button className="camp-guardada-edit-btn" onClick={() => empezarEdicion(g)} title="Editar">✏</button>
-                  <button className="camp-agenda-btn" onClick={() => setEnviando({ ...g, alcance: data.carteraQueue.length })}>
+                  <button className="camp-agenda-btn" onClick={() => setEnviando({ ...g, alcance: queuePara(data, g).length })}>
                     Enviar
                   </button>
                   <button className="camp-guardada-del" onClick={() => borrarGuardada(g.id)} title="Eliminar">✕</button>
@@ -306,11 +326,9 @@ function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
   // Fechas de género (Día de la Madre/Padre) usan su propia cola filtrada por
   // nombre — ver pareceMujer/pareceHombre en crm-data.jsx — para no mandarle
   // el saludo a quien no corresponde (hombres, inmobiliarias, direcciones
-  // cargadas como contacto). Las campañas sin género (custom, 9 de julio, etc.)
-  // siguen yendo a la cartera completa.
-  const queue = campana.genero === 'mujer' ? data.carteraQueueMujeres
-              : campana.genero === 'hombre' ? data.carteraQueueHombres
-              : data.carteraQueue;
+  // cargadas como contacto). Se infiere por título también en campañas custom
+  // (ver inferirGenero/queuePara más arriba), no solo en las automáticas.
+  const queue = queuePara(data, campana);
   const total = campana.alcance;
   const [enviados, setEnviados] = useStateC({});
   const [saltados, setSaltados] = useStateC({});
