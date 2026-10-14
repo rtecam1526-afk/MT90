@@ -265,7 +265,10 @@ function Campanas({ data, onWhatsapp }) {
         <div className="camp-feature-foot">
           <div className="camp-reach">
             <Icon.users />
-            <span>A tu cartera completa · <b>{prox.alcance.toLocaleString("es-AR")} contactos</b></span>
+            <span>
+              {prox.genero === 'mujer' ? 'A las mujeres de tu cartera' : prox.genero === 'hombre' ? 'A los hombres de tu cartera' : 'A tu cartera completa'}
+              {' · '}<b>{prox.alcance.toLocaleString("es-AR")} contactos</b>
+            </span>
           </div>
           <button className="camp-start" onClick={() => setEnviando(prox)}>
             Empezar a enviar <Icon.arrow />
@@ -287,7 +290,7 @@ function Campanas({ data, onWhatsapp }) {
                 <div className="camp-agenda-title">{a.titulo}</div>
                 <div className="camp-agenda-sub">En {a.enDias} días</div>
               </div>
-              <button className="camp-agenda-btn" onClick={() => setEnviando({ ...a, alcance: prox.alcance })}>
+              <button className="camp-agenda-btn" onClick={() => setEnviando(a)}>
                 Preparar
               </button>
             </div>
@@ -300,7 +303,14 @@ function Campanas({ data, onWhatsapp }) {
 
 /* ---------- Cola de envío guiada ---------- */
 function ColaEnvio({ data, campana, onWhatsapp, onSalir }) {
-  const queue = data.carteraQueue;
+  // Fechas de género (Día de la Madre/Padre) usan su propia cola filtrada por
+  // nombre — ver pareceMujer/pareceHombre en crm-data.jsx — para no mandarle
+  // el saludo a quien no corresponde (hombres, inmobiliarias, direcciones
+  // cargadas como contacto). Las campañas sin género (custom, 9 de julio, etc.)
+  // siguen yendo a la cartera completa.
+  const queue = campana.genero === 'mujer' ? data.carteraQueueMujeres
+              : campana.genero === 'hombre' ? data.carteraQueueHombres
+              : data.carteraQueue;
   const total = campana.alcance;
   const [enviados, setEnviados] = useStateC({});
   const [saltados, setSaltados] = useStateC({});
