@@ -2533,6 +2533,12 @@ def crear_contacto():
     data = request.get_json()
     if not data:
         return {"error": "No data"}, 400
+    # "Logro rápido": si llega junto con la creación del contacto, se registra
+    # ADEMÁS del contacto_activado de siempre — para cuando a un agente le
+    # llega una captación/operación por fuera del CRM (ej. por teléfono) y
+    # quiere cargar todo en un solo paso, sin tener que buscar el contacto
+    # recién creado para después marcarle el hito.
+    tipo_logro = data.pop("tipo_logro", None)
     data["agente"] = agente_key
     hdrs = {**_supa_hdrs(), "Prefer": "return=representation"}
     try:
@@ -2548,6 +2554,8 @@ def crear_contacto():
         filas = r.json()
         nuevo_id = filas[0]["id"] if filas else None
         _registrar_evento(agente_key, "contacto_activado", nuevo_id)
+        if tipo_logro and tipo_logro in XP_VALUES:
+            _registrar_evento(agente_key, tipo_logro, nuevo_id)
         return {"ok": True}
     except Exception as e:
         print(f"[POST /contactos] {e}")

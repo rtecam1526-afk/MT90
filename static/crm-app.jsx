@@ -57,6 +57,7 @@ function App() {
   const [buscar, setBuscar] = useStateA(false);
   const [menuMas, setMenuMas] = useStateA(false);
   const [ajustes, setAjustes] = useStateA(false);
+  const [logroOpen, setLogroOpen] = useStateA(false);
   const [syncing, setSyncing] = useStateA(false);
   const [lastSync, setLastSync] = useStateA("Cargando…");
   const [revision, setRevision] = useStateA(false);
@@ -228,7 +229,7 @@ function App() {
           <button className={"icon-btn" + (menuMas ? " active" : "") + (syncing ? " spin" : "")} onClick={() => setMenuMas(v => !v)}>
             {syncing ? <Icon.sync /> : <Icon.more />}
           </button>
-          {menuMas && <MenuMas lastSync={lastSync} onSync={doSync} onIA={() => { setTab("agente"); setMenuMas(false); }} onAjustes={() => { setAjustes(true); setMenuMas(false); }} onClose={() => setMenuMas(false)} />}
+          {menuMas && <MenuMas lastSync={lastSync} onSync={doSync} onIA={() => { setTab("agente"); setMenuMas(false); }} onLogro={() => { setLogroOpen(true); setMenuMas(false); }} onAjustes={() => { setAjustes(true); setMenuMas(false); }} onClose={() => setMenuMas(false)} />}
         </div>
         <button className="btn-add" onClick={() => setModal(true)}><Icon.plus /> Contacto</button>
       </header>
@@ -286,6 +287,7 @@ function App() {
       )}
 
       {modal && <NuevoContacto onClose={() => setModal(false)} onSave={saveContact} />}
+      {logroOpen && <LogroRapido onClose={() => setLogroOpen(false)} onSave={async () => { setLogroOpen(false); showToast('✓ Logro registrado'); await loadContacts(); }} />}
       {buscar && <BuscarOverlay data={data} onOpen={openDetalle} onClose={() => setBuscar(false)} />}
       {ajustes && <AjustesModal data={data} onClose={() => setAjustes(false)} />}
       {revision && <RevisionGuiada data={data} onCerrar={() => { setRevision(false); loadContacts(); }} />}

@@ -54,7 +54,7 @@ function BuscarOverlay({ data, onOpen, onClose }) {
 }
 
 /* ---------- Menú "Más" ---------- */
-function MenuMas({ lastSync, onSync, onIA, onAjustes, onClose }) {
+function MenuMas({ lastSync, onSync, onIA, onLogro, onAjustes, onClose }) {
   const ref = useRefE(null);
   useEffectE(() => {
     function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) onClose(); }
@@ -71,6 +71,10 @@ function MenuMas({ lastSync, onSync, onIA, onAjustes, onClose }) {
       <button className="mm-item" onClick={() => { onClose(); onIA(); }}>
         <span className="mm-ic ia"><Icon.spark /></span>
         <span className="mm-tx"><b>Agente IA</b><small>Redacta tus mensajes</small></span>
+      </button>
+      <button className="mm-item" onClick={() => { onClose(); onLogro(); }}>
+        <span className="mm-ic ia">⚡</span>
+        <span className="mm-tx"><b>Registrar logro rápido</b><small>Captación/operación sin cargar el contacto antes</small></span>
       </button>
       <div className="mm-divider"></div>
       <button className="mm-item" onClick={() => { onClose(); onAjustes(); }}>

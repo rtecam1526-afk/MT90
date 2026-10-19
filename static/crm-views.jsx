@@ -450,6 +450,77 @@ function NuevoContacto({ onClose, onSave }) {
 }
 
 /* ============================================================
+   LOGRO RÁPIDO — para cuando una captación/operación llega por
+   fuera del CRM (ej. por teléfono) y el contacto todavía no está
+   cargado. Crea el contacto y registra el hito en un solo paso,
+   sin tener que buscarlo después para marcarle el logro.
+   ============================================================ */
+var LOGRO_TIPOS = [
+  { k: 'llamada',   label: '📞 Llamada' },
+  { k: 'visita',    label: '🚪 Visita' },
+  { k: 'reunion',   label: '📅 Reunión' },
+  { k: 'captacion', label: '🏠 Captación/operación' },
+  { k: 'operacion', label: '💰 Operación grande' },
+];
+
+function LogroRapido({ onClose, onSave }) {
+  const [nombre, setNombre] = useStateV("");
+  const [tel, setTel] = useStateV("");
+  const [tipo, setTipo] = useStateV("captacion");
+  const [saving, setSaving] = useStateV(false);
+
+  async function guardar() {
+    if (!nombre.trim() || saving) return;
+    setSaving(true);
+    try {
+      const digits = tel.replace(/\D/g, '');
+      if (window.CRM_API) {
+        await window.CRM_API.post('/contactos', {
+          nombre: nombre.trim(), cliente: nombre.trim(),
+          telefono: tel.trim(),
+          whatsapp_link: digits ? 'https://wa.me/54' + digits : '',
+          etapa: 'Caliente',
+          tipo_logro: tipo,
+        });
+      }
+      onSave();
+    } catch (e) { alert('No se pudo registrar: ' + e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-kicker">MT90 Tracción</div>
+        <h2>⚡ Registrar logro rápido</h2>
+        <p className="acm-form-lead">Para cuando te llega una captación u operación por fuera del CRM (por teléfono, referido, etc.) — queda registrada igual, sin tener que cargar el contacto primero.</p>
+        <div className="field">
+          <label>¿Con quién?</label>
+          <input autoFocus value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" />
+        </div>
+        <div className="field">
+          <label>Teléfono <span className="opt">· opcional</span></label>
+          <input value={tel} onChange={(e) => setTel(e.target.value)} placeholder="11 5926 7961" />
+        </div>
+        <div className="field">
+          <label>¿Qué pasó?</label>
+          <div className="dstage-picker">
+            {LOGRO_TIPOS.map((t) => (
+              <button type="button" key={t.k} className={"dstage-opt" + (tipo === t.k ? " active" : "")}
+                onClick={() => setTipo(t.k)}>{t.label}</button>
+            ))}
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="save" onClick={guardar} disabled={!nombre.trim() || saving}>{saving ? 'Guardando…' : 'Registrar'}</button>
+          <button className="cancel" onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    DETALLE DE CONTACTO — panel lateral
    Se abre al tocar cualquier tarjeta. Funciona con contactos de
    "Hoy" (datos completos) y de "Cartera" (datos parciales).
@@ -609,5 +680,5 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
   );
 }
 
-Object.assign(window, { HoyLista, HoyEnfoque, InicioAsistente, Cartera, NuevoContacto, PersonCard, ContactoDetalle });
+Object.assign(window, { HoyLista, HoyEnfoque, InicioAsistente, Cartera, NuevoContacto, LogroRapido, PersonCard, ContactoDetalle });
 
