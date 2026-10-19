@@ -491,9 +491,24 @@ def difusion_calculadora():
             "dias_promedio_publicado": zona_top.get("dias_promedio_publicado"),
         },
         "reparto": [
-            {"canal": "Destacar en el portal", "pct": round(pct_portal * 100), "monto": round(presupuesto * pct_portal), "motivo": motivo_portal},
-            {"canal": "Redes sociales (posteo boosteado)", "pct": round(pct_redes * 100), "monto": round(presupuesto * pct_redes),
-             "motivo": "Para llegar a compradores que todavía no están mirando el portal, y a dueños que publican por su cuenta."},
+            {
+                "canal": "Destacar en el portal", "pct": round(pct_portal * 100), "monto": round(presupuesto * pct_portal), "motivo": motivo_portal,
+                "pasos": [
+                    "Entrá a Zonaprop (o MercadoLibre) con tu cuenta de anunciante.",
+                    "Elegí la publicación de esta propiedad → botón \"Destacar\" / \"Mejorar visibilidad\".",
+                    "Confirmá el paquete que te ofrezca el portal en el momento — el costo exacto lo fija el portal, no es algo que podamos calcular nosotros.",
+                ],
+            },
+            {
+                "canal": "Redes sociales (posteo boosteado)", "pct": round(pct_redes * 100), "monto": round(presupuesto * pct_redes),
+                "motivo": "Para llegar a compradores que todavía no están mirando el portal, y a dueños que publican por su cuenta.",
+                "pasos": [
+                    "Desde Instagram o Facebook, abrí el posteo de la propiedad (o generá uno con fotos reales).",
+                    "Tocá \"Promocionar publicación\" → objetivo \"Más mensajes\" o \"Más visitas al perfil\".",
+                    f"Radio de alcance: 5-8 km alrededor de {barrio_tit} — ahí es donde vive tu comprador más probable.",
+                    "Cargá el monto de esta franja como presupuesto de la campaña y confirmá la duración (el costo por clic/alcance lo fija la plataforma en el momento).",
+                ],
+            },
         ],
         "nota_velocidad": nota_velocidad,
         "aviso": "Esto es una guía según la competencia real de tus zonas, no un costo exacto de Meta/Google Ads — esos precios varían día a día, conviene chequearlos al momento de pautar.",

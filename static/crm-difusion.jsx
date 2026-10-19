@@ -121,6 +121,11 @@ function Difusion() {
                 </div>
                 <div className="tq-bar-track"><div className="tq-bar-fill" style={{ width: r.pct + '%' }}></div></div>
                 <p className="dif-reparto-motivo">{r.motivo}</p>
+                {r.pasos && r.pasos.length > 0 && (
+                  <ol className="dif-pasos">
+                    {r.pasos.map((p, j) => <li key={j}>{p}</li>)}
+                  </ol>
+                )}
               </div>
             ))}
             {resultado.nota_velocidad && <div className="mb-banner mb-media" style={{ marginTop: 14 }}><span className="mb-icon">⏱</span><span className="mb-texto">{resultado.nota_velocidad}</span></div>}
