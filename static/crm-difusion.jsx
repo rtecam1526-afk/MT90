@@ -80,7 +80,7 @@ function Difusion() {
                   {z.precio_m2_promedio != null && (
                     <div className="dif-zona-stat">
                       <span className="dif-chip">USD {Math.round(z.precio_m2_promedio).toLocaleString('es-AR')}/m²</span>
-                      <span className="dif-zona-lbl">precio zona</span>
+                      <span className="dif-zona-lbl">precio zona{z.n_comparables_precio ? ` · ${z.n_comparables_precio} publ.` : ''}</span>
                     </div>
                   )}
                 </div>
