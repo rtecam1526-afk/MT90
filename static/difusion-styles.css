@@ -22,6 +22,7 @@
 .dif-calc-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-sm); }
 .dif-calc-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
 .dif-calc-row input { flex: 1; min-width: 160px; }
+.dif-moneda-select { flex: 0 0 auto; width: auto; min-width: 140px; cursor: pointer; }
 
 .dif-resultado { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 16px; }
 .dif-resultado-zona { font-size: 12.5px; color: var(--muted); }

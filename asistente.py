@@ -439,6 +439,7 @@ def difusion_calculadora():
     Meta/Google Ads (eso varía día a día), da una proporción razonada."""
     agente_key = session.get("agente_key", "")
     data = request.get_json(silent=True) or {}
+    moneda = data.get("moneda") if data.get("moneda") in ("ARS", "USD") else "ARS"
     try:
         presupuesto = float(data.get("presupuesto") or 0)
     except (TypeError, ValueError):
@@ -483,6 +484,7 @@ def difusion_calculadora():
 
     return {
         "presupuesto": presupuesto,
+        "moneda": moneda,
         "zona_referencia": {
             "barrio": barrio_tit, "tipo_inmueble": zona_top["tipo_inmueble"],
             "cantidad_activas": zona_top["cantidad_activas"],

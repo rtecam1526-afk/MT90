@@ -13,6 +13,7 @@ function Difusion() {
   const [zonas, setZonas] = useStateD(null);
   const [error, setError] = useStateD(null);
   const [presupuesto, setPresupuesto] = useStateD('');
+  const [moneda, setMoneda] = useStateD('ARS');
   const [calculando, setCalculando] = useStateD(false);
   const [resultado, setResultado] = useStateD(null);
   const [errorCalc, setErrorCalc] = useStateD(null);
@@ -29,7 +30,7 @@ function Difusion() {
     setErrorCalc(null);
     setResultado(null);
     try {
-      const r = await window.CRM_API.post('/difusion/calculadora', { presupuesto: monto });
+      const r = await window.CRM_API.post('/difusion/calculadora', { presupuesto: monto, moneda });
       setResultado(r);
     } catch (e) {
       setErrorCalc(e.message);
@@ -93,8 +94,12 @@ function Difusion() {
       <div className="dif-calc-card">
         <p className="tq-muted" style={{ marginTop: -6 }}>Cargá tu presupuesto del mes y te sugerimos cómo repartirlo, según la competencia real de tu zona con más movimiento.</p>
         <div className="dif-calc-row">
+          <select className="camp-nueva-input dif-moneda-select" value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+            <option value="ARS">$ (pesos)</option>
+            <option value="USD">USD (dólares)</option>
+          </select>
           <input
-            className="camp-nueva-input" type="number" min="0" placeholder="Ej: 20000"
+            className="camp-nueva-input" type="number" min="0" placeholder="Ej: 500000"
             value={presupuesto} onChange={(e) => setPresupuesto(e.target.value)}
           />
           <button className="camp-start" disabled={!presupuesto || calculando} onClick={calcular}>
@@ -112,7 +117,7 @@ function Difusion() {
               <div className="dif-reparto-row" key={i}>
                 <div className="dif-reparto-top">
                   <span className="dif-reparto-canal">{r.canal}</span>
-                  <span className="dif-reparto-monto">{r.pct}% · USD {r.monto.toLocaleString('es-AR')}</span>
+                  <span className="dif-reparto-monto">{r.pct}% · {resultado.moneda === 'ARS' ? '$' : 'USD'} {r.monto.toLocaleString('es-AR')}</span>
                 </div>
                 <div className="tq-bar-track"><div className="tq-bar-fill" style={{ width: r.pct + '%' }}></div></div>
                 <p className="dif-reparto-motivo">{r.motivo}</p>
