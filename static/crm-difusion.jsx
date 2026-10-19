@@ -9,6 +9,26 @@ function nivelColor(nivel) {
   return 'buena';
 }
 
+var TIPO_ICONO = { departamentos: '🏢', casas: '🏠' };
+
+// Antes salía una tarjeta por (barrio, tipo) — con una zona trabajando deptos
+// Y casas, el mismo nombre de barrio aparecía dos veces seguidas y resultaba
+// confuso ("¿por qué está repetido?"). Se agrupa por barrio en UNA tarjeta,
+// con cada tipo como una columna propia adentro, bien marcada con ícono.
+function agruparPorBarrio(zonas) {
+  var porBarrio = {};
+  zonas.forEach(function (z) {
+    var key = z.barrio;
+    if (!porBarrio[key]) porBarrio[key] = { barrio: z.barrio, tipos: {} };
+    porBarrio[key].tipos[z.tipo_inmueble] = z;
+  });
+  return Object.values(porBarrio).sort(function (a, b) {
+    var maxA = Math.max.apply(null, Object.values(a.tipos).map(function (t) { return t.cantidad_activas || 0; }));
+    var maxB = Math.max.apply(null, Object.values(b.tipos).map(function (t) { return t.cantidad_activas || 0; }));
+    return maxB - maxA;
+  });
+}
+
 function Difusion() {
   const [zonas, setZonas] = useStateD(null);
   const [error, setError] = useStateD(null);
@@ -53,40 +73,44 @@ function Difusion() {
       )}
       {zonas && zonas.length > 0 && (
         <div className="dif-zonas-grid">
-          {zonas.map((z) => {
-            const velocidad = z.dias_promedio_publicado == null ? null
-              : z.dias_promedio_publicado <= 45 ? 'rápida' : z.dias_promedio_publicado <= 90 ? 'media' : 'lenta';
-            const velClase = velocidad === 'lenta' ? 'baja' : velocidad === 'media' ? 'media' : 'buena';
-            // Mismos umbrales que _nivel_competencia en asistente.py — calibrados
-            // contra el total REAL de Zonaprop por zona, no lo que se scrapeó.
-            const compClase = z.cantidad_activas >= 1000 ? 'baja' : z.cantidad_activas >= 300 ? 'media' : 'buena';
-            return (
-              <div className="dif-zona-card" key={z.barrio + z.tipo_inmueble}>
-                <div className="dif-zona-top">
-                  <span className="dif-zona-nombre">{(z.barrio || '').replace(/-/g, ' ')}</span>
-                  <span className="dif-zona-tipo">{z.tipo_inmueble}</span>
-                </div>
-                <div className="dif-zona-stats">
-                  <div className="dif-zona-stat">
-                    <span className={'dif-chip dif-chip-' + compClase}>{z.cantidad_activas} activas</span>
-                    <span className="dif-zona-lbl">competencia</span>
-                  </div>
-                  {velocidad && (
-                    <div className="dif-zona-stat">
-                      <span className={'dif-chip dif-chip-' + velClase}>{Math.round(z.dias_promedio_publicado)} días</span>
-                      <span className="dif-zona-lbl">venta {velocidad}</span>
+          {agruparPorBarrio(zonas).map((grupo) => (
+            <div className="dif-zona-card" key={grupo.barrio}>
+              <div className="dif-zona-nombre">{(grupo.barrio || '').replace(/-/g, ' ')}</div>
+              <div className="dif-zona-tipos">
+                {['departamentos', 'casas'].filter((t) => grupo.tipos[t]).map((t) => {
+                  const z = grupo.tipos[t];
+                  const velocidad = z.dias_promedio_publicado == null ? null
+                    : z.dias_promedio_publicado <= 45 ? 'rápida' : z.dias_promedio_publicado <= 90 ? 'media' : 'lenta';
+                  const velClase = velocidad === 'lenta' ? 'baja' : velocidad === 'media' ? 'media' : 'buena';
+                  // Mismos umbrales que _nivel_competencia en asistente.py.
+                  const compClase = z.cantidad_activas >= 1000 ? 'baja' : z.cantidad_activas >= 300 ? 'media' : 'buena';
+                  return (
+                    <div className="dif-zona-col" key={t}>
+                      <div className="dif-zona-tipo-head">{TIPO_ICONO[t] || ''} {t === 'departamentos' ? 'Departamentos' : 'Casas'}</div>
+                      <div className="dif-zona-stats">
+                        <div className="dif-zona-stat">
+                          <span className={'dif-chip dif-chip-' + compClase}>{z.cantidad_activas} activas</span>
+                          <span className="dif-zona-lbl">competencia</span>
+                        </div>
+                        {velocidad && (
+                          <div className="dif-zona-stat">
+                            <span className={'dif-chip dif-chip-' + velClase}>{Math.round(z.dias_promedio_publicado)} días</span>
+                            <span className="dif-zona-lbl">venta {velocidad}</span>
+                          </div>
+                        )}
+                        {z.precio_m2_promedio != null && (
+                          <div className="dif-zona-stat">
+                            <span className="dif-chip">USD {Math.round(z.precio_m2_promedio).toLocaleString('es-AR')}/m²</span>
+                            <span className="dif-zona-lbl">precio{z.n_comparables_precio ? ` · ${z.n_comparables_precio} publ.` : ''}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  {z.precio_m2_promedio != null && (
-                    <div className="dif-zona-stat">
-                      <span className="dif-chip">USD {Math.round(z.precio_m2_promedio).toLocaleString('es-AR')}/m²</span>
-                      <span className="dif-zona-lbl">precio zona{z.n_comparables_precio ? ` · ${z.n_comparables_precio} publ.` : ''}</span>
-                    </div>
-                  )}
-                </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 

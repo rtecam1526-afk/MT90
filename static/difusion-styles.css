@@ -3,17 +3,22 @@
 .dif-head h1 { font-family: var(--font-display); font-size: calc(26px * var(--fs-scale)); margin: 0 0 4px; }
 .dif-section-title h3 { font-family: var(--font-display); font-size: calc(16px * var(--fs-scale)); margin: 0 0 10px; }
 
-.dif-zonas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.dif-zonas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
 .dif-zona-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
   padding: 14px 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 10px;
 }
-.dif-zona-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.dif-zona-nombre { font-weight: 700; font-size: 13.5px; color: var(--ink); text-transform: capitalize; }
-.dif-zona-tipo { font-size: 10.5px; color: var(--muted); text-transform: capitalize; }
+.dif-zona-nombre { font-weight: 700; font-size: 14px; color: var(--ink); text-transform: capitalize; }
+.dif-zona-tipos { display: flex; gap: 14px; }
+.dif-zona-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.dif-zona-tipos:has(.dif-zona-col:only-child) .dif-zona-col { max-width: 50%; }
+.dif-zona-tipo-head {
+  font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .03em;
+  padding-bottom: 6px; border-bottom: 1px solid var(--line);
+}
 .dif-zona-stats { display: flex; flex-direction: column; gap: 6px; }
-.dif-zona-stat { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.dif-zona-lbl { font-size: 10.5px; color: var(--muted-2); }
+.dif-zona-stat { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.dif-zona-lbl { font-size: 10px; color: var(--muted-2); }
 .dif-chip { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); color: var(--ink); }
 .dif-chip-buena { background: #E4F5EE; color: #0d6b53; }
 .dif-chip-media { background: #FCF3E3; color: #8a5a10; }
