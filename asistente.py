@@ -408,9 +408,14 @@ def difusion_zonas():
 
 
 def _nivel_competencia(cantidad):
-    if cantidad >= 40:
+    # Calibrado contra el total REAL que da Zonaprop por zona (no lo que
+    # alcanzamos a scrapear) — ej. Villa Urquiza departamentos ≈2900,
+    # Núñez casas ≈100. Son umbrales iniciales con pocos datos reales
+    # todavía; conviene revisarlos cuando haya más zonas/agentes para
+    # comparar.
+    if cantidad >= 1000:
         return "alta"
-    if cantidad >= 15:
+    if cantidad >= 300:
         return "media"
     return "baja"
 

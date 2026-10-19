@@ -56,7 +56,9 @@ function Difusion() {
             const velocidad = z.dias_promedio_publicado == null ? null
               : z.dias_promedio_publicado <= 45 ? 'rápida' : z.dias_promedio_publicado <= 90 ? 'media' : 'lenta';
             const velClase = velocidad === 'lenta' ? 'baja' : velocidad === 'media' ? 'media' : 'buena';
-            const compClase = z.cantidad_activas >= 40 ? 'baja' : z.cantidad_activas >= 15 ? 'media' : 'buena';
+            // Mismos umbrales que _nivel_competencia en asistente.py — calibrados
+            // contra el total REAL de Zonaprop por zona, no lo que se scrapeó.
+            const compClase = z.cantidad_activas >= 1000 ? 'baja' : z.cantidad_activas >= 300 ? 'media' : 'buena';
             return (
               <div className="dif-zona-card" key={z.barrio + z.tipo_inmueble}>
                 <div className="dif-zona-top">
