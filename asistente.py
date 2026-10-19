@@ -336,6 +336,38 @@ def upload_radar():
     return {"ok": True, "agente": agente, "fecha": hoy, "chars": len(texto)}
 
 
+@app.route("/radar/stats", methods=["POST"])
+def subir_radar_stats():
+    """El Radar sube acá, además del mail de siempre, estadísticas agregadas
+    por zona+tipo (competencia, velocidad de venta) — es la base de datos
+    real detrás del dashboard de difusión/pauta (ver /difusion/*). No
+    reemplaza el mail, es una vía paralela estructurada para poder
+    consultarlas después sin tener que volver a scrapear nada."""
+    data = request.get_json(silent=True) or {}
+    if data.get("token") != RADAR_TOKEN:
+        return {"error": "No autorizado"}, 401
+    agente = data.get("agente", "")
+    filas = data.get("stats") or []
+    if not agente or not filas:
+        return {"error": "Faltan datos"}, 400
+    for f in filas:
+        f["agente"] = agente
+    try:
+        r = _req.post(
+            f"{SUPABASE_URL}/rest/v1/radar_zona_stats",
+            headers={**_supa_hdrs(), "Prefer": "resolution=merge-duplicates,return=minimal"},
+            json=filas,
+            timeout=15,
+        )
+        if not r.ok:
+            print(f"[radar_zona_stats] {r.status_code}: {r.text}")
+            return {"error": r.text}, 500
+    except Exception as e:
+        print(f"[radar_zona_stats] {e}")
+        return {"error": str(e)}, 500
+    return {"ok": True, "filas": len(filas)}
+
+
 _SUPA_INJECT = r"""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
