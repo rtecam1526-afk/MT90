@@ -1,0 +1,33 @@
+/* DIFUSIÓN — usa tokens de crm.css + algunas clases de teamquest (tq-*) */
+.dif-wrap { max-width: 820px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.dif-head h1 { font-family: var(--font-display); font-size: calc(26px * var(--fs-scale)); margin: 0 0 4px; }
+.dif-section-title h3 { font-family: var(--font-display); font-size: calc(16px * var(--fs-scale)); margin: 0 0 10px; }
+
+.dif-zonas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.dif-zona-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 14px 16px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 10px;
+}
+.dif-zona-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.dif-zona-nombre { font-weight: 700; font-size: 13.5px; color: var(--ink); text-transform: capitalize; }
+.dif-zona-tipo { font-size: 10.5px; color: var(--muted); text-transform: capitalize; }
+.dif-zona-stats { display: flex; flex-direction: column; gap: 6px; }
+.dif-zona-stat { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dif-zona-lbl { font-size: 10.5px; color: var(--muted-2); }
+.dif-chip { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); color: var(--ink); }
+.dif-chip-buena { background: #E4F5EE; color: #0d6b53; }
+.dif-chip-media { background: #FCF3E3; color: #8a5a10; }
+.dif-chip-baja  { background: var(--caliente-soft); color: #a83c24; }
+
+.dif-calc-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow-sm); }
+.dif-calc-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.dif-calc-row input { flex: 1; min-width: 160px; }
+
+.dif-resultado { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 16px; }
+.dif-resultado-zona { font-size: 12.5px; color: var(--muted); }
+.dif-reparto-row { display: flex; flex-direction: column; gap: 6px; }
+.dif-reparto-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.dif-reparto-canal { font-weight: 700; font-size: 13.5px; color: var(--ink); }
+.dif-reparto-monto { font-family: var(--font-display); font-size: 13px; color: var(--primary); font-weight: 700; flex-shrink: 0; }
+.dif-reparto-motivo { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0; }
+.dif-aviso { font-size: 11px; color: var(--muted-2); line-height: 1.5; margin: 4px 0 0; font-style: italic; }

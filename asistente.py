@@ -368,6 +368,131 @@ def subir_radar_stats():
     return {"ok": True, "filas": len(filas)}
 
 
+def _ultima_fila_por_zona(filas):
+    """De una lista de radar_zona_stats ordenada por fecha desc, se queda
+    con la más reciente por (barrio, tipo_inmueble)."""
+    vistos = set()
+    zonas = []
+    for f in filas:
+        clave = (f["barrio"], f["tipo_inmueble"])
+        if clave in vistos:
+            continue
+        vistos.add(clave)
+        zonas.append(f)
+    return zonas
+
+
+@app.route("/difusion/zonas", methods=["GET"])
+@login_required
+def difusion_zonas():
+    """Dashboard de competencia/velocidad por zona — datos reales del Radar
+    de este agente, no estimaciones. Base para decidir dónde conviene
+    invertir en difusión y dónde no hace falta."""
+    agente_key = session.get("agente_key", "")
+    try:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/radar_zona_stats",
+            headers=_supa_hdrs(),
+            params={"agente": f"eq.{agente_key}", "select": "*", "order": "fecha.desc"},
+            timeout=15,
+        )
+        if not r.ok:
+            return {"error": r.text}, 500
+        filas = r.json()
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+    zonas = _ultima_fila_por_zona(filas)
+    zonas.sort(key=lambda z: z.get("cantidad_activas") or 0, reverse=True)
+    return {"zonas": zonas, "actualizado": zonas[0]["fecha"] if zonas else None}
+
+
+def _nivel_competencia(cantidad):
+    if cantidad >= 40:
+        return "alta"
+    if cantidad >= 15:
+        return "media"
+    return "baja"
+
+
+def _nivel_velocidad(dias):
+    if dias is None:
+        return "sin_datos"
+    if dias <= 45:
+        return "rapida"
+    if dias <= 90:
+        return "media"
+    return "lenta"
+
+
+@app.route("/difusion/calculadora", methods=["POST"])
+@login_required
+def difusion_calculadora():
+    """Reparte un presupuesto de difusión según la competencia REAL de la
+    zona donde más oportunidades tiene el agente — no inventa costos de
+    Meta/Google Ads (eso varía día a día), da una proporción razonada."""
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    try:
+        presupuesto = float(data.get("presupuesto") or 0)
+    except (TypeError, ValueError):
+        return {"error": "Presupuesto inválido"}, 400
+    if presupuesto <= 0:
+        return {"error": "Ingresá un presupuesto mayor a 0"}, 400
+
+    try:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/radar_zona_stats",
+            headers=_supa_hdrs(),
+            params={"agente": f"eq.{agente_key}", "select": "*", "order": "fecha.desc"},
+            timeout=15,
+        )
+        filas = r.json() if r.ok else []
+    except Exception:
+        filas = []
+
+    zonas = _ultima_fila_por_zona(filas)
+    if not zonas:
+        return {"error": "Todavía no hay datos de competencia de tus zonas — corré el Radar al menos una vez."}, 400
+
+    zona_top = max(zonas, key=lambda z: z.get("cantidad_activas") or 0)
+    competencia = _nivel_competencia(zona_top.get("cantidad_activas") or 0)
+    velocidad = _nivel_velocidad(zona_top.get("dias_promedio_publicado"))
+    barrio_tit = zona_top["barrio"].replace("-", " ").title()
+
+    if competencia == "alta":
+        pct_portal, pct_redes = 0.65, 0.35
+        motivo_portal = f"{barrio_tit} tiene {zona_top['cantidad_activas']} propiedades activas compitiendo — destacar en el portal es lo que más te saca de ese montón."
+    elif competencia == "media":
+        pct_portal, pct_redes = 0.5, 0.5
+        motivo_portal = f"Competencia media en {barrio_tit} ({zona_top['cantidad_activas']} activas) — vale la pena repartir entre destacar y redes."
+    else:
+        pct_portal, pct_redes = 0.35, 0.65
+        motivo_portal = f"Poca competencia en {barrio_tit} ({zona_top['cantidad_activas']} activas) — no hace falta pelear visibilidad en el portal, conviene invertir más en redes para generar demanda nueva."
+
+    nota_velocidad = None
+    if velocidad == "lenta":
+        dias = zona_top.get("dias_promedio_publicado") or 0
+        nota_velocidad = f"Las propiedades en {barrio_tit} tardan en promedio {dias:.0f} días en venderse — antes de sumar más presupuesto a difusión, vale la pena revisar si el precio está en línea con el mercado (ver ACM)."
+
+    return {
+        "presupuesto": presupuesto,
+        "zona_referencia": {
+            "barrio": barrio_tit, "tipo_inmueble": zona_top["tipo_inmueble"],
+            "cantidad_activas": zona_top["cantidad_activas"],
+            "dias_promedio_publicado": zona_top.get("dias_promedio_publicado"),
+        },
+        "reparto": [
+            {"canal": "Destacar en el portal", "pct": round(pct_portal * 100), "monto": round(presupuesto * pct_portal), "motivo": motivo_portal},
+            {"canal": "Redes sociales (posteo boosteado)", "pct": round(pct_redes * 100), "monto": round(presupuesto * pct_redes),
+             "motivo": "Para llegar a compradores que todavía no están mirando el portal, y a dueños que publican por su cuenta."},
+        ],
+        "nota_velocidad": nota_velocidad,
+        "aviso": "Esto es una guía según la competencia real de tus zonas, no un costo exacto de Meta/Google Ads — esos precios varían día a día, conviene chequearlos al momento de pautar.",
+        "zonas_disponibles": len(zonas),
+    }
+
+
 _SUPA_INJECT = r"""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
