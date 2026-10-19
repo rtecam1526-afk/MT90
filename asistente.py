@@ -356,6 +356,7 @@ def subir_radar_stats():
         r = _req.post(
             f"{SUPABASE_URL}/rest/v1/radar_zona_stats",
             headers={**_supa_hdrs(), "Prefer": "resolution=merge-duplicates,return=minimal"},
+            params={"on_conflict": "agente,barrio,tipo_inmueble,fecha"},
             json=filas,
             timeout=15,
         )
