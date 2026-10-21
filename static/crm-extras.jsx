@@ -54,7 +54,7 @@ function BuscarOverlay({ data, onOpen, onClose }) {
 }
 
 /* ---------- Menú "Más" ---------- */
-function MenuMas({ lastSync, onSync, onIA, onLogro, onAjustes, onClose }) {
+function MenuMas({ lastSync, onSync, onIA, onLogro, onSemaforo, onEvolucion, onAjustes, onClose }) {
   const ref = useRefE(null);
   useEffectE(() => {
     function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) onClose(); }
@@ -75,6 +75,14 @@ function MenuMas({ lastSync, onSync, onIA, onLogro, onAjustes, onClose }) {
       <button className="mm-item" onClick={() => { onClose(); onLogro(); }}>
         <span className="mm-ic ia">⚡</span>
         <span className="mm-tx"><b>Registrar logro rápido</b><small>Captación/operación sin cargar el contacto antes</small></span>
+      </button>
+      <button className="mm-item" onClick={() => { onClose(); onSemaforo(); }}>
+        <span className="mm-ic">🚦</span>
+        <span className="mm-tx"><b>Semáforo</b><small>Estado de tu cartera</small></span>
+      </button>
+      <button className="mm-item" onClick={() => { onClose(); onEvolucion(); }}>
+        <span className="mm-ic">📈</span>
+        <span className="mm-tx"><b>Mi evolución</b><small>Métricas de tu cartera</small></span>
       </button>
       <div className="mm-divider"></div>
       <button className="mm-item" onClick={() => { onClose(); onAjustes(); }}>
