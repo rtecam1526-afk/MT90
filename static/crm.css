@@ -130,16 +130,25 @@ button {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  /* Degradado en el borde derecho — pista visual de "hay más, arrastrá" para
+     cuando ni achicando las pestañas entran todas. Queda sutil aunque no
+     haga falta scrollear (no sabemos eso solo con CSS), por eso es chico. */
+  mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent 100%);
 }
 .nav::-webkit-scrollbar { display: none; }
 .nav button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 18px;
+  gap: 6px;
+  /* Achicado: con 9 pestañas, el tamaño viejo (9px 18px / 15px) obligaba a
+     scrollear casi siempre, y como el scroll no tenía ninguna pista visual,
+     "Difusión" y "Cliente vota" quedaban invisibles sin que nadie supiera
+     que había que arrastrar. Más compacto = entran más sin scrollear. */
+  padding: 8px 13px;
   border-radius: 999px;
   font-weight: 600;
-  font-size: calc(15px * var(--fs-scale));
+  font-size: calc(13.5px * var(--fs-scale));
   color: var(--muted);
   transition: all .16s ease;
   flex-shrink: 0;
