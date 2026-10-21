@@ -98,6 +98,7 @@ button {
   align-items: baseline;
   gap: 8px;
   font-family: var(--font-display);
+  flex-shrink: 0;
 }
 .brand .m {
   font-weight: 800;
@@ -119,7 +120,18 @@ button {
   background: var(--surface-2);
   padding: 5px;
   border-radius: 999px;
+  /* Con 9 pestañas, ya no entran enteras ni en pantallas de compu normales
+     — sin esto, el navegador no achicaba el .nav (el mínimo de flexbox es
+     el contenido completo por default) y en cambio empujaba "+ Contacto" y
+     el menú "···" fuera de la vista, invisibles sin que nadie lo notara.
+     Ahora el .nav es lo único que cede: scrollea adentro suyo, el resto de
+     la topbar (buscar, "···", "+ Contacto") queda siempre visible. */
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.nav::-webkit-scrollbar { display: none; }
 .nav button {
   display: flex;
   align-items: center;
@@ -130,6 +142,8 @@ button {
   font-size: calc(15px * var(--fs-scale));
   color: var(--muted);
   transition: all .16s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .nav button:hover { color: var(--ink); }
 .nav button.active {
@@ -154,6 +168,7 @@ button {
   font-weight: 700;
   font-size: calc(15px * var(--fs-scale));
   transition: transform .12s ease, filter .16s ease;
+  flex-shrink: 0;
 }
 .btn-add:hover { filter: brightness(1.12); transform: translateY(-1px); }
 .btn-add:active { transform: translateY(0); }
@@ -162,6 +177,8 @@ button {
   font-size: calc(13px * var(--fs-scale));
   color: var(--muted-2);
   font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* ---------- Topbar icon buttons + Más menu ---------- */
@@ -174,13 +191,14 @@ button {
   font-size: 19px;
   transition: background .15s ease, color .15s ease;
   position: relative;
+  flex-shrink: 0;
 }
 .icon-btn:hover { background: var(--line); color: var(--ink); }
 .icon-btn.active { background: var(--ink); color: #fff; }
 .icon-btn.spin .icon { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.mas-wrap { position: relative; }
+.mas-wrap { position: relative; flex-shrink: 0; }
 .menu-mas {
   position: absolute;
   top: calc(100% + 10px);
@@ -806,6 +824,7 @@ button {
   padding: 8px 16px; border-radius: 999px;
   font-weight: 700; font-size: calc(13.5px * var(--fs-scale));
   white-space: nowrap; transition: filter .14s ease;
+  flex-shrink: 0;
 }
 .btn-recorrer:hover { filter: brightness(1.07); }
 .btn-recorrer .icon { width: 15px; height: 15px; }
@@ -1535,20 +1554,16 @@ button {
   .brand .t { display: none; }
   .topbar-spacer { display: none; }
   .nav {
+    /* el overflow-x/scroll ya es base (ver más arriba) — acá solo hace
+       falta que pase a ocupar su propia fila completa */
     order: 10;
     flex-basis: 100%;
     max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
     justify-content: flex-start;
   }
-  .nav::-webkit-scrollbar { display: none; }
   .nav button {
-    flex-shrink: 0;
     padding: 8px 14px;
     font-size: calc(13.5px * var(--fs-scale));
-    white-space: nowrap;
   }
   .btn-add span { display: none; }
   .btn-add { padding: 11px 14px; }
