@@ -34,13 +34,21 @@ function Difusion() {
   const [error, setError] = useStateD(null);
   const [presupuesto, setPresupuesto] = useStateD('');
   const [moneda, setMoneda] = useStateD('ARS');
+  const [zonaSel, setZonaSel] = useStateD('');
   const [calculando, setCalculando] = useStateD(false);
   const [resultado, setResultado] = useStateD(null);
   const [errorCalc, setErrorCalc] = useStateD(null);
 
   useEffectD(() => {
     if (!window.CRM_API) return;
-    window.CRM_API.get('/difusion/zonas').then((r) => setZonas(r.zonas || [])).catch((e) => setError(e.message));
+    window.CRM_API.get('/difusion/zonas').then((r) => {
+      const zs = r.zonas || [];
+      setZonas(zs);
+      if (zs.length > 0) {
+        const top = zs.slice().sort((a, b) => (b.cantidad_activas || 0) - (a.cantidad_activas || 0))[0];
+        setZonaSel(top.barrio + '|' + top.tipo_inmueble);
+      }
+    }).catch((e) => setError(e.message));
   }, []);
 
   async function calcular() {
@@ -50,7 +58,8 @@ function Difusion() {
     setErrorCalc(null);
     setResultado(null);
     try {
-      const r = await window.CRM_API.post('/difusion/calculadora', { presupuesto: monto, moneda });
+      const [barrio, tipo_inmueble] = zonaSel.split('|');
+      const r = await window.CRM_API.post('/difusion/calculadora', { presupuesto: monto, moneda, barrio, tipo_inmueble });
       setResultado(r);
     } catch (e) {
       setErrorCalc(e.message);
@@ -116,7 +125,23 @@ function Difusion() {
 
       <div className="dif-section-title" style={{ marginTop: 28 }}><h3>¿Cuánto invertir en difusión?</h3></div>
       <div className="dif-calc-card">
-        <p className="tq-muted" style={{ marginTop: -6 }}>Cargá tu presupuesto del mes y te sugerimos cómo repartirlo, según la competencia real de tu zona con más movimiento.</p>
+        <p className="tq-muted" style={{ marginTop: -6 }}>Elegí para cuál de tus zonas es el presupuesto y te sugerimos cómo repartirlo, según la competencia real de esa zona.</p>
+        {zonas && zonas.length > 0 && (
+          <div className="dif-calc-row" style={{ marginBottom: 10 }}>
+            <select className="camp-nueva-input dif-zona-select" value={zonaSel} onChange={(e) => setZonaSel(e.target.value)} style={{ flex: '1 1 100%' }}>
+              {agruparPorBarrio(zonas).map((grupo) => (
+                ['departamentos', 'casas'].filter((t) => grupo.tipos[t]).map((t) => {
+                  const z = grupo.tipos[t];
+                  return (
+                    <option key={grupo.barrio + '|' + t} value={grupo.barrio + '|' + t}>
+                      {(grupo.barrio || '').replace(/-/g, ' ')} — {t === 'departamentos' ? 'Departamentos' : 'Casas'} ({z.cantidad_activas} activas)
+                    </option>
+                  );
+                })
+              ))}
+            </select>
+          </div>
+        )}
         <div className="dif-calc-row">
           <select className="camp-nueva-input dif-moneda-select" value={moneda} onChange={(e) => setMoneda(e.target.value)}>
             <option value="ARS">$ (pesos)</option>
@@ -135,7 +160,7 @@ function Difusion() {
         {resultado && (
           <div className="dif-resultado">
             <div className="dif-resultado-zona">
-              Basado en <b>{resultado.zona_referencia.barrio}</b> ({resultado.zona_referencia.tipo_inmueble}) — tu zona con más actividad.
+              Para <b>{resultado.zona_referencia.barrio}</b> ({resultado.zona_referencia.tipo_inmueble}).
             </div>
             {resultado.reparto.map((r, i) => (
               <div className="dif-reparto-row" key={i}>

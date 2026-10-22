@@ -440,6 +440,8 @@ def difusion_calculadora():
     agente_key = session.get("agente_key", "")
     data = request.get_json(silent=True) or {}
     moneda = data.get("moneda") if data.get("moneda") in ("ARS", "USD") else "ARS"
+    barrio_elegido = (data.get("barrio") or "").strip()
+    tipo_elegido = (data.get("tipo_inmueble") or "").strip()
     try:
         presupuesto = float(data.get("presupuesto") or 0)
     except (TypeError, ValueError):
@@ -462,7 +464,18 @@ def difusion_calculadora():
     if not zonas:
         return {"error": "Todavía no hay datos de competencia de tus zonas — corré el Radar al menos una vez."}, 400
 
-    zona_top = max(zonas, key=lambda z: z.get("cantidad_activas") or 0)
+    # El agente elige a qué zona suya aplicar el presupuesto — antes se
+    # elegía sola "la de más actividad", lo que confundía (siempre daba la
+    # misma zona sin que quede claro por qué, y no dejaba calcular para la
+    # zona donde el agente realmente tiene una propiedad para promocionar).
+    zona_top = None
+    if barrio_elegido and tipo_elegido:
+        for z in zonas:
+            if z.get("barrio") == barrio_elegido and z.get("tipo_inmueble") == tipo_elegido:
+                zona_top = z
+                break
+    if zona_top is None:
+        zona_top = max(zonas, key=lambda z: z.get("cantidad_activas") or 0)
     competencia = _nivel_competencia(zona_top.get("cantidad_activas") or 0)
     velocidad = _nivel_velocidad(zona_top.get("dias_promedio_publicado"))
     barrio_tit = zona_top["barrio"].replace("-", " ").title()
