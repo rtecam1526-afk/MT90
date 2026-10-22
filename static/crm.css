@@ -85,8 +85,8 @@ button {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 16px 28px;
+  gap: 14px;
+  padding: 16px 20px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   position: sticky;
@@ -116,9 +116,9 @@ button {
 
 .nav {
   display: flex;
-  gap: 6px;
+  gap: 2px;
   background: var(--surface-2);
-  padding: 5px;
+  padding: 4px;
   border-radius: 999px;
   /* Con 9 pestañas, ya no entran enteras ni en pantallas de compu normales
      — sin esto, el navegador no achicaba el .nav (el mínimo de flexbox es
@@ -145,10 +145,10 @@ button {
      scrollear casi siempre, y como el scroll no tenía ninguna pista visual,
      "Difusión" y "Cliente vota" quedaban invisibles sin que nadie supiera
      que había que arrastrar. Más compacto = entran más sin scrollear. */
-  padding: 8px 13px;
+  padding: 7px 10px;
   border-radius: 999px;
   font-weight: 600;
-  font-size: calc(13.5px * var(--fs-scale));
+  font-size: calc(12.5px * var(--fs-scale));
   color: var(--muted);
   transition: all .16s ease;
   flex-shrink: 0;
@@ -183,7 +183,7 @@ button {
 .btn-add:active { transform: translateY(0); }
 
 .topbar-meta {
-  font-size: calc(13px * var(--fs-scale));
+  font-size: calc(11.5px * var(--fs-scale));
   color: var(--muted-2);
   font-weight: 500;
   flex-shrink: 0;
