@@ -482,13 +482,34 @@ def difusion_calculadora():
 
     if competencia == "alta":
         pct_portal, pct_redes = 0.65, 0.35
-        motivo_portal = f"{barrio_tit} tiene {zona_top['cantidad_activas']} propiedades activas compitiendo — destacar en el portal es lo que más te saca de ese montón."
+        motivo_portal = f"{barrio_tit} tiene {zona_top['cantidad_activas']} propiedades activas compitiendo — con tanta oferta, probá primero destacar para no quedar tapado."
     elif competencia == "media":
         pct_portal, pct_redes = 0.5, 0.5
         motivo_portal = f"Competencia media en {barrio_tit} ({zona_top['cantidad_activas']} activas) — vale la pena repartir entre destacar y redes."
     else:
         pct_portal, pct_redes = 0.35, 0.65
         motivo_portal = f"Poca competencia en {barrio_tit} ({zona_top['cantidad_activas']} activas) — no hace falta pelear visibilidad en el portal, conviene invertir más en redes para generar demanda nueva."
+
+    # Evidencia propia (ver /difusion/destaques): si ya hay suficientes
+    # respuestas de este agente sobre si destacar le sirvió, se la mostramos
+    # tal cual en vez de dejar el motivo de arriba como si fuera un hecho
+    # comprobado — es una sugerencia según la competencia, la evidencia real
+    # (si la hay) manda.
+    evidencia_destacado = None
+    try:
+        rd = _req.get(
+            f"{SUPABASE_URL}/rest/v1/destaques_feedback",
+            headers=_supa_hdrs(),
+            params={"agente": f"eq.{agente_key}", "funciono": "not.is.null", "select": "funciono"},
+            timeout=10,
+        )
+        respondidos = rd.json() if rd.ok else []
+    except Exception:
+        respondidos = []
+    if len(respondidos) >= 3:
+        funciono_si = sum(1 for f in respondidos if f.get("funciono") is True)
+        pct_si = round(100 * funciono_si / len(respondidos))
+        evidencia_destacado = f"De tus últimos {len(respondidos)} destacados que respondiste, {funciono_si} te generaron más consultas ({pct_si}%) — guiate más por esto que por la competencia de la zona."
 
     nota_velocidad = None
     if velocidad == "lenta":
@@ -503,6 +524,7 @@ def difusion_calculadora():
             "cantidad_activas": zona_top["cantidad_activas"],
             "dias_promedio_publicado": zona_top.get("dias_promedio_publicado"),
         },
+        "evidencia_destacado": evidencia_destacado,
         "reparto": [
             {
                 "canal": "Destacar en el portal", "pct": round(pct_portal * 100), "monto": round(presupuesto * pct_portal), "motivo": motivo_portal,
@@ -527,6 +549,96 @@ def difusion_calculadora():
         "aviso": "Esto es una guía según la competencia real de tus zonas, no un costo exacto de Meta/Google Ads — esos precios varían día a día, conviene chequearlos al momento de pautar.",
         "zonas_disponibles": len(zonas),
     }
+
+
+# ── Tracking real de "¿destacar sirvió?" ────────────────────────────────
+# Varios agentes dijeron (sin un argumento concreto) que destacar en el
+# portal "no siempre se justifica". En vez de ajustar el reparto de la
+# calculadora a ciegas por un comentario suelto, se junta evidencia propia
+# de MT90: el agente marca cuándo destacó algo, a los pocos días el CRM le
+# pregunta si le sirvió, y esa respuesta queda guardada. Con eso, en unas
+# semanas hay data real (no una sensación) para saber si vale la pena.
+DIAS_ESPERA_FEEDBACK_DESTAQUE = 5
+
+
+@app.route("/difusion/destaque", methods=["POST"])
+@login_required
+def difusion_registrar_destaque():
+    """El agente marca que acaba de destacar una propiedad en el portal,
+    para una zona/tipo puntual. Sin respuesta todavía (se pide a los
+    pocos días, ver /difusion/destaques)."""
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    barrio = (data.get("barrio") or "").strip()
+    tipo_inmueble = (data.get("tipo_inmueble") or "").strip()
+    if not barrio or not tipo_inmueble:
+        return {"error": "Falta barrio o tipo_inmueble"}, 400
+    try:
+        r = _req.post(
+            f"{SUPABASE_URL}/rest/v1/destaques_feedback",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+            json={"agente": agente_key, "barrio": barrio, "tipo_inmueble": tipo_inmueble},
+            timeout=10,
+        )
+        if not r.ok:
+            return {"error": r.text}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
+    return {"ok": True}
+
+
+@app.route("/difusion/destaques", methods=["GET"])
+@login_required
+def difusion_destaques():
+    """Pendientes de responder (destacados de hace >= N días sin feedback
+    todavía) + estadística propia del agente para mostrar en la calculadora."""
+    agente_key = session.get("agente_key", "")
+    try:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/destaques_feedback",
+            headers=_supa_hdrs(),
+            params={"agente": f"eq.{agente_key}", "select": "*", "order": "created_at.desc", "limit": "200"},
+            timeout=15,
+        )
+        filas = r.json() if r.ok else []
+    except Exception:
+        filas = []
+
+    corte = (datetime.datetime.now() - datetime.timedelta(days=DIAS_ESPERA_FEEDBACK_DESTAQUE)).isoformat()
+    pendientes = [
+        f for f in filas
+        if f.get("funciono") is None and f.get("created_at") and f["created_at"] <= corte
+    ]
+    respondidos = [f for f in filas if f.get("funciono") is not None]
+    funciono_si = sum(1 for f in respondidos if f.get("funciono") is True)
+
+    return {
+        "pendientes": pendientes[:5],
+        "stats": {"total_respondidos": len(respondidos), "funciono_si": funciono_si},
+    }
+
+
+@app.route("/difusion/destaque/<int:destaque_id>/feedback", methods=["POST"])
+@login_required
+def difusion_destaque_feedback(destaque_id):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    funciono = data.get("funciono")
+    if not isinstance(funciono, bool):
+        return {"error": "Falta funciono (true/false)"}, 400
+    try:
+        r = _req.patch(
+            f"{SUPABASE_URL}/rest/v1/destaques_feedback",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+            params={"id": f"eq.{destaque_id}", "agente": f"eq.{agente_key}"},
+            json={"funciono": funciono, "fecha_respuesta": datetime.datetime.now().isoformat()},
+            timeout=10,
+        )
+        if not r.ok:
+            return {"error": r.text}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
+    return {"ok": True}
 
 
 _SUPA_INJECT = r"""

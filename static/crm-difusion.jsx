@@ -38,6 +38,14 @@ function Difusion() {
   const [calculando, setCalculando] = useStateD(false);
   const [resultado, setResultado] = useStateD(null);
   const [errorCalc, setErrorCalc] = useStateD(null);
+  const [pendientesDestaque, setPendientesDestaque] = useStateD([]);
+  const [marcandoDestaque, setMarcandoDestaque] = useStateD(false);
+  const [destaqueMarcado, setDestaqueMarcado] = useStateD(false);
+
+  function cargarDestaques() {
+    if (!window.CRM_API) return;
+    window.CRM_API.get('/difusion/destaques').then((r) => setPendientesDestaque(r.pendientes || [])).catch(() => {});
+  }
 
   useEffectD(() => {
     if (!window.CRM_API) return;
@@ -49,7 +57,28 @@ function Difusion() {
         setZonaSel(top.barrio + '|' + top.tipo_inmueble);
       }
     }).catch((e) => setError(e.message));
+    cargarDestaques();
   }, []);
+
+  async function responderDestaque(id, funciono) {
+    try {
+      await window.CRM_API.post(`/difusion/destaque/${id}/feedback`, { funciono });
+      setPendientesDestaque((prev) => prev.filter((p) => p.id !== id));
+    } catch (e) {}
+  }
+
+  async function marcarDestaque() {
+    if (!resultado) return;
+    setMarcandoDestaque(true);
+    try {
+      await window.CRM_API.post('/difusion/destaque', {
+        barrio: resultado.zona_referencia.barrio,
+        tipo_inmueble: resultado.zona_referencia.tipo_inmueble,
+      });
+      setDestaqueMarcado(true);
+    } catch (e) {}
+    setMarcandoDestaque(false);
+  }
 
   async function calcular() {
     const monto = parseFloat(presupuesto);
@@ -57,6 +86,7 @@ function Difusion() {
     setCalculando(true);
     setErrorCalc(null);
     setResultado(null);
+    setDestaqueMarcado(false);
     try {
       const [barrio, tipo_inmueble] = zonaSel.split('|');
       const r = await window.CRM_API.post('/difusion/calculadora', { presupuesto: monto, moneda, barrio, tipo_inmueble });
@@ -73,6 +103,23 @@ function Difusion() {
         <h1>Difusión</h1>
         <p className="tq-muted">Competencia real de tus zonas (sacada del Radar) y dónde conviene poner tu presupuesto de pauta.</p>
       </div>
+
+      {pendientesDestaque.length > 0 && (
+        <div className="dif-destaque-pendientes">
+          {pendientesDestaque.map((p) => (
+            <div className="mb-banner mb-media" key={p.id}>
+              <span className="mb-icon">🤔</span>
+              <span className="mb-texto">
+                Hace unos días marcaste que destacaste en <b>{(p.barrio || '').replace(/-/g, ' ')}</b> ({p.tipo_inmueble}) — ¿te generó más consultas?
+              </span>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button className="camp-start" onClick={() => responderDestaque(p.id, true)}>Sí, sirvió</button>
+                <button className="camp-start" style={{ background: '#ccc', color: '#333' }} onClick={() => responderDestaque(p.id, false)}>No sirvió</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="dif-section-title"><h3>Tus zonas, hoy</h3></div>
       {error && <p className="tq-error">No se pudo cargar: {error}</p>}
@@ -162,6 +209,12 @@ function Difusion() {
             <div className="dif-resultado-zona">
               Para <b>{resultado.zona_referencia.barrio}</b> ({resultado.zona_referencia.tipo_inmueble}).
             </div>
+            {resultado.evidencia_destacado && (
+              <div className="mb-banner mb-media" style={{ marginBottom: 14 }}>
+                <span className="mb-icon">📊</span>
+                <span className="mb-texto">{resultado.evidencia_destacado}</span>
+              </div>
+            )}
             {resultado.reparto.map((r, i) => (
               <div className="dif-reparto-row" key={i}>
                 <div className="dif-reparto-top">
@@ -174,6 +227,15 @@ function Difusion() {
                   <ol className="dif-pasos">
                     {r.pasos.map((p, j) => <li key={j}>{p}</li>)}
                   </ol>
+                )}
+                {r.canal === 'Destacar en el portal' && (
+                  destaqueMarcado ? (
+                    <p className="dif-aviso" style={{ marginTop: 8 }}>Anotado — en unos días te preguntamos acá mismo si te sirvió.</p>
+                  ) : (
+                    <button className="camp-start" style={{ marginTop: 8 }} disabled={marcandoDestaque} onClick={marcarDestaque}>
+                      {marcandoDestaque ? 'Anotando…' : 'Ya lo hice — avisame en unos días si sirvió'}
+                    </button>
+                  )
                 )}
               </div>
             ))}
