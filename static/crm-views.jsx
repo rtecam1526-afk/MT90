@@ -364,6 +364,7 @@ function ClasificarRapido({ contactos, onClose, onUpdate }) {
 function Cartera({ data, onOpen, onUpdate }) {
   const [q, setQ] = useStateV("");
   const [clasificando, setClasificando] = useStateV(false);
+  const [filtroEtapa, setFiltroEtapa] = useStateV("todos");
   const sinClasificar = data.cartera.sin || [];
   const all = [
     ...data.cartera.caliente,
@@ -372,13 +373,22 @@ function Cartera({ data, onOpen, onUpdate }) {
     ...data.cartera.sin,
   ];
 
+  const FILTROS = [
+    { k: "todos",    label: "Todos" },
+    { k: "caliente", label: STAGE.caliente.label, color: STAGE.caliente.color },
+    { k: "media",    label: STAGE.media.label,    color: STAGE.media.color },
+    { k: "fria",     label: STAGE.fria.label,     color: STAGE.fria.color },
+    { k: "sin",      label: STAGE.sin.label,      color: STAGE.sin.color },
+  ];
+  const porEtapa = filtroEtapa === "todos" ? all : all.filter(c => c.etapa === filtroEtapa);
+
   const filtered = q.trim()
-    ? all.filter(c =>
+    ? porEtapa.filter(c =>
         (c.nombre || "").toLowerCase().includes(q.toLowerCase()) ||
         (c.nota || "").toLowerCase().includes(q.toLowerCase()) ||
         (c.necesidad || "").toLowerCase().includes(q.toLowerCase())
       )
-    : all;
+    : porEtapa;
 
   return (
     <div className="fade-in">
@@ -402,6 +412,30 @@ function Cartera({ data, onOpen, onUpdate }) {
       {clasificando && (
         <ClasificarRapido contactos={sinClasificar} onClose={() => setClasificando(false)} onUpdate={onUpdate} />
       )}
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+        {FILTROS.map((f) => {
+          const n = f.k === "todos" ? all.length : all.filter(c => c.etapa === f.k).length;
+          if (f.k !== "todos" && n === 0) return null;
+          const active = filtroEtapa === f.k;
+          return (
+            <button
+              key={f.k}
+              onClick={() => setFiltroEtapa(f.k)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6, padding: "7px 13px", borderRadius: 999,
+                border: "1.5px solid " + (active ? (f.color || "var(--primary)") : "var(--line-strong)"),
+                background: active ? (f.color ? f.color + "22" : "var(--primary-soft, #FDE8E0)") : "var(--surface)",
+                color: active ? (f.color || "var(--primary)") : "var(--muted)",
+                fontFamily: "inherit", fontSize: "calc(13px * var(--fs-scale))", fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              {f.color && <span style={{ width: 7, height: 7, borderRadius: "50%", background: f.color, flexShrink: 0 }}></span>}
+              {f.label} <span style={{ opacity: 0.7 }}>({n})</span>
+            </button>
+          );
+        })}
+      </div>
 
       <div style={{ marginBottom: "16px", maxWidth: "440px", position: "relative" }}>
         <span style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none", display: "flex" }}>
