@@ -156,18 +156,27 @@ function genMensaje(c, agente) {
   // reconocible de una necesidad inmobiliaria real — si no, fallback.
   const PALABRAS_NECESIDAD = /compr|vend|alquil|rent|busc|invert|mudar|depto|departamento|\bcasa\b|\bph\b|terreno|lote|cochera|oficina|local|ambiente|duplex|monoambiente|countr|chalet|quinta|\bcampo\b/i;
   const esTagCorto = necRaw && necRaw.length <= 55 && !/[.!?]/.test(necRaw) && PALABRAS_NECESIDAD.test(necRaw);
-  const nec = esTagCorto ? necRaw : 'la propiedad';
+  // Minúscula inicial: la cartera importada trae tags en mayúscula de
+  // título ("Vender 2 ambientes...") que pegados en medio de una oración
+  // ("lo de Vender 2 ambientes...") leen roto/pegoteado.
+  const nec = esTagCorto ? necRaw.charAt(0).toLowerCase() + necRaw.slice(1) : null;
+  // Si no hay un tag real usable, NO se mete un relleno genérico tipo
+  // "la propiedad" como si fuera algo concreto (quedaba vacío/robótico:
+  // "retomar lo de la propiedad") — directamente se omite esa referencia
+  // y el mensaje queda sin mención puntual, pero natural.
+  const sobreNec = nec ? ` lo de ${nec}` : "";
+
   // Misma lógica en los 4 tonos: proactivo, de valor, pidiendo unos
   // minutos — nunca pasivo ni dependiendo de "hace tiempo que no
   // hablamos" (suena a reclamo) ni de "¿seguís con interés?" (lo deja a
   // él la iniciativa). Varía el grado de urgencia/calidez según la etapa.
   if (c.etapa === 'caliente')
-    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero avanzar con lo de ${nec} — ¿tenés unos minutos hoy para coordinar los próximos pasos?`;
+    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero avanzar con${sobreNec || " lo tuyo"} — ¿tenés unos minutos hoy para coordinar los próximos pasos?`;
   if (c.etapa === 'media')
-    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero retomar lo de ${nec} y ver en qué puedo ayudarte ahora — ¿tenés unos minutos para charlar?`;
+    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero retomar${sobreNec || " el contacto"} y ver en qué puedo ayudarte ahora — ¿tenés unos minutos para charlar?`;
   if (c.etapa === 'fria')
     return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero ayudarte a hacer valer tu propiedad (o tu dinero, si estás por invertir) — ¿tenés unos minutos para charlar?`;
-  return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero contarte en qué puedo ayudarte con ${nec} — ¿tenés unos minutos?`;
+  return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero contarte en qué puedo ayudarte${sobreNec} — ¿tenés unos minutos?`;
 }
 
 // Genera campañas de fechas especiales argentinas
