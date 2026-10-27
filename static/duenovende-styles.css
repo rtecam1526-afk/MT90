@@ -1,0 +1,79 @@
+.dv-wrap { max-width: 760px; margin: 0 auto; }
+
+.dv-link-btn {
+  background: transparent; border: 1.5px solid var(--line-strong); color: var(--ink);
+  padding: 9px 14px; border-radius: 10px; font-family: inherit; font-weight: 600;
+  font-size: 13px; cursor: pointer;
+}
+.dv-link-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+.dv-contacto-res { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.dv-contacto-opt {
+  text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; font-family: inherit; font-size: 13.5px; cursor: pointer;
+}
+.dv-contacto-opt:hover { border-color: var(--primary); }
+.dv-contacto-nuevo { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.dv-contacto-chip {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--primary-soft, #FDE8E0); border-radius: 10px; padding: 9px 12px; font-weight: 600; font-size: 13.5px;
+}
+.dv-contacto-chip button {
+  background: transparent; border: none; color: var(--primary); font-weight: 700; cursor: pointer; font-family: inherit; font-size: 12.5px;
+}
+
+.dv-busquedas-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.dv-busqueda-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+}
+.dv-busqueda-barrios { font-weight: 700; font-size: 14px; text-transform: capitalize; }
+.dv-chip-toggle {
+  border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--muted);
+  border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.dv-chip-toggle.on { border-color: var(--whatsapp, #17B892); color: var(--whatsapp, #17B892); background: #E4F5EE; }
+
+.dv-variante {
+  border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px;
+  font-size: 14px; line-height: 1.4; cursor: pointer; background: var(--surface);
+}
+.dv-variante.active { border-color: var(--primary); background: var(--primary-soft, #FDE8E0); }
+.dv-variante-edit {
+  width: 100%; border: 1.5px solid var(--line-strong); border-radius: 10px; padding: 10px 12px;
+  font-family: inherit; font-size: 13.5px; resize: vertical; margin-top: 4px;
+}
+
+.dv-ficha-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.dv-ficha-head h1 { text-transform: capitalize; }
+
+.dv-historial { display: flex; flex-direction: column; gap: 4px; }
+.dv-historial-row {
+  display: flex; justify-content: space-between; font-size: 13.5px; padding: 4px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.dv-coincidencia { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+.dv-coincidencia-top { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; margin-bottom: 4px; }
+
+.dv-interaccion { border-bottom: 1px dashed var(--line); padding: 10px 0; }
+.dv-interaccion-top { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.dv-interaccion-msg { font-size: 13.5px; background: var(--surface); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px; }
+
+.dv-listado { display: flex; flex-direction: column; gap: 10px; }
+.dv-prop-card {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px; cursor: pointer; transition: border-color .15s;
+}
+.dv-prop-card:hover { border-color: var(--primary); }
+.dv-prop-barrio { font-weight: 700; font-size: 15px; text-transform: capitalize; }
+.dv-prop-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+@media (max-width: 640px) {
+  .dv-prop-card { flex-wrap: wrap; }
+  .dv-prop-side { width: 100%; justify-content: flex-start; }
+}

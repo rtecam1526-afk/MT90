@@ -641,6 +641,741 @@ def difusion_destaque_feedback(destaque_id):
     return {"ok": True}
 
 
+# ══════════════════════════════════════════════════════════════════════
+#  DUEÑO VENDE — captación de propietarios que publican por su cuenta
+# ══════════════════════════════════════════════════════════════════════
+# Objetivo: NO mandar más mensajes. Que cada contacto sea pocos, oportunos,
+# relevantes y bien escritos. Ver los principios completos en la spec — acá
+# solo el resumen que guía el código: relevancia antes que servicio, un
+# detalle concreto de la propiedad, pedir poco (una charla de 2 min), sin
+# lenguaje de inmobiliaria, nada inventado, pocos toques (máx 4 / 45 días),
+# respeto inmediato del "no", y el CRM nunca envía — solo prepara y abre
+# WhatsApp para que el agente decida.
+
+TIPOS_DV   = ("depto", "ph", "casa", "terreno", "local", "otro")
+ESTADOS_DV = (
+    "nuevo", "en_contacto", "conversacion", "llamada_hecha", "autorizacion",
+    "captada", "en_pausa", "no_contactar", "vendida_por_dueno", "descartada",
+)
+ENFOQUES_DV = ("comprador", "cambio_precio", "vende_para_comprar", "zona", "cierre")
+
+# Tabla editable de barrios limítrofes (CABA + zona norte GBA que trabaja el
+# equipo). Ampliar acá a medida que se agreguen zonas nuevas.
+BARRIOS_LIMITROFES_DV = {
+    "villa urquiza":    ["belgrano", "nunez", "saavedra", "colegiales", "villa pueyrredon"],
+    "belgrano":         ["villa urquiza", "nunez", "colegiales", "palermo"],
+    "nunez":            ["belgrano", "saavedra", "villa urquiza"],
+    "saavedra":         ["nunez", "villa urquiza", "coghlan"],
+    "palermo":          ["belgrano", "recoleta", "colegiales", "villa crespo", "barrio norte"],
+    "recoleta":         ["palermo", "barrio norte", "balvanera"],
+    "barrio norte":     ["recoleta", "palermo", "balvanera"],
+    "villa devoto":     ["villa del parque", "villa pueyrredon", "monte castro"],
+    "villa del parque": ["villa devoto", "villa urquiza", "agronomia"],
+    "villa pueyrredon":  ["villa devoto", "villa urquiza", "coghlan"],
+    "caballito":        ["villa crespo", "almagro", "flores"],
+    "pilar":            [],
+}
+
+# Lenguaje prohibido en el primer contacto (principio 4) y marcas que nunca
+# se mencionan en el mensaje generado (principio 5) — configurable acá.
+DV_PALABRAS_PROHIBIDAS = [
+    "exclusiva", "exclusividad", "captación", "captacion", "cartera",
+    "tasación sin cargo", "tasacion sin cargo", "te ofrecemos", "ofrecemos",
+    "oportunidad única", "oportunidad unica", "somos líderes", "somos lideres",
+    "nuestro equipo", "equipo de profesionales", "líderes del mercado", "lideres del mercado",
+]
+DV_MARCAS_PROHIBIDAS = ["MT90", "MT90 Tracción", "MT90 Traccion", "Remax", "RE/MAX", "JRC", "JRC Inmobiliaria"]
+
+
+def _dv_normalizar_barrio(b):
+    return (b or "").strip().lower().replace("-", " ")
+
+
+def _dv_calcular_coincidencia(prop, busq):
+    """Puntaje 0-100 + motivos legibles, o None si hay un filtro excluyente
+    (tipo que no calza, fuera de zona, precio muy por encima, rasgo
+    excluyente faltante). Ver sección 4 de la spec."""
+    motivos = []
+    puntaje = 0
+
+    tipo_prop = (prop.get("tipo") or "").strip().lower()
+    tipo_busq = (busq.get("tipo") or "").strip().lower()
+    if tipo_busq and tipo_prop and tipo_busq != tipo_prop:
+        return None
+    if tipo_prop and tipo_busq:
+        puntaje += 15
+        motivos.append("mismo tipo de propiedad")
+
+    barrio_prop = _dv_normalizar_barrio(prop.get("barrio"))
+    barrios_busq = [_dv_normalizar_barrio(b) for b in (busq.get("barrios") or [])]
+    if barrios_busq:
+        if barrio_prop in barrios_busq:
+            puntaje += 35
+            motivos.append("mismo barrio")
+        elif any(
+            barrio_prop in BARRIOS_LIMITROFES_DV.get(b, []) or b in BARRIOS_LIMITROFES_DV.get(barrio_prop, [])
+            for b in barrios_busq
+        ):
+            puntaje += 18
+            motivos.append("barrio limítrofe")
+        else:
+            return None
+
+    precio_prop = prop.get("precio_publicado_actual")
+    moneda_prop = (prop.get("moneda") or "USD").upper()
+    moneda_busq = (busq.get("moneda") or "USD").upper()
+    pmax = busq.get("presupuesto_max")
+    if precio_prop is not None and pmax is not None and moneda_prop == moneda_busq:
+        if precio_prop <= pmax:
+            puntaje += 25
+            motivos.append("precio dentro del presupuesto")
+        elif precio_prop <= pmax * 1.10:
+            puntaje += 12
+            motivos.append("precio hasta 10% sobre el presupuesto")
+        else:
+            return None
+
+    amb_prop, amb_busq = prop.get("ambientes"), busq.get("ambientes")
+    if amb_prop is not None and amb_busq is not None:
+        if amb_prop == amb_busq:
+            puntaje += 15
+            motivos.append("mismos ambientes")
+        elif abs(amb_prop - amb_busq) == 1:
+            puntaje += 7
+            motivos.append("ambientes similares (±1)")
+
+    rasgos_excl = [r.strip().lower() for r in (busq.get("rasgos_excluyentes") or [])]
+    rasgos_prop = [r.strip().lower() for r in (prop.get("rasgos") or [])]
+    for r in rasgos_excl:
+        if r not in rasgos_prop:
+            return None
+
+    return (min(puntaje, 100), motivos)
+
+
+def _dv_perfil_busqueda_anon(b):
+    """Perfil SIN datos del comprador (nunca nombre/teléfono) para pasarle
+    al generador de mensajes — principio 'privacidad' de la sección 4."""
+    partes = []
+    tipo, amb = b.get("tipo"), b.get("ambientes")
+    if amb and tipo:
+        partes.append(f"{tipo} de {amb} ambientes")
+    elif tipo:
+        partes.append(tipo)
+    barrios = b.get("barrios") or []
+    if barrios:
+        partes.append("en " + "/".join(barrios))
+    pmax = b.get("presupuesto_max")
+    if pmax:
+        partes.append(f"presupuesto hasta {b.get('moneda', 'USD')} {int(pmax):,}".replace(",", "."))
+    rasgos = b.get("rasgos_excluyentes") or []
+    if rasgos:
+        partes.append("necesita " + ", ".join(rasgos))
+    return "Alguien que busca " + ", ".join(partes) if partes else "Alguien con una búsqueda activa en la zona"
+
+
+def _dv_recalcular_coincidencias_propiedad(pid):
+    """Recalcula las coincidencias de UNA propiedad contra todas las
+    búsquedas activas del equipo (no solo las del mismo agente — una
+    búsqueda de otro agente también puede calzar)."""
+    rp = _req.get(
+        f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+        headers=_supa_hdrs(), params={"id": f"eq.{pid}", "select": "*"}, timeout=10,
+    )
+    if not rp.ok or not rp.json():
+        return
+    prop = rp.json()[0]
+    _req.delete(
+        f"{SUPABASE_URL}/rest/v1/coincidencias_propiedad",
+        headers={**_supa_hdrs(), "Prefer": ""},
+        params={"propiedad_id": f"eq.{pid}", "estado": "eq.sugerida"}, timeout=10,
+    )
+    if prop.get("estado") in ("no_contactar", "descartada", "vendida_por_dueno"):
+        return
+    rb = _req.get(
+        f"{SUPABASE_URL}/rest/v1/busquedas_comprador",
+        headers=_supa_hdrs(), params={"activa": "eq.true", "select": "*"}, timeout=10,
+    )
+    busquedas = rb.json() if rb.ok else []
+    filas = []
+    for b in busquedas:
+        res = _dv_calcular_coincidencia(prop, b)
+        if res and res[0] >= 60:
+            filas.append({"propiedad_id": pid, "busqueda_id": b["id"], "puntaje": res[0], "motivos": res[1], "estado": "sugerida"})
+    if filas:
+        _req.post(
+            f"{SUPABASE_URL}/rest/v1/coincidencias_propiedad",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"}, json=filas, timeout=10,
+        )
+
+
+def _dv_recalcular_coincidencias_busqueda(bid):
+    """Misma lógica pero disparada desde una búsqueda nueva/editada: la
+    cruza contra todas las propiedades activas del equipo."""
+    rb = _req.get(
+        f"{SUPABASE_URL}/rest/v1/busquedas_comprador",
+        headers=_supa_hdrs(), params={"id": f"eq.{bid}", "select": "*"}, timeout=10,
+    )
+    if not rb.ok or not rb.json():
+        return
+    busq = rb.json()[0]
+    _req.delete(
+        f"{SUPABASE_URL}/rest/v1/coincidencias_propiedad",
+        headers={**_supa_hdrs(), "Prefer": ""},
+        params={"busqueda_id": f"eq.{bid}", "estado": "eq.sugerida"}, timeout=10,
+    )
+    if not busq.get("activa"):
+        return
+    rp = _req.get(
+        f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+        headers=_supa_hdrs(),
+        params={"select": "*", "estado": "not.in.(no_contactar,descartada,vendida_por_dueno)"}, timeout=15,
+    )
+    props = rp.json() if rp.ok else []
+    filas = []
+    for p in props:
+        res = _dv_calcular_coincidencia(p, busq)
+        if res and res[0] >= 60:
+            filas.append({"propiedad_id": p["id"], "busqueda_id": bid, "puntaje": res[0], "motivos": res[1], "estado": "sugerida"})
+    if filas:
+        _req.post(
+            f"{SUPABASE_URL}/rest/v1/coincidencias_propiedad",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"}, json=filas, timeout=10,
+        )
+
+
+def _dv_validar_variante(texto, enfoque, tiene_coincidencia, oficina):
+    """Validación servidor post-generación (sección 7.6). Devuelve None si
+    está OK, o el motivo del rechazo."""
+    if not texto or not texto.strip():
+        return "mensaje vacío"
+    if len(texto) > 280:
+        return "supera 280 caracteres"
+    bajo = texto.lower()
+    for p in DV_PALABRAS_PROHIBIDAS:
+        if p in bajo:
+            return f'contiene lenguaje de inmobiliaria prohibido: "{p}"'
+    for m in DV_MARCAS_PROHIBIDAS + ([oficina] if oficina else []):
+        if m and m.lower() in bajo:
+            return f'menciona una marca/oficina: "{m}"'
+    if enfoque == "comprador" and not tiene_coincidencia:
+        return "enfoque 'comprador' sin coincidencia real"
+    return None
+
+
+def _dv_system_prompt(nombre_agente, estilo):
+    base = f"""Sos el asistente de redacción de {nombre_agente}, agente inmobiliario/a en Buenos Aires.
+Escribís mensajes de WhatsApp para propietarios que venden por su cuenta ("dueño vende").
+Estas personas conocen el proceso inmobiliario y rechazan los mensajes de inmobiliarias.
+Tu trabajo es escribir como una persona real, atenta y respetuosa, que tiene algo
+concreto y relevante para decirle a ESTE propietario.
+
+Reglas obligatorias:
+- Español rioplatense, con voseo. Tono cálido, natural y breve.
+- Máximo 280 caracteres. Sin listas, sin saludos largos, sin firma formal.
+- Incluí al menos UN detalle específico de la propiedad (barrio, calle, ambientes o un rasgo).
+- El objetivo es pedir una conversación corta (por ejemplo, 2 minutos), nada más.
+- No uses: "exclusiva", "captación", "cartera", "tasación sin cargo", "te ofrecemos",
+  "oportunidad", "somos", "nuestro equipo", ni lenguaje publicitario.
+- No menciones el nombre de ninguna inmobiliaria ni marca en este mensaje.
+- Nunca te hagas pasar por comprador, vecino o particular. No niegues ser agente.
+- No inventes compradores, cifras ni datos de mercado. Usá solo lo que está en el contexto.
+- Si es un seguimiento, aportá algo NUEVO respecto de los mensajes anteriores.
+- Como máximo un emoji, y solo si suma naturalidad.
+- Variá la estructura entre las 3 variantes: no empieces todas igual.
+"""
+    if estilo:
+        base += f"\nEstilo personal de {nombre_agente}: {estilo}\n"
+    base += '\nDevolvé solo un JSON: {"variantes": ["...", "...", "..."]}'
+    return base
+
+
+def _dv_contexto_usuario(prop, enfoque, numero_toque, interacciones_prev, perfil_coincidencia):
+    partes = [
+        f"Propietario: {prop.get('_nombre_pila') or 'sin nombre'}",
+        f"Barrio: {prop.get('barrio')}",
+        f"Calle de referencia: {prop.get('calle_referencia') or 'no especificada'}",
+        f"Tipo: {prop.get('tipo')}, {prop.get('ambientes') or '?'} ambientes",
+        f"Rasgos: {', '.join(prop.get('rasgos') or []) or 'ninguno cargado'}",
+        f"Precio publicado: {prop.get('moneda')} {prop.get('precio_publicado_actual') or 'no especificado'}",
+        f"Días publicada: {prop.get('_dias_publicada')}",
+        f"Enfoque elegido: {enfoque}",
+        f"Número de toque: {numero_toque}",
+    ]
+    if perfil_coincidencia:
+        partes.append(f"Búsqueda real que coincide: {perfil_coincidencia}")
+    if interacciones_prev:
+        partes.append("Interacciones previas con este propietario (para no repetir y aportar algo nuevo):")
+        for it in interacciones_prev:
+            txt = it.get("mensaje_enviado") or it.get("mensaje_sugerido") or ""
+            partes.append(f"- Toque {it.get('numero_toque')}, enfoque {it.get('enfoque')}: \"{txt}\" → resultado: {it.get('resultado') or 'sin registrar'}")
+    return "\n".join(partes)
+
+
+def _dv_parse_json_variantes(texto):
+    try:
+        m = re.search(r"\{.*\}", texto, re.DOTALL)
+        obj = json.loads(m.group(0) if m else texto)
+        return [v.strip() for v in (obj.get("variantes") or []) if isinstance(v, str) and v.strip()]
+    except Exception:
+        return []
+
+
+# ── Propiedades ──────────────────────────────────────────────────────────
+
+@app.route("/duenovende/propiedades/previsualizar", methods=["POST"])
+@login_required
+def dv_previsualizar():
+    """Reutiliza el mismo extractor de 'Cliente vota' — pega un link, trae
+    lo que se pueda por Open Graph. Nunca scraping masivo de portales."""
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or "").strip()
+    if not url:
+        return {"error": "Falta la URL"}, 400
+    try:
+        info = acm_scraper.extraer_propiedad_de_url(url)
+    except Exception as e:
+        return {"error": str(e)}, 500
+    return info
+
+
+@app.route("/duenovende/propiedades", methods=["GET"])
+@login_required
+def dv_listar_propiedades():
+    agente_key = session.get("agente_key", "")
+    params = {"agente": f"eq.{agente_key}", "select": "*", "order": "updated_at.desc"}
+    if request.args.get("barrio"):
+        params["barrio"] = f"eq.{request.args.get('barrio')}"
+    if request.args.get("estado"):
+        params["estado"] = f"eq.{request.args.get('estado')}"
+    r = _req.get(f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende", headers=_supa_hdrs(), params=params, timeout=15)
+    if not r.ok:
+        return {"error": r.text}, 500
+    props = r.json()
+
+    ids = [p["id"] for p in props]
+    coincidencias_count = {}
+    if ids:
+        rc = _req.get(
+            f"{SUPABASE_URL}/rest/v1/coincidencias_propiedad",
+            headers=_supa_hdrs(),
+            params={"propiedad_id": f"in.({','.join(str(i) for i in ids)})", "estado": "neq.descartada", "select": "propiedad_id"},
+            timeout=15,
+        )
+        if rc.ok:
+            for row in rc.json():
+                coincidencias_count[row["propiedad_id"]] = coincidencias_count.get(row["propiedad_id"], 0) + 1
+
+    for p in props:
+        p["dias_publicada"] = _dias_desde(str(p.get("fecha_primera_vista") or ""))
+        p["coincidencias_count"] = coincidencias_count.get(p["id"], 0)
+
+    dias_min = request.args.get("dias_publicada_min")
+    con_coincidencia = request.args.get("con_coincidencia")
+    if dias_min:
+        props = [p for p in props if (p["dias_publicada"] or 0) >= int(dias_min)]
+    if con_coincidencia == "1":
+        props = [p for p in props if p["coincidencias_count"] > 0]
+
+    return {"propiedades": props}
+
+
+@app.route("/duenovende/propiedades/<int:pid>", methods=["GET"])
+@login_required
+def dv_ficha_propiedad(pid):
+    agente_key = session.get("agente_key", "")
+    rp = _req.get(
+        f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+        headers=_supa_hdrs(), params={"id": f"eq.{pid}", "agente": f"eq.{agente_key}", "select": "*"}, timeout=10,
+    )
+    if not rp.ok or not rp.json():
+        return {"error": "No encontrada"}, 404
+    prop = rp.json()[0]
+    prop["dias_publicada"] = _dias_desde(str(prop.get("fecha_primera_vista") or ""))
+
+    rc = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers=_supa_hdrs(), params={"id": f"eq.{prop['contacto_id']}", "select": "*"}, timeout=10,
+    )
+    contacto = rc.json()[0] if rc.ok and rc.json() else None
+
+    rh = _req.get(
+        f"{SUPABASE_URL}/rest/v1/historial_precio_propiedad",
+        headers=_supa_hdrs(), params={"propiedad_id": f"eq.{pid}", "select": "*", "order": "fecha.asc"}, timeout=10,
+    )
+    historial = rh.json() if rh.ok else []
+
+    ri = _req.get(
+        f"{SUPABASE_URL}/rest/v1/interacciones_propiedad",
+        headers=_supa_hdrs(), params={"propiedad_id": f"eq.{pid}", "select": "*", "order": "fecha.desc"}, timeout=10,
+    )
+    interacciones = ri.json() if ri.ok else []
+
+    rco = _req.get(
+        f"{SUPABASE_URL}/rest/v1/coincidencias_propiedad",
+        headers=_supa_hdrs(), params={"propiedad_id": f"eq.{pid}", "estado": "neq.descartada", "select": "*", "order": "puntaje.desc"}, timeout=10,
+    )
+    coincidencias = []
+    for c in (rco.json() if rco.ok else []):
+        rb = _req.get(
+            f"{SUPABASE_URL}/rest/v1/busquedas_comprador",
+            headers=_supa_hdrs(), params={"id": f"eq.{c['busqueda_id']}", "select": "*"}, timeout=10,
+        )
+        b = rb.json()[0] if rb.ok and rb.json() else {}
+        coincidencias.append({**c, "perfil": _dv_perfil_busqueda_anon(b)})
+
+    return {"propiedad": prop, "contacto": contacto, "historial_precio": historial, "interacciones": interacciones, "coincidencias": coincidencias}
+
+
+@app.route("/duenovende/propiedades", methods=["POST"])
+@login_required
+def dv_crear_propiedad():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    contacto_id = data.get("contacto_id")
+    barrio = (data.get("barrio") or "").strip().lower()
+    tipo = (data.get("tipo") or "").strip().lower()
+    if not contacto_id:
+        return {"error": "Falta contacto_id"}, 400
+    if not barrio:
+        return {"error": "Falta barrio"}, 400
+    if tipo not in TIPOS_DV:
+        return {"error": "Tipo inválido"}, 400
+
+    fila = {
+        "agente": agente_key, "contacto_id": contacto_id, "barrio": barrio,
+        "calle_referencia": data.get("calle_referencia"), "tipo": tipo,
+        "ambientes": data.get("ambientes"), "dormitorios": data.get("dormitorios"),
+        "m2_cubiertos": data.get("m2_cubiertos"), "m2_totales": data.get("m2_totales"),
+        "rasgos": data.get("rasgos") or [], "moneda": (data.get("moneda") or "USD").upper(),
+        "precio_publicado_actual": data.get("precio_publicado_actual"),
+        "fuente": data.get("fuente"), "link_aviso": data.get("link_aviso"),
+        "notas_agente": data.get("notas_agente"), "estado": "nuevo",
+    }
+    r = _req.post(
+        f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+        headers={**_supa_hdrs(), "Prefer": "return=representation"}, json=fila, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    prop = r.json()[0]
+
+    if prop.get("precio_publicado_actual") is not None:
+        _req.post(
+            f"{SUPABASE_URL}/rest/v1/historial_precio_propiedad",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+            json={"propiedad_id": prop["id"], "precio": prop["precio_publicado_actual"], "moneda": prop["moneda"]}, timeout=10,
+        )
+
+    _dv_recalcular_coincidencias_propiedad(prop["id"])
+    return {"ok": True, "propiedad": prop}
+
+
+@app.route("/duenovende/propiedades/<int:pid>", methods=["PUT"])
+@login_required
+def dv_editar_propiedad(pid):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    data.pop("id", None); data.pop("agente", None); data.pop("contacto_id", None)
+
+    precio_nuevo = data.get("precio_publicado_actual")
+    if precio_nuevo is not None:
+        rp = _req.get(
+            f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+            headers=_supa_hdrs(), params={"id": f"eq.{pid}", "agente": f"eq.{agente_key}", "select": "precio_publicado_actual,moneda"}, timeout=10,
+        )
+        actual = rp.json()[0] if rp.ok and rp.json() else {}
+        if actual and actual.get("precio_publicado_actual") != precio_nuevo:
+            _req.post(
+                f"{SUPABASE_URL}/rest/v1/historial_precio_propiedad",
+                headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+                json={"propiedad_id": pid, "precio": precio_nuevo, "moneda": data.get("moneda") or actual.get("moneda") or "USD"}, timeout=10,
+            )
+
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"id": f"eq.{pid}", "agente": f"eq.{agente_key}"}, json=data, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+
+    if any(k in data for k in ("precio_publicado_actual", "barrio", "tipo", "ambientes", "rasgos")):
+        _dv_recalcular_coincidencias_propiedad(pid)
+    return {"ok": True}
+
+
+@app.route("/duenovende/propiedades/<int:pid>/no_contactar", methods=["POST"])
+@login_required
+def dv_no_contactar(pid):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    motivo = (data.get("motivo") or "Pidió no ser contactado").strip()
+    rp = _req.get(
+        f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+        headers=_supa_hdrs(), params={"id": f"eq.{pid}", "agente": f"eq.{agente_key}", "select": "contacto_id"}, timeout=10,
+    )
+    if not rp.ok or not rp.json():
+        return {"error": "Propiedad no encontrada"}, 404
+    contacto_id = rp.json()[0]["contacto_id"]
+    _req.patch(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"}, params={"id": f"eq.{contacto_id}"},
+        json={"no_contactar": True, "motivo_no_contactar": motivo}, timeout=10,
+    )
+    _req.patch(
+        f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"}, params={"id": f"eq.{pid}"},
+        json={"estado": "no_contactar"}, timeout=10,
+    )
+    _req.delete(
+        f"{SUPABASE_URL}/rest/v1/coincidencias_propiedad",
+        headers={**_supa_hdrs(), "Prefer": ""}, params={"propiedad_id": f"eq.{pid}", "estado": "eq.sugerida"}, timeout=10,
+    )
+    return {"ok": True}
+
+
+# ── Búsquedas de comprador ───────────────────────────────────────────────
+
+@app.route("/duenovende/busquedas", methods=["GET"])
+@login_required
+def dv_listar_busquedas():
+    agente_key = session.get("agente_key", "")
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/busquedas_comprador",
+        headers=_supa_hdrs(), params={"agente": f"eq.{agente_key}", "select": "*", "order": "created_at.desc"}, timeout=15,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"busquedas": r.json()}
+
+
+@app.route("/duenovende/busquedas", methods=["POST"])
+@login_required
+def dv_crear_busqueda():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    contacto_id = data.get("contacto_id")
+    barrios = [b.strip().lower() for b in (data.get("barrios") or []) if b and b.strip()]
+    if not contacto_id:
+        return {"error": "Falta contacto_id"}, 400
+    if not barrios:
+        return {"error": "Agregá al menos un barrio"}, 400
+    fila = {
+        "agente": agente_key, "contacto_id": contacto_id, "barrios": barrios,
+        "tipo": (data.get("tipo") or "").strip().lower() or None,
+        "presupuesto_min": data.get("presupuesto_min"), "presupuesto_max": data.get("presupuesto_max"),
+        "moneda": (data.get("moneda") or "USD").upper(),
+        "ambientes": data.get("ambientes"), "dormitorios": data.get("dormitorios"),
+        "rasgos_excluyentes": data.get("rasgos_excluyentes") or [],
+        "notas": data.get("notas"), "activa": True,
+    }
+    r = _req.post(
+        f"{SUPABASE_URL}/rest/v1/busquedas_comprador",
+        headers={**_supa_hdrs(), "Prefer": "return=representation"}, json=fila, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    busq = r.json()[0]
+    _dv_recalcular_coincidencias_busqueda(busq["id"])
+    return {"ok": True, "busqueda": busq}
+
+
+@app.route("/duenovende/busquedas/<int:bid>", methods=["PUT"])
+@login_required
+def dv_editar_busqueda(bid):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    data.pop("id", None); data.pop("agente", None); data.pop("contacto_id", None)
+    if "barrios" in data:
+        data["barrios"] = [b.strip().lower() for b in (data["barrios"] or []) if b and b.strip()]
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/busquedas_comprador",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"id": f"eq.{bid}", "agente": f"eq.{agente_key}"}, json=data, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    _dv_recalcular_coincidencias_busqueda(bid)
+    return {"ok": True}
+
+
+# ── Mensaje sugerido (IA) ────────────────────────────────────────────────
+
+@app.route("/duenovende/propiedades/<int:pid>/mensaje", methods=["POST"])
+@login_required
+def dv_generar_mensaje(pid):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    enfoque = (data.get("enfoque") or "").strip()
+    if enfoque not in ENFOQUES_DV:
+        return {"error": "Enfoque inválido"}, 400
+
+    rp = _req.get(
+        f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+        headers=_supa_hdrs(), params={"id": f"eq.{pid}", "agente": f"eq.{agente_key}", "select": "*"}, timeout=10,
+    )
+    if not rp.ok or not rp.json():
+        return {"error": "Propiedad no encontrada"}, 404
+    prop = rp.json()[0]
+
+    rc = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers=_supa_hdrs(), params={"id": f"eq.{prop['contacto_id']}", "select": "*"}, timeout=10,
+    )
+    contacto = rc.json()[0] if rc.ok and rc.json() else {}
+    if contacto.get("no_contactar"):
+        return {"error": "Este contacto pidió que no le escriban — no se puede generar mensaje."}, 403
+
+    ri = _req.get(
+        f"{SUPABASE_URL}/rest/v1/interacciones_propiedad",
+        headers=_supa_hdrs(), params={"propiedad_id": f"eq.{pid}", "select": "*", "order": "fecha.desc"}, timeout=10,
+    )
+    interacciones = ri.json() if ri.ok else []
+    numero_toque = len(interacciones) + 1
+    if numero_toque == 1 and enfoque == "cierre":
+        return {"error": "El primer contacto no puede ser de cierre"}, 400
+
+    coincidencia, perfil_coincidencia = None, None
+    if enfoque == "comprador":
+        rco = _req.get(
+            f"{SUPABASE_URL}/rest/v1/coincidencias_propiedad",
+            headers=_supa_hdrs(),
+            params={"propiedad_id": f"eq.{pid}", "estado": "neq.descartada", "select": "*", "order": "puntaje.desc", "limit": "1"},
+            timeout=10,
+        )
+        cs = rco.json() if rco.ok else []
+        if not cs:
+            return {"error": "No hay una coincidencia real con una búsqueda activa — no se puede usar el enfoque 'comprador'."}, 400
+        coincidencia = cs[0]
+        rb = _req.get(
+            f"{SUPABASE_URL}/rest/v1/busquedas_comprador",
+            headers=_supa_hdrs(), params={"id": f"eq.{coincidencia['busqueda_id']}", "select": "*"}, timeout=10,
+        )
+        b = rb.json()[0] if rb.ok and rb.json() else {}
+        perfil_coincidencia = _dv_perfil_busqueda_anon(b)
+
+    agente_row = obtener_agentes().get(agente_key, {})
+    nombre_agente = agente_row.get("nombre") or agente_key
+    oficina = agente_row.get("oficina") or ""
+    estilo = agente_row.get("estilo_mensaje") or ""
+
+    prop["_nombre_pila"] = ((contacto.get("nombre") or "").split(" ")[0]) or None
+    prop["_dias_publicada"] = _dias_desde(str(prop.get("fecha_primera_vista") or ""))
+
+    system = _dv_system_prompt(nombre_agente, estilo)
+    contexto = _dv_contexto_usuario(prop, enfoque, numero_toque, interacciones[:3], perfil_coincidencia)
+
+    def _llamar():
+        try:
+            resp = client.messages.create(
+                model=cfg.MODELO, max_tokens=700, system=system,
+                messages=[{"role": "user", "content": contexto}],
+            )
+            texto = resp.content[0].text if resp.content else ""
+            return _dv_parse_json_variantes(texto)
+        except Exception as e:
+            print(f"[dv_generar_mensaje] {e}")
+            return []
+
+    crudas = _llamar()
+    validas = []
+    for v in crudas:
+        if not _dv_validar_variante(v, enfoque, bool(coincidencia), oficina):
+            validas.append(v)
+    if len(validas) < 3 and len(validas) < len(crudas):
+        for v in _llamar():
+            if v not in validas and not _dv_validar_variante(v, enfoque, bool(coincidencia), oficina):
+                validas.append(v)
+    validas = validas[:3]
+    if not validas:
+        return {"error": "No se pudo generar un mensaje que cumpla las reglas. Probá de nuevo."}, 500
+
+    return {
+        "variantes": validas, "enfoque": enfoque, "numero_toque": numero_toque,
+        "coincidencia": ({"motivos": coincidencia.get("motivos"), "perfil": perfil_coincidencia} if coincidencia else None),
+    }
+
+
+# ── Interacciones ────────────────────────────────────────────────────────
+
+@app.route("/duenovende/propiedades/<int:pid>/interacciones", methods=["POST"])
+@login_required
+def dv_crear_interaccion(pid):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    canal = (data.get("canal") or "").strip()
+    enfoque = (data.get("enfoque") or "").strip()
+    resultado = (data.get("resultado") or "").strip() or None
+    forzar = bool(data.get("forzar"))
+    if canal not in ("whatsapp", "llamada", "en_persona"):
+        return {"error": "Canal inválido"}, 400
+
+    rp = _req.get(
+        f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+        headers=_supa_hdrs(), params={"id": f"eq.{pid}", "agente": f"eq.{agente_key}", "select": "*"}, timeout=10,
+    )
+    if not rp.ok or not rp.json():
+        return {"error": "Propiedad no encontrada"}, 404
+    prop = rp.json()[0]
+
+    ri = _req.get(
+        f"{SUPABASE_URL}/rest/v1/interacciones_propiedad",
+        headers=_supa_hdrs(), params={"propiedad_id": f"eq.{pid}", "select": "*", "order": "fecha.desc", "limit": "1"}, timeout=10,
+    )
+    previas = ri.json() if ri.ok else []
+    if previas and not forzar:
+        dias = _dias_desde(str(previas[0].get("fecha") or "")[:10])
+        if dias is not None and dias < 7:
+            return {"error": "Menos de 7 días desde el último toque con este propietario.", "requiere_confirmacion": True}, 409
+
+    rc = _req.get(
+        f"{SUPABASE_URL}/rest/v1/interacciones_propiedad",
+        headers=_supa_hdrs(), params={"propiedad_id": f"eq.{pid}", "select": "id"}, timeout=10,
+    )
+    numero_toque = (len(rc.json()) if rc.ok else 0) + 1
+
+    fila = {
+        "propiedad_id": pid, "canal": canal, "enfoque": enfoque, "numero_toque": numero_toque,
+        "mensaje_sugerido": data.get("mensaje_sugerido"), "mensaje_enviado": data.get("mensaje_enviado"),
+        "resultado": resultado, "notas": data.get("notas"),
+    }
+    ri2 = _req.post(
+        f"{SUPABASE_URL}/rest/v1/interacciones_propiedad",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"}, json=fila, timeout=10,
+    )
+    if not ri2.ok:
+        return {"error": ri2.text}, 500
+
+    nuevo_estado = None
+    if resultado == "no_contactar":
+        nuevo_estado = "no_contactar"
+        _req.patch(
+            f"{SUPABASE_URL}/rest/v1/contactos",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"}, params={"id": f"eq.{prop['contacto_id']}"},
+            json={"no_contactar": True, "motivo_no_contactar": "Pidió no ser contactado (Dueño Vende)"}, timeout=10,
+        )
+        _req.delete(
+            f"{SUPABASE_URL}/rest/v1/coincidencias_propiedad",
+            headers={**_supa_hdrs(), "Prefer": ""}, params={"propiedad_id": f"eq.{pid}", "estado": "eq.sugerida"}, timeout=10,
+        )
+    elif prop.get("estado") == "nuevo":
+        nuevo_estado = "en_contacto"
+    elif canal == "llamada":
+        nuevo_estado = "llamada_hecha"
+    elif resultado in ("positivo", "neutro") and prop.get("estado") == "en_contacto":
+        nuevo_estado = "conversacion"
+
+    if nuevo_estado:
+        _req.patch(
+            f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"}, params={"id": f"eq.{pid}"},
+            json={"estado": nuevo_estado}, timeout=10,
+        )
+
+    return {"ok": True, "numero_toque": numero_toque}
+
+
 _SUPA_INJECT = r"""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
