@@ -242,7 +242,7 @@ function App() {
             onOpen={openDetalle} onIrHoy={() => { setTab("hoy"); setForceEnfoque(false); }}
             onRevision={() => setRevision(true)} />
         )}
-        {tab === "cartera" && !recorriendo && <Cartera data={data} onOpen={openDetalle} onWhatsapp={onWhatsapp} onToggleDone={toggleDone} done={done} />}
+        {tab === "cartera" && !recorriendo && <Cartera data={data} onOpen={openDetalle} onWhatsapp={onWhatsapp} onToggleDone={toggleDone} done={done} onUpdate={loadContacts} />}
         {tab === "cartera" && recorriendo && window.CarteraRecorrer && React.createElement(window.CarteraRecorrer, { data: data, done: done, onToggleDone: toggleDone, onWhatsapp: onWhatsapp, onSalir: () => setRecorriendo(false) })}
         {tab === "agente" && <AgenteIA data={data} onWhatsapp={onWhatsapp} />}
         {tab === "campanas" && <Campanas data={data} onWhatsapp={onWhatsapp} />}

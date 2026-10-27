@@ -291,8 +291,80 @@ function InicioAsistente({ data, done, onEmpezar, onWhatsapp, onToggleDone, onOp
    CARTERA — lista simple con buscador. Sin kanban, sin badges.
    Lenguaje humano: "Hace 8 meses sin hablar".
    ============================================================ */
-function Cartera({ data, onOpen }) {
+function ClasificarRapido({ contactos, onClose, onUpdate }) {
+  const [stack, setStack] = useStateV(contactos);
+  const [hechos, setHechos] = useStateV(0);
+  const [saving, setSaving] = useStateV(false);
+  const stageOrder = ["caliente", "media", "fria"];
+  const EMAP = { caliente: "Caliente", media: "Media", fria: "Fria" };
+
+  if (stack.length === 0) {
+    return (
+      <div className="modal-backdrop" onClick={onClose}>
+        <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="m-kicker">MT90 Tracción</div>
+          <h2>¡Listo!</h2>
+          <p className="aj-tip">Clasificaste {hechos} contacto{hechos === 1 ? "" : "s"}.</p>
+          <div className="modal-actions">
+            <button className="save" onClick={() => { if (onUpdate) onUpdate(); onClose(); }}>Cerrar</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const actual = stack[0];
+  const necesidad = actual.necesidad || actual.nota || "";
+
+  async function clasificar(k) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      if (actual.id && window.CRM_API) {
+        await window.CRM_API.put("/contactos/" + actual.id, { etapa: EMAP[k] });
+      }
+      setHechos((h) => h + 1);
+      setStack((s) => s.slice(1));
+    } catch (e) {
+      alert("Error al guardar: " + e.message);
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-kicker">Clasificación rápida · {hechos} hechos{stack.length > 1 ? `, ${stack.length} quedan` : ""}</div>
+        <h2>{actual.nombre}</h2>
+        {necesidad && <p className="aj-tip">{necesidad}</p>}
+        <div className="field">
+          <label>¿Cómo está esta persona hoy?</label>
+          <div className="dstage-picker">
+            {stageOrder.map((k) => {
+              const s = STAGE[k];
+              return (
+                <button type="button" key={k} disabled={saving} className="dstage-opt"
+                  style={{ borderColor: s.color, color: s.color }}
+                  onClick={() => clasificar(k)}>
+                  <span className="dot" style={{ background: s.color }}></span>{s.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="cancel" onClick={() => setStack((s) => s.slice(1))} disabled={saving}>Saltar</button>
+          <button className="cancel" onClick={() => { if (onUpdate) onUpdate(); onClose(); }}>Terminar por ahora</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Cartera({ data, onOpen, onUpdate }) {
   const [q, setQ] = useStateV("");
+  const [clasificando, setClasificando] = useStateV(false);
+  const sinClasificar = data.cartera.sin || [];
   const all = [
     ...data.cartera.caliente,
     ...data.cartera.media,
@@ -316,6 +388,20 @@ function Cartera({ data, onOpen }) {
           <p>{data.totalContactos} contactos · tu día ya está en “Hoy”.</p>
         </div>
       </div>
+
+      {sinClasificar.length > 0 && (
+        <div className="mb-banner mb-media" style={{ marginBottom: 16 }}>
+          <span className="mb-icon">🗂️</span>
+          <span className="mb-texto">
+            Tenés {sinClasificar.length} contacto{sinClasificar.length === 1 ? "" : "s"} sin clasificar — no aparecen agrupados en ningún lado hasta que les pongas una etapa.
+          </span>
+          <button className="camp-start" style={{ marginLeft: "auto" }} onClick={() => setClasificando(true)}>Clasificar ahora</button>
+        </div>
+      )}
+
+      {clasificando && (
+        <ClasificarRapido contactos={sinClasificar} onClose={() => setClasificando(false)} onUpdate={onUpdate} />
+      )}
 
       <div style={{ marginBottom: "16px", maxWidth: "440px", position: "relative" }}>
         <span style={{ position: "absolute", left: "13px", top: "50%", transform: "translateY(-50%)", color: "var(--muted)", pointerEvents: "none", display: "flex" }}>
@@ -680,5 +766,5 @@ function ContactoDetalle({ c, done, onToggleDone, onWhatsapp, onClose, onUpdate 
   );
 }
 
-Object.assign(window, { HoyLista, HoyEnfoque, InicioAsistente, Cartera, NuevoContacto, LogroRapido, PersonCard, ContactoDetalle });
+Object.assign(window, { HoyLista, HoyEnfoque, InicioAsistente, Cartera, NuevoContacto, LogroRapido, PersonCard, ContactoDetalle, ClasificarRapido });
 

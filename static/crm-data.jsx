@@ -149,8 +149,14 @@ function genMensaje(c, agente) {
   const nec = c.necesidad || 'el tema de la propiedad';
   if (c.etapa === 'caliente')
     return `Hola ${primer}! ¿Cómo estás? Quería ver cómo sigue lo de ${nec}. Estoy a disposición cuando necesites.`;
+  // Tibio: ya hay algo concreto hablado, el mensaje retoma ESO puntual —
+  // no es un "¿cómo andás?" genérico, es seguimiento de lo último que dijo.
   if (c.etapa === 'media')
-    return `Hola ${primer}! Hace un tiempo no hablamos. ¿Seguís con planes de ${nec}?`;
+    return `Hola ${primer}! Te escribo para retomar lo de ${nec} — ¿en qué quedamos la última vez? ¿Seguís con esos planes?`;
+  // Frío: retomar "lo de siempre" ya no funcionó, necesita un gancho nuevo
+  // para reabrir la conversación, no otro recordatorio de lo mismo.
+  if (c.etapa === 'fria')
+    return `Hola ${primer}! Soy ${agente}. Hace un tiempo que no hablamos de ${nec} — surgió algo nuevo en la zona que te puede interesar, ¿te cuento?`;
   return `Hola ${primer}! Soy ${agente}. ¿Seguís con interés en ${nec}?`;
 }
 
