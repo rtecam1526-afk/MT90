@@ -146,7 +146,15 @@ function urgencia(c) {
 
 function genMensaje(c, agente) {
   const primer = (c.nombre || '').split(' ')[0];
-  const nec = c.necesidad || 'el tema de la propiedad';
+  const necRaw = (c.necesidad || '').trim();
+  // Mucha cartera importada trae en "necesidad" una nota larga/histórica
+  // ("Locador. Le alquile su temporario varias veces. Vive en Dinamarca")
+  // en vez de un tag corto ("comprar depto 2 amb"). Si la metemos tal cual
+  // dentro de una oración ("no hablamos de Locador. Le alquile...") el
+  // mensaje sale incoherente. Si es larga o tiene puntuación propia de
+  // oración, no se interpola — se usa un fallback genérico pero prolijo.
+  const esTagCorto = necRaw && necRaw.length <= 45 && !/[.!?]/.test(necRaw);
+  const nec = esTagCorto ? necRaw : 'la propiedad';
   if (c.etapa === 'caliente')
     return `Hola ${primer}! ¿Cómo estás? Quería ver cómo sigue lo de ${nec}. Estoy a disposición cuando necesites.`;
   // Tibio: ya hay algo concreto hablado, el mensaje retoma ESO puntual —
