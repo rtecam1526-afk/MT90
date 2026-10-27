@@ -3596,7 +3596,7 @@ def crear_contacto():
         _registrar_evento(agente_key, "contacto_activado", nuevo_id)
         if tipo_logro and tipo_logro in XP_VALUES:
             _registrar_evento(agente_key, tipo_logro, nuevo_id)
-        return {"ok": True}
+        return {"ok": True, "id": nuevo_id}
     except Exception as e:
         print(f"[POST /contactos] {e}")
         return {"error": str(e)}, 500
