@@ -163,12 +163,12 @@ function genMensaje(c, agente) {
   // no es un "¿cómo andás?" genérico, es seguimiento de lo último que dijo.
   if (c.etapa === 'media')
     return `Hola ${primer}! Te escribo para retomar lo de ${nec} — ¿en qué quedamos la última vez? ¿Seguís con esos planes?`;
-  // Frío: a veces es una propiedad que vio hace años — preguntarle "¿te
-  // sigue interesando?" suena forzado y comercial. Mejor reconectar con
-  // empatía primero (cómo está, sin apuro) y dejar la puerta abierta,
-  // en vez de ir directo a un gancho de venta.
+  // Frío: a veces es una propiedad que vio hace años — ni preguntarle
+  // "¿te sigue interesando?" ni recordarle "hace tiempo que no hablamos"
+  // suma, queda a la defensiva. Mejor un gancho proactivo de valor (ayudarlo
+  // a sacarle rédito a lo que tiene) y pedirle unos minutos, directo.
   if (c.etapa === 'fria')
-    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Hace bastante que no hablamos — quería saludarte y ver cómo estás. Si en algún momento te cruzás con algo del mercado inmobiliario, acá estoy para lo que necesites, sin ningún compromiso.`;
+    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero ayudarte a hacer valer tu propiedad (o tu dinero, si estás por invertir) — ¿tenés unos minutos para charlar?`;
   return `Hola ${primer}! Soy ${agente}. ¿Seguís con interés en ${nec}?`;
 }
 
