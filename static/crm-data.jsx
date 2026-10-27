@@ -157,19 +157,17 @@ function genMensaje(c, agente) {
   const PALABRAS_NECESIDAD = /compr|vend|alquil|rent|busc|invert|mudar|depto|departamento|\bcasa\b|\bph\b|terreno|lote|cochera|oficina|local|ambiente|duplex|monoambiente|countr|chalet|quinta|\bcampo\b/i;
   const esTagCorto = necRaw && necRaw.length <= 55 && !/[.!?]/.test(necRaw) && PALABRAS_NECESIDAD.test(necRaw);
   const nec = esTagCorto ? necRaw : 'la propiedad';
+  // Misma lógica en los 4 tonos: proactivo, de valor, pidiendo unos
+  // minutos — nunca pasivo ni dependiendo de "hace tiempo que no
+  // hablamos" (suena a reclamo) ni de "¿seguís con interés?" (lo deja a
+  // él la iniciativa). Varía el grado de urgencia/calidez según la etapa.
   if (c.etapa === 'caliente')
-    return `Hola ${primer}! ¿Cómo estás? Quería ver cómo sigue lo de ${nec}. Estoy a disposición cuando necesites.`;
-  // Tibio: ya hay algo concreto hablado, el mensaje retoma ESO puntual —
-  // no es un "¿cómo andás?" genérico, es seguimiento de lo último que dijo.
+    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero avanzar con lo de ${nec} — ¿tenés unos minutos hoy para coordinar los próximos pasos?`;
   if (c.etapa === 'media')
-    return `Hola ${primer}! Te escribo para retomar lo de ${nec} — ¿en qué quedamos la última vez? ¿Seguís con esos planes?`;
-  // Frío: a veces es una propiedad que vio hace años — ni preguntarle
-  // "¿te sigue interesando?" ni recordarle "hace tiempo que no hablamos"
-  // suma, queda a la defensiva. Mejor un gancho proactivo de valor (ayudarlo
-  // a sacarle rédito a lo que tiene) y pedirle unos minutos, directo.
+    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero retomar lo de ${nec} y ver en qué puedo ayudarte ahora — ¿tenés unos minutos para charlar?`;
   if (c.etapa === 'fria')
     return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero ayudarte a hacer valer tu propiedad (o tu dinero, si estás por invertir) — ¿tenés unos minutos para charlar?`;
-  return `Hola ${primer}! Soy ${agente}. ¿Seguís con interés en ${nec}?`;
+  return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero contarte en qué puedo ayudarte con ${nec} — ¿tenés unos minutos?`;
 }
 
 // Genera campañas de fechas especiales argentinas
