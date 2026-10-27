@@ -156,27 +156,28 @@ function genMensaje(c, agente) {
   // reconocible de una necesidad inmobiliaria real — si no, fallback.
   const PALABRAS_NECESIDAD = /compr|vend|alquil|rent|busc|invert|mudar|depto|departamento|\bcasa\b|\bph\b|terreno|lote|cochera|oficina|local|ambiente|duplex|monoambiente|countr|chalet|quinta|\bcampo\b/i;
   const esTagCorto = necRaw && necRaw.length <= 55 && !/[.!?]/.test(necRaw) && PALABRAS_NECESIDAD.test(necRaw);
-  // Minúscula inicial: la cartera importada trae tags en mayúscula de
-  // título ("Vender 2 ambientes...") que pegados en medio de una oración
-  // ("lo de Vender 2 ambientes...") leen roto/pegoteado.
   const nec = esTagCorto ? necRaw.charAt(0).toLowerCase() + necRaw.slice(1) : null;
-  // Si no hay un tag real usable, NO se mete un relleno genérico tipo
-  // "la propiedad" como si fuera algo concreto (quedaba vacío/robótico:
-  // "retomar lo de la propiedad") — directamente se omite esa referencia
-  // y el mensaje queda sin mención puntual, pero natural.
-  const sobreNec = nec ? ` lo de ${nec}` : "";
+  // "necesidad" viene con formas muy distintas según el contacto (un verbo
+  // en infinitivo, una frase corta, nada) — intentar que calce como objeto
+  // gramatical de la oración ("lo de vender...") rompe apenas la forma no
+  // encaja. Va entre paréntesis como referencia/recordatorio, no como parte
+  // de la gramática de la frase — así funciona sea cual sea su forma, y se
+  // omite entero si no hay nada usable.
+  const refNec = nec ? ` (${nec})` : "";
 
-  // Misma lógica en los 4 tonos: proactivo, de valor, pidiendo unos
-  // minutos — nunca pasivo ni dependiendo de "hace tiempo que no
-  // hablamos" (suena a reclamo) ni de "¿seguís con interés?" (lo deja a
-  // él la iniciativa). Varía el grado de urgencia/calidez según la etapa.
+  // Caliente y Media: ya lo conocen, no hace falta re-presentarse ("Soy
+  // Mauro Larea, de MT90 Tracción") — queda forzado con alguien con quien
+  // ya hay trato. Fría y sin etapa sí se presentan, porque hay más
+  // distancia/tiempo. Los 4 tonos son proactivos y piden unos minutos,
+  // nunca pasivos ("¿seguís con interés?") ni apelan a "hace tiempo que
+  // no hablamos" (suena a reclamo).
   if (c.etapa === 'caliente')
-    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero avanzar con${sobreNec || " lo tuyo"} — ¿tenés unos minutos hoy para coordinar los próximos pasos?`;
+    return `Hola ${primer}! Quiero avanzar con lo tuyo${refNec} — ¿tenés unos minutos hoy para coordinar los próximos pasos?`;
   if (c.etapa === 'media')
-    return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero retomar${sobreNec || " el contacto"} y ver en qué puedo ayudarte ahora — ¿tenés unos minutos para charlar?`;
+    return `Hola ${primer}! Quiero retomar el contacto${refNec} y ver en qué puedo ayudarte ahora — ¿tenés unos minutos para charlar?`;
   if (c.etapa === 'fria')
     return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero ayudarte a hacer valer tu propiedad (o tu dinero, si estás por invertir) — ¿tenés unos minutos para charlar?`;
-  return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero contarte en qué puedo ayudarte${sobreNec} — ¿tenés unos minutos?`;
+  return `Hola ${primer}! Soy ${agente}, de MT90 Tracción. Quiero contarte en qué puedo ayudarte${refNec} — ¿tenés unos minutos?`;
 }
 
 // Genera campañas de fechas especiales argentinas
