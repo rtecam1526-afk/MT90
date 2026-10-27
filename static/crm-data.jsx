@@ -148,12 +148,14 @@ function genMensaje(c, agente) {
   const primer = (c.nombre || '').split(' ')[0];
   const necRaw = (c.necesidad || '').trim();
   // Mucha cartera importada trae en "necesidad" una nota larga/histórica
-  // ("Locador. Le alquile su temporario varias veces. Vive en Dinamarca")
-  // en vez de un tag corto ("comprar depto 2 amb"). Si la metemos tal cual
-  // dentro de una oración ("no hablamos de Locador. Le alquile...") el
-  // mensaje sale incoherente. Si es larga o tiene puntuación propia de
-  // oración, no se interpola — se usa un fallback genérico pero prolijo.
-  const esTagCorto = necRaw && necRaw.length <= 45 && !/[.!?]/.test(necRaw);
+  // ("Locador. Le alquile su temporario varias veces...") o directamente
+  // un comentario del agente que no es una necesidad real ("Ni idea de
+  // donde viene"). Ninguna de las dos sirve como objeto de una oración
+  // ("no hablamos de Ni idea de donde viene"). Para aceptarla tiene que
+  // ser corta, sin puntuación de oración propia, Y mencionar algo
+  // reconocible de una necesidad inmobiliaria real — si no, fallback.
+  const PALABRAS_NECESIDAD = /compr|vend|alquil|rent|busc|invert|mudar|depto|departamento|\bcasa\b|\bph\b|terreno|lote|cochera|oficina|local|ambiente|duplex|monoambiente|countr|chalet|quinta|\bcampo\b/i;
+  const esTagCorto = necRaw && necRaw.length <= 55 && !/[.!?]/.test(necRaw) && PALABRAS_NECESIDAD.test(necRaw);
   const nec = esTagCorto ? necRaw : 'la propiedad';
   if (c.etapa === 'caliente')
     return `Hola ${primer}! ¿Cómo estás? Quería ver cómo sigue lo de ${nec}. Estoy a disposición cuando necesites.`;
