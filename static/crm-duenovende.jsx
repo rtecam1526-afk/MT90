@@ -581,6 +581,25 @@ function DVFicha({ pid, onVolver }) {
   );
 }
 
+/* ── Guía de pasos ─────────────────────────────────────────────────── */
+function DVGuia({ onCerrar }) {
+  return (
+    <div className="dv-guia">
+      <div className="dv-guia-top">
+        <b>¿Cómo se usa esto?</b>
+        <button className="dv-link-btn" onClick={onCerrar}>Entendido, cerrar</button>
+      </div>
+      <ol className="dv-guia-pasos">
+        <li><b>Cargá las propiedades</b> de dueños que venden por su cuenta que vas encontrando (cartel, portal, referido) con <b>"+ Propiedad"</b>.</li>
+        <li><b>Cargá las búsquedas reales</b> de compradores de tu equipo con <b>"+ Búsqueda de comprador"</b> — así el sistema puede avisarte cuándo una propiedad le calza a alguien de verdad, no inventa compradores.</li>
+        <li><b>Entrá a cada propiedad</b> (tocá la tarjeta en el listado) para ver si tiene coincidencias y elegir con qué enfoque escribirle.</li>
+        <li><b>Pedí el mensaje sugerido</b>, revisalo o editalo, y abrilo en WhatsApp — el sistema nunca manda nada solo, vos decidís y enviás.</li>
+        <li><b>Volvé más adelante</b> a esa misma propiedad para registrar qué pasó — así no se te pisan los toques ni le escribís dos veces lo mismo.</li>
+      </ol>
+    </div>
+  );
+}
+
 /* ── Listado + orquestación ───────────────────────────────────────── */
 function DuenoVende() {
   const [propiedades, setPropiedades] = useStateDV(null);
@@ -590,6 +609,14 @@ function DuenoVende() {
   const [modalBusqueda, setModalBusqueda] = useStateDV(false);
   const [modalBusquedas, setModalBusquedas] = useStateDV(false);
   const [filtroEstado, setFiltroEstado] = useStateDV("");
+  const [verGuia, setVerGuia] = useStateDV(() => {
+    try { return localStorage.getItem("mt90_dv_guia_oculta") !== "1"; } catch (e) { return true; }
+  });
+
+  function cerrarGuia() {
+    setVerGuia(false);
+    try { localStorage.setItem("mt90_dv_guia_oculta", "1"); } catch (e) {}
+  }
 
   function cargar() {
     const params = filtroEstado ? "?estado=" + filtroEstado : "";
@@ -603,12 +630,14 @@ function DuenoVende() {
     <div className="dv-wrap fade-in">
       <div className="dif-head">
         <h1>Dueño vende</h1>
-        <p className="tq-muted">Propietarios que publican por su cuenta — pocos toques, bien elegidos.</p>
+        <p className="tq-muted">Propietarios que publican por su cuenta — pocos toques, bien elegidos. {!verGuia && <button className="dv-link-btn" style={{ marginLeft: 8 }} onClick={() => setVerGuia(true)}>¿Cómo funciona?</button>}</p>
       </div>
 
+      {verGuia && <DVGuia onCerrar={cerrarGuia} />}
+
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
-        <button className="camp-start" onClick={() => setModalCarga(true)}>+ Propiedad</button>
-        <button className="dv-link-btn" onClick={() => setModalBusqueda(true)}>+ Búsqueda de comprador</button>
+        <button className="camp-start" onClick={() => setModalCarga(true)}>1. + Propiedad</button>
+        <button className="dv-link-btn" onClick={() => setModalBusqueda(true)}>2. + Búsqueda de comprador</button>
         <button className="dv-link-btn" onClick={() => setModalBusquedas(true)}>Mis búsquedas</button>
         <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} style={{ marginLeft: "auto", padding: "7px 10px", borderRadius: 10, border: "1.5px solid var(--line-strong)", fontFamily: "inherit" }}>
           <option value="">Todos los estados</option>
