@@ -37,10 +37,70 @@ function vqFechaCorta(iso) {
   } catch (e) { return iso || ""; }
 }
 
+/* ── Registrar rápido una propiedad ya captada (sin pasar por Dueño Vende —
+   un agente puede tener algo captado por referido, boca a boca, etc.) ──── */
+function VQNuevaPropiedadCaptada({ onCreada, onCancelar }) {
+  const [dueno, setDueno] = useStateVQ(null);
+  const [barrio, setBarrio] = useStateVQ("");
+  const [tipo, setTipo] = useStateVQ("depto");
+  const [ambientes, setAmbientes] = useStateVQ("");
+  const [moneda, setMoneda] = useStateVQ("USD");
+  const [precio, setPrecio] = useStateVQ("");
+  const [guardando, setGuardando] = useStateVQ(false);
+  const [error, setError] = useStateVQ(null);
+
+  async function guardar() {
+    if (!dueno || !barrio.trim()) return;
+    setGuardando(true);
+    setError(null);
+    try {
+      const r = await window.CRM_API.post("/duenovende/propiedades", {
+        contacto_id: dueno.id, barrio: barrio.trim(), tipo,
+        ambientes: ambientes ? parseInt(ambientes, 10) : null,
+        moneda, precio_publicado_actual: precio ? parseFloat(precio) : null,
+      });
+      const prop = r.propiedad;
+      await window.CRM_API.put("/duenovende/propiedades/" + prop.id, { estado: "captada" });
+      onCreada({ ...prop, estado: "captada" });
+    } catch (e) {
+      setError(e.message);
+    }
+    setGuardando(false);
+  }
+
+  return (
+    <div className="dv-contacto-nuevo" style={{ border: "1.5px dashed var(--line-strong)", borderRadius: 12, padding: 12, marginTop: 6 }}>
+      {!dueno ? (
+        <DVBuscarContacto onPick={setDueno} />
+      ) : (
+        <div className="dv-contacto-chip">Dueño: {dueno.nombre || "Sin nombre"} <button type="button" onClick={() => setDueno(null)}>cambiar</button></div>
+      )}
+      <input value={barrio} onChange={(e) => setBarrio(e.target.value)} placeholder="Barrio" />
+      <div className="field-row">
+        <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
+          <option value="depto">Depto</option><option value="ph">PH</option><option value="casa">Casa</option>
+          <option value="terreno">Terreno</option><option value="local">Local</option><option value="otro">Otro</option>
+        </select>
+        <input type="number" value={ambientes} onChange={(e) => setAmbientes(e.target.value)} placeholder="Ambientes" />
+      </div>
+      <div className="field-row">
+        <select value={moneda} onChange={(e) => setMoneda(e.target.value)}><option value="USD">USD</option><option value="ARS">$ (pesos)</option></select>
+        <input type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Precio" />
+      </div>
+      {error && <p className="tq-error">{error}</p>}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button type="button" className="camp-start" disabled={guardando || !dueno || !barrio.trim()} onClick={guardar}>{guardando ? "Guardando…" : "Usar esta propiedad"}</button>
+        <button type="button" className="dv-link-btn" onClick={onCancelar}>Cancelar</button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Agendar visita (propiedad + comprador + precalificación) ────────── */
 function VQAgendar({ onClose, onSave }) {
   const [propiedades, setPropiedades] = useStateVQ(null);
   const [propiedadId, setPropiedadId] = useStateVQ("");
+  const [nuevaPropiedad, setNuevaPropiedad] = useStateVQ(false);
   const [comprador, setComprador] = useStateVQ(null);
   const [fecha, setFecha] = useStateVQ("");
   const [compra, setCompra] = useStateVQ("");
@@ -130,16 +190,30 @@ function VQAgendar({ onClose, onSave }) {
         <h2>Agendar visita</h2>
 
         <div className="field">
-          <label>Propiedad</label>
-          {propiedades === null ? <p className="tq-muted">Cargando…</p> : propiedades.length === 0 ? (
-            <p className="tq-muted">No tenés propiedades en "Autorización" ni "Captada" todavía — se cargan desde Dueño Vende.</p>
+          <label>Propiedad captada</label>
+          {!nuevaPropiedad ? (
+            <React.Fragment>
+              {propiedades === null ? <p className="tq-muted">Cargando…</p> : propiedades.length === 0 ? (
+                <p className="tq-muted">Todavía no tenés ninguna propiedad captada cargada.</p>
+              ) : (
+                <select value={propiedadId} onChange={(e) => setPropiedadId(e.target.value)}>
+                  <option value="">Elegí una propiedad…</option>
+                  {propiedades.map((p) => (
+                    <option key={p.id} value={p.id}>{(p.barrio || "").replace(/-/g, " ")} · {p.tipo} · {p.moneda} {p.precio_publicado_actual || "?"}</option>
+                  ))}
+                </select>
+              )}
+              <button type="button" className="dv-link-btn" style={{ marginTop: 8 }} onClick={() => setNuevaPropiedad(true)}>+ Es una propiedad captada nueva</button>
+            </React.Fragment>
           ) : (
-            <select value={propiedadId} onChange={(e) => setPropiedadId(e.target.value)}>
-              <option value="">Elegí una propiedad…</option>
-              {propiedades.map((p) => (
-                <option key={p.id} value={p.id}>{(p.barrio || "").replace(/-/g, " ")} · {p.tipo} · {p.moneda} {p.precio_publicado_actual || "?"}</option>
-              ))}
-            </select>
+            <VQNuevaPropiedadCaptada
+              onCancelar={() => setNuevaPropiedad(false)}
+              onCreada={(p) => {
+                setPropiedades((prev) => [...(prev || []), p]);
+                setPropiedadId(String(p.id));
+                setNuevaPropiedad(false);
+              }}
+            />
           )}
         </div>
 
