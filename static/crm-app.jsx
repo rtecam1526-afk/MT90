@@ -210,6 +210,9 @@ function App() {
           <button className={tab === "duenovende" ? "active" : ""} onClick={() => setTab("duenovende")}>
             Dueño vende
           </button>
+          <button className={tab === "visitas" ? "active" : ""} onClick={() => setTab("visitas")}>
+            Visitas
+          </button>
           {!t.esconderCartera && (
             <button className={tab === "cartera" ? "active" : ""} onClick={() => setTab("cartera")}>
               Cartera
@@ -255,6 +258,7 @@ function App() {
         {tab === "selecciones" && window.Selecciones && <Selecciones />}
         {tab === "difusion" && window.Difusion && <Difusion />}
         {tab === "duenovende" && window.DuenoVende && <DuenoVende />}
+        {tab === "visitas" && window.Visitas && <Visitas />}
       </main>
 
       {detalle && (

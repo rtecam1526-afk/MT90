@@ -1376,6 +1376,240 @@ def dv_crear_interaccion(pid):
     return {"ok": True, "numero_toque": numero_toque}
 
 
+# ══════════════════════════════════════════════════════════════════════
+#  VISITAS QUE CIERRAN — Fase 1
+# ══════════════════════════════════════════════════════════════════════
+# Se apoya en lo que ya existe: la propiedad es propiedades_dueno_vende
+# (no se crea una entidad "Propiedad" separada), el comprador es un
+# contacto normal, y la temperatura caliente/tibio/frío sigue siendo la
+# de contactos.etapa — este módulo la LEE y SUGIERE cambios, nunca crea
+# una escala paralela.
+
+VQ_ESTADOS = ("agendada", "realizada", "cancelada", "no_asistio")
+
+
+def _vq_mapear_etapa(e):
+    """Mismo mapeo que mapEtapa() en crm-data.jsx — para comparar la
+    etapa actual del contacto contra la que sugiere la precalificación."""
+    e = (e or "").lower()
+    if "caliente" in e:
+        return "caliente"
+    if "media" in e or "tibio" in e:
+        return "media"
+    if "fria" in e or "fría" in e:
+        return "fria"
+    return "sin"
+
+
+def _vq_sugerir_etapa(precal):
+    """Criterios configurables acá mismo. No inventa una escala nueva —
+    devuelve una de las etapas que ya existen en el CRM (caliente/media/fria)
+    según cómo y para cuándo compra el visitante."""
+    compra = precal.get("precalificacion_compra") or ""
+    timing = precal.get("precalificacion_timing") or ""
+    if compra in ("ahorros", "credito_preaprobado") and timing in ("ya", "3_meses"):
+        motivo_compra = "con ahorros" if compra == "ahorros" else "con crédito pre-aprobado"
+        motivo_timing = "ya" if timing == "ya" else "en los próximos 3 meses"
+        return "caliente", f"Dijo que compra {motivo_compra} y que se muda {motivo_timing} — ¿lo pasás a Caliente?"
+    if timing == "explorando" or compra == "vendiendo_no_publicada":
+        motivo = "está explorando, sin apuro" if timing == "explorando" else "depende de vender una propiedad que todavía ni publicó"
+        return "fria", f"Dijo que {motivo} — ¿lo pasás a Fría?"
+    return "media", "Las respuestas no suenan ni muy urgentes ni muy lejanas — ¿lo dejás en Media?"
+
+
+def _vq_formatear_fecha(iso_str):
+    try:
+        d = datetime.datetime.fromisoformat((iso_str or "").replace("Z", "+00:00"))
+        return d.strftime("%d/%m a las %H:%M")
+    except Exception:
+        return iso_str or ""
+
+
+def _vq_mensaje_precalificacion(nombre, fecha_fmt):
+    primer = (nombre or "").split(" ")[0]
+    saludo = f"Hola {primer}!" if primer else "Hola!"
+    return (
+        f"{saludo} Te confirmo la visita del {fecha_fmt}. Para mostrarte lo que más te sirva: "
+        "¿estás comprando con ahorros, con crédito o vendiendo otra propiedad? "
+        "¿Y para cuándo necesitás mudarte?"
+    )
+
+
+VQ_MENSAJES_SEGUIMIENTO = {
+    "precio": "¿Qué valor te parecería razonable para avanzar? Lo puedo conversar con el propietario.",
+    "estado": "Te paso un estimado de lo que podría costar la reforma que mencionaste.",
+    "financiacion": "¿Querés que veamos juntos las opciones de crédito?",
+}
+
+
+def _vq_mensaje_seguimiento(objecion, interes):
+    if objecion in VQ_MENSAJES_SEGUIMIENTO:
+        return VQ_MENSAJES_SEGUIMIENTO[objecion]
+    if objecion in (None, "", "ninguna") and (interes or 0) >= 4:
+        return "¿Qué te frenaría para hacer una oferta?"
+    return "¿Cómo seguís pensando la propiedad que visitaste? Cualquier duda, estoy para ayudarte."
+
+
+@app.route("/visitas", methods=["POST"])
+@login_required
+def vq_crear_visita():
+    """Agendar visita + precalificación (sección 3.1 de la spec) en el mismo
+    paso — son 3 toques, no una pantalla aparte."""
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    propiedad_id = data.get("propiedad_id")
+    comprador_id = data.get("comprador_id")
+    fecha_hora = (data.get("fecha_hora") or "").strip()
+    if not propiedad_id or not comprador_id or not fecha_hora:
+        return {"error": "Faltan datos (propiedad, comprador o fecha)"}, 400
+
+    fila = {
+        "agente": agente_key, "propiedad_id": propiedad_id, "comprador_id": comprador_id,
+        "fecha_hora": fecha_hora, "estado": "agendada",
+        "precalificacion_compra": data.get("precalificacion_compra"),
+        "precalificacion_timing": data.get("precalificacion_timing"),
+        "precalificacion_competencia": data.get("precalificacion_competencia"),
+    }
+    r = _req.post(
+        f"{SUPABASE_URL}/rest/v1/visitas",
+        headers={**_supa_hdrs(), "Prefer": "return=representation"}, json=fila, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    visita = r.json()[0]
+
+    sugerencia_etapa = None
+    if data.get("precalificacion_compra") or data.get("precalificacion_timing"):
+        rc = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos",
+            headers=_supa_hdrs(), params={"id": f"eq.{comprador_id}", "select": "etapa"}, timeout=10,
+        )
+        etapa_actual = rc.json()[0].get("etapa") if rc.ok and rc.json() else None
+        etapa_sug, motivo = _vq_sugerir_etapa(data)
+        if _vq_mapear_etapa(etapa_actual) != etapa_sug:
+            sugerencia_etapa = {"etapa": etapa_sug, "motivo": motivo}
+
+    rcc = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers=_supa_hdrs(), params={"id": f"eq.{comprador_id}", "select": "nombre,telefono"}, timeout=10,
+    )
+    comprador = rcc.json()[0] if rcc.ok and rcc.json() else {}
+    mensaje = _vq_mensaje_precalificacion(comprador.get("nombre"), _vq_formatear_fecha(fecha_hora))
+
+    return {"ok": True, "visita": visita, "sugerencia_etapa": sugerencia_etapa, "mensaje_precalificacion": mensaje, "comprador": comprador}
+
+
+@app.route("/visitas", methods=["GET"])
+@login_required
+def vq_listar_visitas():
+    agente_key = session.get("agente_key", "")
+    params = {"agente": f"eq.{agente_key}", "select": "*", "order": "fecha_hora.desc"}
+    if request.args.get("estado"):
+        params["estado"] = f"eq.{request.args.get('estado')}"
+    if request.args.get("propiedad_id"):
+        params["propiedad_id"] = f"eq.{request.args.get('propiedad_id')}"
+    r = _req.get(f"{SUPABASE_URL}/rest/v1/visitas", headers=_supa_hdrs(), params=params, timeout=15)
+    if not r.ok:
+        return {"error": r.text}, 500
+    visitas = r.json()
+
+    prop_ids = sorted({v["propiedad_id"] for v in visitas})
+    comp_ids = sorted({v["comprador_id"] for v in visitas})
+    props, comps = {}, {}
+    if prop_ids:
+        rp = _req.get(
+            f"{SUPABASE_URL}/rest/v1/propiedades_dueno_vende", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in prop_ids)})", "select": "id,barrio,tipo"}, timeout=15,
+        )
+        if rp.ok:
+            props = {p["id"]: p for p in rp.json()}
+    if comp_ids:
+        rc = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in comp_ids)})", "select": "id,nombre,telefono,etapa"}, timeout=15,
+        )
+        if rc.ok:
+            comps = {c["id"]: c for c in rc.json()}
+    for v in visitas:
+        v["_propiedad"] = props.get(v["propiedad_id"])
+        v["_comprador"] = comps.get(v["comprador_id"])
+    return {"visitas": visitas}
+
+
+@app.route("/visitas/<int:vid>", methods=["PUT"])
+@login_required
+def vq_editar_visita(vid):
+    """Un solo endpoint para todo lo que se actualiza después de crear la
+    visita: el checklist de salida (3 toques), cancelar/no-show, y marcar
+    los seguimientos de 24hs/3 días como hechos."""
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    data.pop("id", None); data.pop("agente", None); data.pop("propiedad_id", None); data.pop("comprador_id", None)
+
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/visitas",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"id": f"eq.{vid}", "agente": f"eq.{agente_key}"}, json=data, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+
+    if data.get("estado") == "realizada":
+        rv = _req.get(
+            f"{SUPABASE_URL}/rest/v1/visitas", headers=_supa_hdrs(),
+            params={"id": f"eq.{vid}", "select": "comprador_id"}, timeout=10,
+        )
+        comprador_id = rv.json()[0]["comprador_id"] if rv.ok and rv.json() else None
+        _registrar_evento(agente_key, "visita", comprador_id)  # mismo evento que ya suma XP y cuenta para el Semáforo
+
+    return {"ok": True}
+
+
+@app.route("/visitas/seguimientos", methods=["GET"])
+@login_required
+def vq_seguimientos():
+    """Visitas realizadas que ya están en ventana de seguimiento (24hs o,
+    si el de 24hs ya se hizo y pasaron 3 días sin respuesta, el segundo)."""
+    agente_key = session.get("agente_key", "")
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/visitas", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "estado": "eq.realizada", "select": "*", "order": "fecha_hora.desc"}, timeout=15,
+    )
+    visitas = r.json() if r.ok else []
+
+    ahora = datetime.datetime.now(datetime.timezone.utc)
+    candidatas = []
+    for v in visitas:
+        try:
+            fh = datetime.datetime.fromisoformat((v.get("fecha_hora") or "").replace("Z", "+00:00"))
+        except Exception:
+            continue
+        horas = (ahora - fh).total_seconds() / 3600
+        if not v.get("seguimiento_24h_hecho") and horas >= 24:
+            candidatas.append((v, "24h"))
+        elif v.get("seguimiento_24h_hecho") and not v.get("seguimiento_3d_hecho") and horas >= 72:
+            candidatas.append((v, "3d"))
+
+    comp_ids = sorted({v["comprador_id"] for v, _ in candidatas})
+    comps = {}
+    if comp_ids:
+        rc = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in comp_ids)})", "select": "id,nombre,telefono"}, timeout=15,
+        )
+        if rc.ok:
+            comps = {c["id"]: c for c in rc.json()}
+
+    pendientes = [
+        {
+            "visita_id": v["id"], "tipo": tipo, "comprador": comps.get(v["comprador_id"]),
+            "mensaje": _vq_mensaje_seguimiento(v.get("objecion_principal"), v.get("interes")),
+        }
+        for v, tipo in candidatas
+    ]
+    return {"pendientes": pendientes}
+
+
 _SUPA_INJECT = r"""
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

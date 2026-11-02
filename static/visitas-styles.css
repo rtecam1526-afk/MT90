@@ -1,0 +1,8 @@
+.vq-emoji-row { display: flex; gap: 10px; }
+.vq-emoji-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border: 1.5px solid var(--line-strong); background: var(--surface); border-radius: 12px;
+  padding: 12px 8px; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted);
+}
+.vq-emoji-btn.active { border-color: var(--primary); background: var(--primary-soft, #FDE8E0); color: var(--primary); }
+.vq-emoji { font-size: 26px; }
