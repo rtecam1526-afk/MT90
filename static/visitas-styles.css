@@ -1,3 +1,8 @@
+.vq-fila-propiedad {
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px 10px 2px; margin-bottom: 10px; background: var(--surface);
+}
+.vq-fila-propiedad .field-row { margin-bottom: 8px; }
+
 .vq-emoji-row { display: flex; gap: 10px; }
 .vq-emoji-btn {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;

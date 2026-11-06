@@ -96,13 +96,17 @@ function VQNuevaPropiedadCaptada({ onCreada, onCancelar }) {
   );
 }
 
-/* ── Agendar visita (propiedad + comprador + precalificación) ────────── */
+/* ── Agendar visita (comprador + 1 o varias propiedades + precalificación) ──
+   Una búsqueda de comprador puede terminar en varias propiedades del mismo
+   recorrido (4, o más) — se agendan todas juntas, con una sola
+   precalificación, porque es la misma persona respondiendo las mismas 3
+   preguntas una sola vez. */
+let _vqFilaId = 0;
 function VQAgendar({ onClose, onSave }) {
   const [propiedades, setPropiedades] = useStateVQ(null);
-  const [propiedadId, setPropiedadId] = useStateVQ("");
-  const [nuevaPropiedad, setNuevaPropiedad] = useStateVQ(false);
+  const [filas, setFilas] = useStateVQ([{ id: ++_vqFilaId, propiedadId: "", fecha: "" }]);
+  const [nuevaPropiedadEn, setNuevaPropiedadEn] = useStateVQ(null); // id de la fila que está cargando una propiedad nueva, o null
   const [comprador, setComprador] = useStateVQ(null);
-  const [fecha, setFecha] = useStateVQ("");
   const [compra, setCompra] = useStateVQ("");
   const [timing, setTiming] = useStateVQ("");
   const [competencia, setCompetencia] = useStateVQ("");
@@ -117,13 +121,27 @@ function VQAgendar({ onClose, onSave }) {
     }).catch(() => setPropiedades([]));
   }, []);
 
+  function actualizarFila(id, campo, valor) {
+    setFilas((prev) => prev.map((f) => (f.id === id ? { ...f, [campo]: valor } : f)));
+  }
+  function agregarFila() {
+    setFilas((prev) => [...prev, { id: ++_vqFilaId, propiedadId: "", fecha: "" }]);
+  }
+  function sacarFila(id) {
+    setFilas((prev) => (prev.length > 1 ? prev.filter((f) => f.id !== id) : prev));
+  }
+
+  const filasCompletas = filas.filter((f) => f.propiedadId && f.fecha);
+  const puedeGuardar = comprador && filasCompletas.length > 0 && filasCompletas.length === filas.length;
+
   async function guardar() {
-    if (!propiedadId || !comprador || !fecha) return;
+    if (!puedeGuardar) return;
     setGuardando(true);
     setError(null);
     try {
       const r = await window.CRM_API.post("/visitas", {
-        propiedad_id: parseInt(propiedadId, 10), comprador_id: comprador.id, fecha_hora: vqFechaInputAIso(fecha),
+        comprador_id: comprador.id,
+        propiedades: filas.map((f) => ({ propiedad_id: parseInt(f.propiedadId, 10), fecha_hora: vqFechaInputAIso(f.fecha) })),
         precalificacion_compra: compra || null, precalificacion_timing: timing || null, precalificacion_competencia: competencia || null,
       });
       setResultado(r);
@@ -154,7 +172,7 @@ function VQAgendar({ onClose, onSave }) {
       <div className="modal-backdrop" onClick={onClose}>
         <div className="modal" onClick={(e) => e.stopPropagation()}>
           <div className="m-kicker">Visitas que cierran</div>
-          <h2>¡Visita agendada!</h2>
+          <h2>{resultado.visitas && resultado.visitas.length > 1 ? `¡${resultado.visitas.length} visitas agendadas!` : "¡Visita agendada!"}</h2>
 
           {resultado.sugerencia_etapa && (
             <div className="mb-banner mb-media" style={{ marginBottom: 14 }}>
@@ -189,34 +207,6 @@ function VQAgendar({ onClose, onSave }) {
         <div className="m-kicker">Visitas que cierran</div>
         <h2>Agendar visita</h2>
 
-        <div className="field">
-          <label>Propiedad captada</label>
-          {!nuevaPropiedad ? (
-            <React.Fragment>
-              {propiedades === null ? <p className="tq-muted">Cargando…</p> : propiedades.length === 0 ? (
-                <p className="tq-muted">Todavía no tenés ninguna propiedad captada cargada.</p>
-              ) : (
-                <select value={propiedadId} onChange={(e) => setPropiedadId(e.target.value)}>
-                  <option value="">Elegí una propiedad…</option>
-                  {propiedades.map((p) => (
-                    <option key={p.id} value={p.id}>{(p.barrio || "").replace(/-/g, " ")} · {p.tipo} · {p.moneda} {p.precio_publicado_actual || "?"}</option>
-                  ))}
-                </select>
-              )}
-              <button type="button" className="dv-link-btn" style={{ marginTop: 8 }} onClick={() => setNuevaPropiedad(true)}>+ Es una propiedad captada nueva</button>
-            </React.Fragment>
-          ) : (
-            <VQNuevaPropiedadCaptada
-              onCancelar={() => setNuevaPropiedad(false)}
-              onCreada={(p) => {
-                setPropiedades((prev) => [...(prev || []), p]);
-                setPropiedadId(String(p.id));
-                setNuevaPropiedad(false);
-              }}
-            />
-          )}
-        </div>
-
         {!comprador ? (
           <DVBuscarContacto onPick={setComprador} />
         ) : (
@@ -227,8 +217,38 @@ function VQAgendar({ onClose, onSave }) {
         )}
 
         <div className="field">
-          <label>Fecha y hora</label>
-          <input type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          <label>Propiedades a visitar <span className="opt">· puede ser más de una</span></label>
+          {filas.map((f, i) => (
+            <div key={f.id} className="vq-fila-propiedad">
+              {nuevaPropiedadEn === f.id ? (
+                <VQNuevaPropiedadCaptada
+                  onCancelar={() => setNuevaPropiedadEn(null)}
+                  onCreada={(p) => {
+                    setPropiedades((prev) => [...(prev || []), p]);
+                    actualizarFila(f.id, "propiedadId", String(p.id));
+                    setNuevaPropiedadEn(null);
+                  }}
+                />
+              ) : (
+                <React.Fragment>
+                  <div className="field-row">
+                    <select value={f.propiedadId} onChange={(e) => actualizarFila(f.id, "propiedadId", e.target.value)}>
+                      <option value="">{propiedades === null ? "Cargando…" : "Elegí una propiedad…"}</option>
+                      {(propiedades || []).map((p) => (
+                        <option key={p.id} value={p.id}>{(p.barrio || "").replace(/-/g, " ")} · {p.tipo} · {p.moneda} {p.precio_publicado_actual || "?"}</option>
+                      ))}
+                    </select>
+                    <input type="datetime-local" value={f.fecha} onChange={(e) => actualizarFila(f.id, "fecha", e.target.value)} />
+                  </div>
+                  <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                    <button type="button" className="dv-link-btn" onClick={() => setNuevaPropiedadEn(f.id)}>+ Propiedad captada nueva</button>
+                    {filas.length > 1 && <button type="button" className="dv-link-btn" onClick={() => sacarFila(f.id)}>Sacar</button>}
+                  </div>
+                </React.Fragment>
+              )}
+            </div>
+          ))}
+          <button type="button" className="dv-link-btn" onClick={agregarFila}>+ Agregar otra propiedad</button>
         </div>
 
         <div className="field">
@@ -258,7 +278,7 @@ function VQAgendar({ onClose, onSave }) {
 
         {error && <p className="tq-error">{error}</p>}
         <div className="modal-actions">
-          <button className="save" disabled={guardando || !propiedadId || !comprador || !fecha} onClick={guardar}>{guardando ? "Guardando…" : "Agendar visita"}</button>
+          <button className="save" disabled={guardando || !puedeGuardar} onClick={guardar}>{guardando ? "Guardando…" : filasCompletas.length > 1 ? `Agendar ${filasCompletas.length} visitas` : "Agendar visita"}</button>
           <button className="cancel" onClick={onClose}>Cancelar</button>
         </div>
       </div>

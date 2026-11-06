@@ -1453,30 +1453,46 @@ def _vq_mensaje_seguimiento(objecion, interes):
 @app.route("/visitas", methods=["POST"])
 @login_required
 def vq_crear_visita():
-    """Agendar visita + precalificación (sección 3.1 de la spec) en el mismo
-    paso — son 3 toques, no una pantalla aparte."""
+    """Agendar una o varias visitas + precalificación (sección 3.1 de la
+    spec) en el mismo paso. Una búsqueda de comprador puede terminar en
+    varias propiedades del mismo recorrido (4, o más) — se cargan todas
+    juntas, con una sola precalificación, porque es la misma persona
+    respondiendo las mismas 3 preguntas, no tiene sentido repetirlas por
+    cada propiedad. `propiedades` es una lista de {propiedad_id, fecha_hora};
+    por compatibilidad también acepta un solo propiedad_id/fecha_hora sueltos."""
     agente_key = session.get("agente_key", "")
     data = request.get_json(silent=True) or {}
-    propiedad_id = data.get("propiedad_id")
     comprador_id = data.get("comprador_id")
-    fecha_hora = (data.get("fecha_hora") or "").strip()
-    if not propiedad_id or not comprador_id or not fecha_hora:
-        return {"error": "Faltan datos (propiedad, comprador o fecha)"}, 400
+    items = data.get("propiedades")
+    if not items and data.get("propiedad_id") and data.get("fecha_hora"):
+        items = [{"propiedad_id": data.get("propiedad_id"), "fecha_hora": data.get("fecha_hora")}]
+    items = items or []
+    if not comprador_id or not items:
+        return {"error": "Faltan datos (comprador y al menos una propiedad con fecha)"}, 400
 
-    fila = {
-        "agente": agente_key, "propiedad_id": propiedad_id, "comprador_id": comprador_id,
-        "fecha_hora": fecha_hora, "estado": "agendada",
-        "precalificacion_compra": data.get("precalificacion_compra"),
-        "precalificacion_timing": data.get("precalificacion_timing"),
-        "precalificacion_competencia": data.get("precalificacion_competencia"),
-    }
+    filas = []
+    for it in items:
+        pid = it.get("propiedad_id")
+        fh = (it.get("fecha_hora") or "").strip()
+        if not pid or not fh:
+            continue
+        filas.append({
+            "agente": agente_key, "propiedad_id": pid, "comprador_id": comprador_id,
+            "fecha_hora": fh, "estado": "agendada",
+            "precalificacion_compra": data.get("precalificacion_compra"),
+            "precalificacion_timing": data.get("precalificacion_timing"),
+            "precalificacion_competencia": data.get("precalificacion_competencia"),
+        })
+    if not filas:
+        return {"error": "Ninguna propiedad tiene fecha válida"}, 400
+
     r = _req.post(
         f"{SUPABASE_URL}/rest/v1/visitas",
-        headers={**_supa_hdrs(), "Prefer": "return=representation"}, json=fila, timeout=10,
+        headers={**_supa_hdrs(), "Prefer": "return=representation"}, json=filas, timeout=10,
     )
     if not r.ok:
         return {"error": r.text}, 500
-    visita = r.json()[0]
+    visitas = r.json()
 
     sugerencia_etapa = None
     if data.get("precalificacion_compra") or data.get("precalificacion_timing"):
@@ -1494,9 +1510,21 @@ def vq_crear_visita():
         headers=_supa_hdrs(), params={"id": f"eq.{comprador_id}", "select": "nombre,telefono"}, timeout=10,
     )
     comprador = rcc.json()[0] if rcc.ok and rcc.json() else {}
-    mensaje = _vq_mensaje_precalificacion(comprador.get("nombre"), _vq_formatear_fecha(fecha_hora))
+    if len(visitas) == 1:
+        mensaje = _vq_mensaje_precalificacion(comprador.get("nombre"), _vq_formatear_fecha(visitas[0]["fecha_hora"]))
+    else:
+        primer = (comprador.get("nombre") or "").split(" ")[0]
+        saludo = f"Hola {primer}!" if primer else "Hola!"
+        mensaje = (
+            f"{saludo} Te confirmo que coordinamos {len(visitas)} visitas para recorrer juntos. "
+            "Para mostrarte lo que más te sirva en cada una: ¿estás comprando con ahorros, con crédito o vendiendo otra propiedad? "
+            "¿Y para cuándo necesitás mudarte?"
+        )
 
-    return {"ok": True, "visita": visita, "sugerencia_etapa": sugerencia_etapa, "mensaje_precalificacion": mensaje, "comprador": comprador}
+    return {
+        "ok": True, "visita": visitas[0], "visitas": visitas,
+        "sugerencia_etapa": sugerencia_etapa, "mensaje_precalificacion": mensaje, "comprador": comprador,
+    }
 
 
 @app.route("/visitas", methods=["GET"])
