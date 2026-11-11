@@ -3971,11 +3971,15 @@ def crear_campana():
     data = request.get_json()
     if not data or not data.get("titulo") or not data.get("mensaje"):
         return {"error": "Falta titulo o mensaje"}, 400
+    etapa_objetivo = data.get("etapa_objetivo")
+    if etapa_objetivo not in (None, "caliente", "media", "fria"):
+        return {"error": "etapa_objetivo inválida"}, 400
     row = {
         "agente":  agente_key,
         "titulo":  data["titulo"],
         "mensaje": data["mensaje"],
         "imagen":  data.get("imagen"),
+        "etapa_objetivo": etapa_objetivo,
     }
     r = _req.post(
         f"{SUPABASE_URL}/rest/v1/campanas",
@@ -3996,8 +4000,10 @@ def editar_campana(cid):
     if not data:
         return {"error": "No data"}, 400
     cambios = {}
-    for campo in ("titulo", "mensaje", "imagen"):
+    for campo in ("titulo", "mensaje", "imagen", "etapa_objetivo"):
         if campo in data:
+            if campo == "etapa_objetivo" and data[campo] not in (None, "caliente", "media", "fria"):
+                return {"error": "etapa_objetivo inválida"}, 400
             cambios[campo] = data[campo]
     if not cambios:
         return {"error": "Nada para actualizar"}, 400

@@ -28,11 +28,16 @@ function inferirGenero(campana) {
   return null;
 }
 
+// Además del género, una campaña (sobre todo una armada a mano, como la de
+// Mauro para el finde largo) puede apuntar a una sola etapa de la cartera
+// (caliente/tibio/frío) — se aplica DESPUÉS del filtro de género, sobre la
+// misma lista, así los dos filtros se pueden combinar sin pisarse.
 function queuePara(data, campana) {
   const genero = inferirGenero(campana);
-  return genero === 'mujer' ? data.carteraQueueMujeres
-       : genero === 'hombre' ? data.carteraQueueHombres
-       : data.carteraQueue;
+  const base = genero === 'mujer' ? data.carteraQueueMujeres
+             : genero === 'hombre' ? data.carteraQueueHombres
+             : data.carteraQueue;
+  return campana.etapa_objetivo ? base.filter((c) => c.etapa === campana.etapa_objetivo) : base;
 }
 
 // WhatsApp (wa.me) solo permite precargar texto, nunca una imagen — no existe
@@ -58,6 +63,7 @@ function Campanas({ data, onWhatsapp }) {
   const [nuevaTitulo, setNuevaTitulo] = useStateC('');
   const [nuevaMensaje,setNuevaMensaje]= useStateC('');
   const [nuevaImagen, setNuevaImagen] = useStateC(null);
+  const [nuevaEtapa,  setNuevaEtapa]  = useStateC(''); // '' = toda la cartera | 'caliente' | 'media' | 'fria'
   const [guardando,   setGuardando]   = useStateC(false);
   // Campañas propias ya guardadas — antes se perdían si no se enviaban en
   // el momento; ahora quedan acá disponibles hasta que el agente las borre.
@@ -75,6 +81,7 @@ function Campanas({ data, onWhatsapp }) {
   const [editTitulo, setEditTitulo] = useStateC('');
   const [editMensaje,setEditMensaje]= useStateC('');
   const [editImagen, setEditImagen] = useStateC(null);
+  const [editEtapa,  setEditEtapa]  = useStateC('');
   const [editGuardando, setEditGuardando] = useStateC(false);
 
   useEffectC(() => {
@@ -99,10 +106,11 @@ function Campanas({ data, onWhatsapp }) {
     const mensaje = nuevaMensaje.trim();
     if (!titulo || !mensaje) return;
     setGuardando(true);
-    let guardada = { id: 'custom-' + Date.now(), titulo, mensaje, imagen: nuevaImagen || null };
+    const etapa_objetivo = nuevaEtapa || null;
+    let guardada = { id: 'custom-' + Date.now(), titulo, mensaje, imagen: nuevaImagen || null, etapa_objetivo };
     try {
       if (window.CRM_API) {
-        guardada = await window.CRM_API.post('/campanas', { titulo, mensaje, imagen: nuevaImagen || null });
+        guardada = await window.CRM_API.post('/campanas', { titulo, mensaje, imagen: nuevaImagen || null, etapa_objetivo });
         setGuardadas(g => [guardada, ...g]);
       }
     } catch (e) {
@@ -113,6 +121,7 @@ function Campanas({ data, onWhatsapp }) {
     setNuevaTitulo('');
     setNuevaMensaje('');
     setNuevaImagen(null);
+    setNuevaEtapa('');
     setEnviando({ ...guardada, alcance: queuePara(data, guardada).length });
   }
 
@@ -126,6 +135,7 @@ function Campanas({ data, onWhatsapp }) {
     setEditTitulo(g.titulo);
     setEditMensaje(g.mensaje);
     setEditImagen(g.imagen || null);
+    setEditEtapa(g.etapa_objetivo || '');
   }
   function cancelarEdicion() { setEditandoId(null); }
   function onEditImagenSelect(e) {
@@ -140,7 +150,7 @@ function Campanas({ data, onWhatsapp }) {
     const mensaje = editMensaje.trim();
     if (!titulo || !mensaje) return;
     setEditGuardando(true);
-    const cambios = { titulo, mensaje, imagen: editImagen || null };
+    const cambios = { titulo, mensaje, imagen: editImagen || null, etapa_objetivo: editEtapa || null };
     try {
       if (window.CRM_API) await window.CRM_API.put('/campanas/' + id, cambios);
       setGuardadas(g => g.map(c => c.id === id ? { ...c, ...cambios } : c));
@@ -194,6 +204,14 @@ function Campanas({ data, onWhatsapp }) {
                 <button className="camp-nueva-img-remove" onClick={() => setNuevaImagen(null)}>✕ Quitar</button>
               )}
             </div>
+            <div className="field" style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 6 }}>¿A quién se la mandás?</label>
+              <div className="dstage-picker">
+                {[['', 'Toda la cartera'], ['caliente', 'Solo Caliente'], ['media', 'Solo Tibio'], ['fria', 'Solo Frío']].map(([k, lbl]) => (
+                  <button type="button" key={k || 'todos'} className={"dstage-opt" + (nuevaEtapa === k ? " active" : "")} onClick={() => setNuevaEtapa(k)}>{lbl}</button>
+                ))}
+              </div>
+            </div>
             <button
               className="camp-start"
               style={{ marginTop: 8 }}
@@ -239,6 +257,14 @@ function Campanas({ data, onWhatsapp }) {
                       <button className="camp-nueva-img-remove" onClick={() => setEditImagen(null)}>✕ Quitar</button>
                     )}
                   </div>
+                  <div className="field" style={{ marginBottom: 8 }}>
+                    <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 6 }}>¿A quién se la mandás?</label>
+                    <div className="dstage-picker">
+                      {[['', 'Toda la cartera'], ['caliente', 'Solo Caliente'], ['media', 'Solo Tibio'], ['fria', 'Solo Frío']].map(([k, lbl]) => (
+                        <button type="button" key={k || 'todos'} className={"dstage-opt" + (editEtapa === k ? " active" : "")} onClick={() => setEditEtapa(k)}>{lbl}</button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="camp-guardada-edit-actions">
                     <button className="cola-skip" onClick={cancelarEdicion}>Cancelar</button>
                     <button
@@ -257,7 +283,7 @@ function Campanas({ data, onWhatsapp }) {
                     : <div className="camp-cal"><span className="camp-cal-d">✉</span></div>
                   }
                   <div className="camp-agenda-id">
-                    <div className="camp-agenda-title">{g.titulo}</div>
+                    <div className="camp-agenda-title">{g.titulo} {g.etapa_objetivo && <StageTag etapa={g.etapa_objetivo} />}</div>
                     <div className="camp-agenda-sub">{g.mensaje}</div>
                   </div>
                   <button className="camp-guardada-edit-btn" onClick={() => empezarEdicion(g)} title="Editar">✏</button>
