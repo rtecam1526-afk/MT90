@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Club de referidos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F5F5F7;--card:#FFFFFF;--ink:#16171D;--mut:#5E6170;--line:#E4E5EC;--acc:{{ color }};--acc2:{{ acc2 }};--onacc:#FFFFFF;--amb:#A86A00;--amb2:#FFF2D4;--grn:#0F7A4A;--grn2:#DDF5E8;color-scheme:light}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#101117;--card:#1A1B23;--ink:#F2F3F7;--mut:#A8ABBA;--line:#2A2C38;--acc:{{ acc_dark }};--acc2:{{ acc2_dark }};--onacc:#101117;--amb:#FFC24B;--amb2:#3A2E12;--grn:#5ED6A0;--grn2:#123A2A;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#101117;--card:#1A1B23;--ink:#F2F3F7;--mut:#A8ABBA;--line:#2A2C38;--acc:{{ acc_dark }};--acc2:{{ acc2_dark }};--onacc:#101117;--amb:#FFC24B;--amb2:#3A2E12;--grn:#5ED6A0;--grn2:#123A2A;color-scheme:dark}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,sans-serif;line-height:1.45}
+.wrap{max-width:720px;margin:0 auto;padding:22px 16px 48px;display:flex;flex-direction:column;gap:16px}
+h1,h2,.num{font-family:'Space Grotesk',Inter,sans-serif;letter-spacing:-.01em;margin:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px}
+.hero{background:var(--acc);color:var(--onacc);border:none}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.85}
+.bal{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:18px}
+.bal>div{background:rgba(255,255,255,.14);border-radius:14px;padding:12px}
+.bal .num{font-size:26px}
+.bal small{display:block;font-size:12px;opacity:.85;margin-top:2px}
+.tbl{overflow-x:auto;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:460px}
+th{text-align:left;font-size:12px;color:var(--mut);font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:8px 6px;border-bottom:1px solid var(--line)}
+td{padding:10px 6px;border-bottom:1px solid var(--line)}
+td.pts{font-weight:700;color:var(--amb);text-align:right;white-space:nowrap}
+.st{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:var(--bg);color:var(--mut)}
+.st.ok{background:var(--grn2);color:var(--grn)}.st.mid{background:var(--amb2);color:var(--amb)}
+.vacio{color:var(--mut);font-size:14px;margin-top:10px}
+.ben{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.ben>div{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.ben b{font-size:15px}
+.ben span{font-size:13px;font-weight:700;color:var(--amb)}
+.bar{height:8px;border-radius:999px;background:var(--bg);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc)}
+.ben button{margin-top:4px;min-height:38px;border:none;border-radius:10px;background:var(--acc);color:var(--onacc);font:inherit;font-weight:700;font-size:13px;cursor:pointer}
+.ben button:disabled{opacity:.4;cursor:default}
+.q{margin-top:16px}
+.q p{margin:0 0 8px;font-weight:600}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts button{min-height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.opts button[aria-pressed="true"]{background:var(--acc);border-color:var(--acc);color:var(--onacc)}
+input[type=text]{width:100%;min-height:44px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit}
+.send{margin-top:18px;width:100%;min-height:52px;border:none;border-radius:14px;background:var(--acc);color:var(--onacc);font:inherit;font-weight:800;font-size:16px;cursor:pointer}
+.send:disabled{opacity:.45;cursor:default}
+.done{margin-top:14px;padding:14px;border-radius:14px;background:var(--grn2);color:var(--grn);font-weight:600;display:none}
+.done a{color:inherit;font-weight:800}
+.wabackup{margin-top:10px;width:100%;min-height:46px;border:1.5px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:inherit;font-weight:700;cursor:pointer;display:none}
+.pill{display:inline-block;padding:6px 12px;border-radius:999px;background:var(--amb2);color:var(--amb);font-weight:700;font-size:13px}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.foot{font-size:12px;color:var(--mut);text-align:center;line-height:1.6}
+.foot a{color:var(--mut)}
+@media (max-width:520px){.bal .num{font-size:21px}.ben{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+
+<div class="card hero">
+  <div class="eyebrow" id="club"></div>
+  <h1 style="font-size:30px;margin-top:8px" id="hola"></h1>
+  <div style="opacity:.9;font-size:15px" id="per"></div>
+  <div class="bal">
+    <div><div class="num" id="saldo"></div><small>Tus puntos</small></div>
+    <div><div class="num" id="mes"></div><small>Sumados este mes</small></div>
+    <div><div class="num" id="refs"></div><small>Personas que recomendaste</small></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="font-size:20px">Tus recomendaciones</h2>
+  <div style="color:var(--mut);font-size:14px">Las personas que nos recomendaste y cómo avanzan. Sumás puntos en cada paso.</div>
+  <div class="tbl" id="tblWrap" style="display:none"><table><thead><tr><th>Fecha</th><th>Recomendaste a</th><th>Estado</th><th style="text-align:right">Puntos</th></tr></thead><tbody id="rows"></tbody></table></div>
+  <div class="vacio" id="sinRefs" style="display:none">Todavía no nos recomendaste a nadie — contanos en la encuesta de abajo si conocés a alguien.</div>
+</div>
+
+<div class="card" id="benCard" style="display:none">
+  <h2 style="font-size:20px">Lo que podés canjear</h2>
+  <div class="ben" id="ben"></div>
+</div>
+
+<div class="card" id="encCard">
+  <div class="row"><h2 style="font-size:20px">Encuesta del mes</h2><span class="pill">+150 puntos</span></div>
+  <div style="color:var(--mut);font-size:14px">Un minuto. Si nos recomendás a alguien, en breve lo revisamos y sumás +200 extra.</div>
+  <div class="q"><p>1. ¿Cómo calificarías la atención que recibiste?</p><div class="opts" data-q="atencion"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div></div>
+  <div class="q"><p>2. ¿Pensás mudarte en el próximo año?</p><div class="opts" data-q="mudanza"><button data-v="si">Sí</button><button data-v="tal_vez">Tal vez</button><button data-v="no">No por ahora</button></div></div>
+  <div class="q"><p>3. ¿Conocés a alguien que quiera vender, comprar o alquilar?</p><div class="opts" data-q="conoce"><button data-v="si">Sí</button><button data-v="no">No por ahora</button></div></div>
+  <div class="q" id="refBox" style="display:none"><p>¿A quién? (opcional, +200 puntos cuando lo validemos)</p><input type="text" id="ref" placeholder="Nombre y, si querés, su teléfono"></div>
+  <button class="send" id="send" disabled>Enviar respuestas</button>
+  <div class="done" id="done"></div>
+  <button class="wabackup" id="waBtn">Avisale por WhatsApp también</button>
+</div>
+<div class="foot" id="foot"></div>
+<div class="foot">¿No querés recibir más esto? <a href="#" id="bajaLink">Darte de baja del club</a>.</div>
+</div>
+<script>
+const TOKEN = {{ token|tojson }};
+const D = {{ datos_json|safe }};
+const $=s=>document.querySelector(s); const fmt=n=>n.toLocaleString('es-AR');
+
+$('#club').textContent='Club de referidos · '+D.agente;
+$('#hola').textContent='Hola, '+D.contacto;
+$('#per').textContent='Tu estado de cuenta · '+D.periodo;
+$('#saldo').textContent=fmt(D.saldo); $('#mes').textContent=(D.sumados>=0?'+':'')+fmt(D.sumados); $('#refs').textContent=D.recomendaciones.length;
+
+if (D.recomendaciones.length > 0) {
+  $('#tblWrap').style.display = 'block';
+  D.recomendaciones.forEach(r=>{
+    const tr=document.createElement('tr');
+    const cls = r.estado==='Operación' ? 'ok' : (['Reunión','Visita','Tasación'].includes(r.estado) ? 'mid' : '');
+    [r.fecha, r.nombre].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
+    const td=document.createElement('td');const sp=document.createElement('span');sp.className='st '+cls;sp.textContent=r.estado;td.appendChild(sp);tr.appendChild(td);
+    const tp=document.createElement('td');tp.className='pts';tp.textContent=(r.puntos>=0?'+':'')+fmt(r.puntos);tr.appendChild(tp);
+    $('#rows').appendChild(tr);
+  });
+} else {
+  $('#sinRefs').style.display = 'block';
+}
+
+if (D.beneficios.length > 0) {
+  $('#benCard').style.display = 'block';
+  D.beneficios.forEach(b=>{
+    const d=document.createElement('div');
+    const t=document.createElement('b');t.textContent=b.nombre;
+    const c=document.createElement('span');
+    const falta=b.costo-D.saldo;
+    c.textContent = falta<=0 ? `${fmt(b.costo)} puntos · ¡ya lo podés canjear!` : `${fmt(b.costo)} puntos · te faltan ${fmt(falta)}`;
+    const bar=document.createElement('div');bar.className='bar';const i=document.createElement('i');i.style.width=Math.min(100,D.saldo/b.costo*100)+'%';bar.appendChild(i);
+    const btn=document.createElement('button');btn.textContent = falta<=0 ? 'Quiero canjearlo' : 'Todavía no te alcanza';
+    btn.disabled = falta>0;
+    btn.addEventListener('click', async ()=>{
+      btn.disabled=true; btn.textContent='Pidiendo…';
+      try {
+        const r = await fetch(`/club/${TOKEN}/canjear`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({beneficio_id: b.id})});
+        if (!r.ok) throw new Error((await r.json()).error || 'Error');
+        btn.textContent = '¡Listo! Ya le avisamos a tu agente';
+      } catch(e) {
+        btn.disabled=false; btn.textContent='Quiero canjearlo';
+        alert('No se pudo pedir el canje: ' + e.message);
+      }
+    });
+    d.append(t,c,bar,btn); $('#ben').appendChild(d);
+  });
+}
+
+$('#foot').textContent = D.cargo ? `${D.agente} · ${D.cargo} · ${D.contactoAgente}` : `${D.agente} · ${D.contactoAgente}`;
+
+if (D.yaRespondio) {
+  $('#encCard').innerHTML = '<h2 style="font-size:20px">Encuesta del mes</h2><div style="color:var(--mut);font-size:14px;margin-top:8px">Ya respondiste la encuesta de este mes — ¡gracias! Te esperamos el mes que viene.</div>';
+} else {
+  const ans = {};
+  document.querySelectorAll('.opts').forEach(g=>g.querySelectorAll('button').forEach(b=>{
+    b.setAttribute('aria-pressed','false');
+    b.addEventListener('click', ()=>{
+      g.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed','false'));
+      b.setAttribute('aria-pressed','true');
+      ans[g.dataset.q] = b.dataset.v;
+      $('#refBox').style.display = ans.conoce==='si' ? 'block' : 'none';
+      $('#send').disabled = !(ans.atencion && ans.mudanza && ans.conoce);
+    });
+  }));
+  $('#send').addEventListener('click', async ()=>{
+    const ref = $('#ref').value.trim();
+    $('#send').disabled = true; $('#send').textContent = 'Enviando…';
+    try {
+      const r = await fetch(`/club/${TOKEN}/encuesta`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({atencion: parseInt(ans.atencion,10), mudanza: ans.mudanza, conoce: ans.conoce, recomienda_a: ref || null}),
+      });
+      if (!r.ok) throw new Error((await r.json()).error || 'Error');
+      const body = await r.json();
+      const done = $('#done'); done.style.display='block';
+      done.textContent = body.puntos_otorgados > 0 ? `¡Gracias! Sumaste +${fmt(body.puntos_otorgados)} puntos.` : '¡Gracias por responder de nuevo!';
+      $('#send').style.display = 'none';
+      const waTxt = `Encuesta del Club de referidos · ${D.contacto} · ${D.periodo}\n1. Atención: ${ans.atencion}/5\n2. ¿Se muda en el próximo año?: ${ans.mudanza}\n3. ¿Conoce a alguien?: ${ans.conoce}${ref?'\nRecomienda a: '+ref:''}`;
+      const waBtn = $('#waBtn'); waBtn.style.display = 'block';
+      waBtn.addEventListener('click', ()=>{ window.open(`https://wa.me/${D.whatsapp}?text=`+encodeURIComponent(waTxt), '_blank'); });
+    } catch(e) {
+      $('#send').disabled = false; $('#send').textContent = 'Enviar respuestas';
+      alert('No se pudo enviar: ' + e.message);
+    }
+  });
+}
+
+$('#bajaLink').addEventListener('click', async (ev)=>{
+  ev.preventDefault();
+  if (!confirm('¿Seguro que querés darte de baja del Club de referidos? Vas a dejar de recibir el estado de cuenta mensual.')) return;
+  try {
+    await fetch(`/club/${TOKEN}/baja`, {method:'POST'});
+    document.querySelector('.wrap').innerHTML = '<div class="card"><h1 style="font-size:18px">Listo, te diste de baja</h1><p style="color:var(--mut);font-size:14px;margin-top:8px">Ya no vas a recibir más el estado de cuenta del club. Gracias por haber participado.</p></div>';
+  } catch(e) {}
+});
+</script></body></html>
