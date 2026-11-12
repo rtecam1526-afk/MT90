@@ -4,7 +4,7 @@ MT90 Tracción — Agente IA
 Asistente de captación para agentes Remax
 """
 
-import os, json, glob, uuid, re, time, datetime, base64
+import os, json, glob, uuid, re, time, datetime, base64, colorsys
 from functools import wraps
 from dotenv import load_dotenv
 load_dotenv()
@@ -1636,6 +1636,653 @@ def vq_seguimientos():
         for v, tipo in candidatas
     ]
     return {"pendientes": pendientes}
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  CLUB DE REFERIDOS — Fase 1
+# ══════════════════════════════════════════════════════════════════════
+# Puntos fijos acá (configurables por agente recién en Fase 3, ver spec).
+CLUB_PUNTOS_RECOMENDACION_RECIBIDA  = 100
+CLUB_PUNTOS_RECOMENDACION_AVANZA    = 200   # una sola vez, al llegar a reunión/visita/tasación
+CLUB_PUNTOS_RECOMENDACION_OPERACION = 1000
+CLUB_PUNTOS_ENCUESTA                = 150
+
+CLUB_ESTADOS_RECOMENDACION = ("recibida", "contactada", "reunion", "visita", "tasacion", "operacion", "descartada")
+CLUB_ESTADOS_AVANZA = ("reunion", "visita", "tasacion")
+CLUB_ESTADO_LABEL = {
+    "recibida": "Recibida", "contactada": "Contactada", "reunion": "Reunión", "visita": "Visita",
+    "tasacion": "Tasación", "operacion": "Operación", "descartada": "Descartada",
+}
+CLUB_MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+
+
+def _club_generar_token():
+    return uuid.uuid4().hex  # 32 chars, 122 bits random — "imposible de adivinar" (spec 2.1)
+
+
+def _club_registrar_movimiento(contacto_id, agente_key, puntos, motivo, referencia_id=None, nota=None):
+    """No frena el flujo principal si falla — perder un movimiento de puntos
+    no puede tirar abajo la creación/edición de una recomendación o encuesta."""
+    try:
+        _req.post(
+            f"{SUPABASE_URL}/rest/v1/movimientos_puntos",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+            json={"contacto_id": contacto_id, "agente": agente_key, "puntos": puntos, "motivo": motivo, "referencia_id": referencia_id, "nota": nota},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"[_club_registrar_movimiento] {motivo} para contacto {contacto_id}: {e}")
+
+
+def _club_saldo(contacto_id):
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/movimientos_puntos", headers=_supa_hdrs(),
+        params={"contacto_id": f"eq.{contacto_id}", "select": "puntos"}, timeout=10,
+    )
+    return sum(f["puntos"] for f in (r.json() if r.ok else []))
+
+
+def _club_ya_otorgado(referencia_id, motivo):
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/movimientos_puntos", headers=_supa_hdrs(),
+        params={"referencia_id": f"eq.{referencia_id}", "motivo": f"eq.{motivo}", "select": "id", "limit": "1"}, timeout=10,
+    )
+    return bool(r.ok and r.json())
+
+
+def _club_soft_tint(hex_color):
+    """Mismo blend que softTint() en crm-app.jsx (acercar al blanco ~86%)
+    — para el fondo clarito del acento en modo claro (--acc2)."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    r = round(r + (255 - r) * 0.86)
+    g = round(g + (255 - g) * 0.86)
+    b = round(b + (255 - b) * 0.86)
+    return "#{:02X}{:02X}{:02X}".format(r, g, b)
+
+
+def _club_lighten_hex(hex_color, luminosidad_min, saturacion_min=0.35):
+    """Sube la luminosidad en HSL manteniendo el tono — para que el color de
+    cada agente tenga una versión legible en fondo oscuro sin tener que
+    elegirla a mano por agente (los dos HTML de ejemplo la eligieron a ojo;
+    esto da un resultado razonable para cualquier color que se cargue)."""
+    h = hex_color.lstrip("#")
+    r, g, b = int(h[0:2], 16) / 255, int(h[2:4], 16) / 255, int(h[4:6], 16) / 255
+    hh, ll, ss = colorsys.rgb_to_hls(r, g, b)
+    ll = max(ll, luminosidad_min)
+    ss = max(ss, saturacion_min)
+    r2, g2, b2 = colorsys.hls_to_rgb(hh, ll, ss)
+    return "#{:02X}{:02X}{:02X}".format(round(r2 * 255), round(g2 * 255), round(b2 * 255))
+
+
+# ── Inscripción al club ──────────────────────────────────────────────────
+
+@app.route("/club/contactos", methods=["GET"])
+@login_required
+def club_listar_contactos():
+    agente_key = session.get("agente_key", "")
+    todos, offset, PAGE = [], 0, 1000
+    while True:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos",
+            headers={**_supa_hdrs(), "Range-Unit": "items", "Range": f"{offset}-{offset + PAGE - 1}"},
+            params={"agente": f"eq.{agente_key}", "select": "id,nombre,telefono,club_activo,club_token,club_fecha_alta", "order": "club_activo.desc,nombre.asc"},
+            timeout=15,
+        )
+        if not r.ok:
+            return {"error": r.text}, 500
+        pagina = r.json()
+        todos.extend(pagina)
+        if len(pagina) < PAGE:
+            break
+        offset += PAGE
+
+    activos_ids = [c["id"] for c in todos if c["club_activo"]]
+    saldos = {}
+    if activos_ids:
+        rm = _req.get(
+            f"{SUPABASE_URL}/rest/v1/movimientos_puntos", headers=_supa_hdrs(),
+            params={"contacto_id": f"in.({','.join(str(i) for i in activos_ids)})", "select": "contacto_id,puntos"}, timeout=15,
+        )
+        if rm.ok:
+            for f in rm.json():
+                saldos[f["contacto_id"]] = saldos.get(f["contacto_id"], 0) + f["puntos"]
+    for c in todos:
+        c["saldo"] = saldos.get(c["id"], 0)
+    return {"contactos": todos}
+
+
+@app.route("/club/contactos/<int:cid>/activar", methods=["POST"])
+@login_required
+def club_activar_contacto(cid):
+    agente_key = session.get("agente_key", "")
+    token = _club_generar_token()
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers={**_supa_hdrs(), "Prefer": "return=representation"},
+        params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"},
+        json={"club_activo": True, "club_fecha_alta": datetime.datetime.now().isoformat(), "club_token": token},
+        timeout=10,
+    )
+    if not r.ok or not r.json():
+        return {"error": r.text or "No encontrado"}, 500
+    return {"ok": True, "club_token": r.json()[0]["club_token"]}
+
+
+@app.route("/club/contactos/activar_lote", methods=["POST"])
+@login_required
+def club_activar_lote():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ids") or []
+    hechos = 0
+    for cid in ids:
+        r = _req.patch(
+            f"{SUPABASE_URL}/rest/v1/contactos",
+            headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+            params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"},
+            json={"club_activo": True, "club_fecha_alta": datetime.datetime.now().isoformat(), "club_token": _club_generar_token()},
+            timeout=10,
+        )
+        if r.ok:
+            hechos += 1
+    return {"ok": True, "hechos": hechos, "total": len(ids)}
+
+
+@app.route("/club/contactos/<int:cid>/desactivar", methods=["POST"])
+@login_required
+def club_desactivar_contacto(cid):
+    agente_key = session.get("agente_key", "")
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"}, json={"club_activo": False}, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True}
+
+
+@app.route("/club/contactos/<int:cid>/regenerar_token", methods=["POST"])
+@login_required
+def club_regenerar_token(cid):
+    agente_key = session.get("agente_key", "")
+    token = _club_generar_token()
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/contactos",
+        headers={**_supa_hdrs(), "Prefer": "return=representation"},
+        params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"}, json={"club_token": token}, timeout=10,
+    )
+    if not r.ok or not r.json():
+        return {"error": "No encontrado"}, 404
+    return {"ok": True, "club_token": token}
+
+
+# ── Perfil del club del agente (color + teléfono para el link de WhatsApp) ─
+
+@app.route("/club/perfil", methods=["GET"])
+@login_required
+def club_get_perfil():
+    agente_key = session.get("agente_key", "")
+    ag = obtener_agentes().get(agente_key, {})
+    return {"color": ag.get("club_color_primario") or "#E0633A", "telefono": ag.get("club_telefono") or ""}
+
+
+@app.route("/club/perfil", methods=["PUT"])
+@login_required
+def club_set_perfil():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    cambios = {}
+    if "color" in data:
+        color = (data.get("color") or "").strip()
+        if color and not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+            return {"error": "Color inválido (formato #RRGGBB)"}, 400
+        cambios["club_color_primario"] = color or None
+    if "telefono" in data:
+        cambios["club_telefono"] = (data.get("telefono") or "").strip() or None
+    if not cambios:
+        return {"error": "Nada para actualizar"}, 400
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/agentes", headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"key": f"eq.{agente_key}"}, json=cambios, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    obtener_agentes(forzar=True)
+    return {"ok": True}
+
+
+# ── Beneficios (catálogo por agente) ─────────────────────────────────────
+
+@app.route("/club/beneficios", methods=["GET"])
+@login_required
+def club_listar_beneficios():
+    agente_key = session.get("agente_key", "")
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/beneficios", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "select": "*", "order": "costo_puntos.asc"}, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"beneficios": r.json()}
+
+
+@app.route("/club/beneficios", methods=["POST"])
+@login_required
+def club_crear_beneficio():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    nombre = (data.get("nombre") or "").strip()
+    costo = data.get("costo_puntos")
+    if not nombre or not costo:
+        return {"error": "Falta nombre o costo en puntos"}, 400
+    fila = {
+        "agente": agente_key, "nombre": nombre, "descripcion": data.get("descripcion"),
+        "costo_puntos": int(costo), "activo": True, "stock": data.get("stock"),
+    }
+    r = _req.post(f"{SUPABASE_URL}/rest/v1/beneficios", headers={**_supa_hdrs(), "Prefer": "return=representation"}, json=fila, timeout=10)
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True, "beneficio": r.json()[0]}
+
+
+@app.route("/club/beneficios/<int:bid>", methods=["PUT"])
+@login_required
+def club_editar_beneficio(bid):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    cambios = {k: data[k] for k in ("nombre", "descripcion", "costo_puntos", "activo", "stock") if k in data}
+    if not cambios:
+        return {"error": "Nada para actualizar"}, 400
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/beneficios", headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"id": f"eq.{bid}", "agente": f"eq.{agente_key}"}, json=cambios, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True}
+
+
+# ── Recomendaciones (carga manual del agente — Fase 1) ──────────────────
+
+@app.route("/club/recomendaciones", methods=["GET"])
+@login_required
+def club_listar_recomendaciones():
+    agente_key = session.get("agente_key", "")
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/recomendaciones", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "select": "*", "order": "fecha.desc"}, timeout=15,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    recos = r.json()
+    ids = sorted({x for rr in recos for x in (rr["contacto_que_recomienda_id"], rr["contacto_recomendado_id"])})
+    nombres = {}
+    if ids:
+        rc = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in ids)})", "select": "id,nombre"}, timeout=15,
+        )
+        if rc.ok:
+            nombres = {c["id"]: c["nombre"] for c in rc.json()}
+    for rr in recos:
+        rr["_recomienda"] = nombres.get(rr["contacto_que_recomienda_id"])
+        rr["_recomendado"] = nombres.get(rr["contacto_recomendado_id"])
+    return {"recomendaciones": recos}
+
+
+@app.route("/club/recomendaciones", methods=["POST"])
+@login_required
+def club_crear_recomendacion():
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    recomienda_id = data.get("contacto_que_recomienda_id")
+    recomendado_id = data.get("contacto_recomendado_id")
+    if not recomienda_id or not recomendado_id:
+        return {"error": "Faltan los dos contactos"}, 400
+    if recomienda_id == recomendado_id:
+        return {"error": "Un contacto no puede recomendarse a sí mismo"}, 400
+    fila = {
+        "contacto_que_recomienda_id": recomienda_id, "contacto_recomendado_id": recomendado_id,
+        "agente": agente_key, "estado": "recibida", "origen": "carga_manual",
+    }
+    r = _req.post(f"{SUPABASE_URL}/rest/v1/recomendaciones", headers={**_supa_hdrs(), "Prefer": "return=representation"}, json=fila, timeout=10)
+    if not r.ok:
+        return {"error": r.text}, 500
+    reco = r.json()[0]
+    _club_registrar_movimiento(recomienda_id, agente_key, CLUB_PUNTOS_RECOMENDACION_RECIBIDA, "recomendacion_recibida", reco["id"])
+    return {"ok": True, "recomendacion": reco}
+
+
+@app.route("/club/recomendaciones/<int:rid>", methods=["PUT"])
+@login_required
+def club_editar_recomendacion(rid):
+    agente_key = session.get("agente_key", "")
+    data = request.get_json(silent=True) or {}
+    nuevo_estado = data.get("estado")
+    if nuevo_estado not in CLUB_ESTADOS_RECOMENDACION:
+        return {"error": "Estado inválido"}, 400
+    rr = _req.get(
+        f"{SUPABASE_URL}/rest/v1/recomendaciones", headers=_supa_hdrs(),
+        params={"id": f"eq.{rid}", "agente": f"eq.{agente_key}", "select": "*"}, timeout=10,
+    )
+    if not rr.ok or not rr.json():
+        return {"error": "No encontrada"}, 404
+    reco = rr.json()[0]
+    _req.patch(
+        f"{SUPABASE_URL}/rest/v1/recomendaciones", headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"id": f"eq.{rid}"}, json={"estado": nuevo_estado}, timeout=10,
+    )
+    quien = reco["contacto_que_recomienda_id"]
+    # Los puntos de "avanza" y "operación" se otorgan una sola vez cada uno,
+    # sin importar cuántas veces cambie de estado entre medio (ej. de visita
+    # a tasación sigue siendo "avanza", no suma dos veces).
+    if nuevo_estado in CLUB_ESTADOS_AVANZA and not _club_ya_otorgado(rid, "recomendacion_avanza"):
+        _club_registrar_movimiento(quien, agente_key, CLUB_PUNTOS_RECOMENDACION_AVANZA, "recomendacion_avanza", rid)
+    elif nuevo_estado == "operacion" and not _club_ya_otorgado(rid, "recomendacion_operacion"):
+        if not _club_ya_otorgado(rid, "recomendacion_avanza"):
+            _club_registrar_movimiento(quien, agente_key, CLUB_PUNTOS_RECOMENDACION_AVANZA, "recomendacion_avanza", rid)
+        _club_registrar_movimiento(quien, agente_key, CLUB_PUNTOS_RECOMENDACION_OPERACION, "recomendacion_operacion", rid)
+    return {"ok": True}
+
+
+# ── Canjes (vista para el agente — la gestión completa es Fase 2) ───────
+
+@app.route("/club/canjes", methods=["GET"])
+@login_required
+def club_listar_canjes():
+    agente_key = session.get("agente_key", "")
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/canjes", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "select": "*", "order": "fecha_pedido.desc"}, timeout=15,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    canjes = r.json()
+    cont_ids = sorted({c["contacto_id"] for c in canjes})
+    ben_ids = sorted({c["beneficio_id"] for c in canjes})
+    nombres, benef = {}, {}
+    if cont_ids:
+        rc = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in cont_ids)})", "select": "id,nombre,telefono"}, timeout=15,
+        )
+        if rc.ok:
+            nombres = {c["id"]: c for c in rc.json()}
+    if ben_ids:
+        rb = _req.get(
+            f"{SUPABASE_URL}/rest/v1/beneficios", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in ben_ids)})", "select": "id,nombre,costo_puntos"}, timeout=15,
+        )
+        if rb.ok:
+            benef = {b["id"]: b for b in rb.json()}
+    for c in canjes:
+        c["_contacto"] = nombres.get(c["contacto_id"])
+        c["_beneficio"] = benef.get(c["beneficio_id"])
+    return {"canjes": canjes}
+
+
+# ── Envío mensual asistido por WhatsApp ──────────────────────────────────
+
+@app.route("/club/envio_mes", methods=["GET"])
+@login_required
+def club_envio_mes():
+    agente_key = session.get("agente_key", "")
+    periodo = datetime.date.today().strftime("%Y-%m")
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "club_activo": "eq.true", "select": "id,nombre,telefono,club_token", "order": "nombre.asc"}, timeout=15,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    contactos = r.json()
+
+    renv = _req.get(
+        f"{SUPABASE_URL}/rest/v1/club_envios_mes", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "periodo": f"eq.{periodo}", "select": "contacto_id,fecha_envio"}, timeout=15,
+    )
+    enviados = {e["contacto_id"]: e["fecha_envio"] for e in (renv.json() if renv.ok else [])}
+
+    rresp = _req.get(
+        f"{SUPABASE_URL}/rest/v1/respuestas_encuesta", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "periodo": f"eq.{periodo}", "select": "contacto_id"}, timeout=15,
+    )
+    respondieron = {x["contacto_id"] for x in (rresp.json() if rresp.ok else [])}
+
+    base_url = request.url_root.rstrip("/")
+    for c in contactos:
+        c["enviado"] = c["id"] in enviados
+        c["fecha_envio"] = enviados.get(c["id"])
+        c["respondio"] = c["id"] in respondieron
+        nombre_primero = (c.get("nombre") or "").split(" ")[0] or "vos"
+        c["link"] = f"{base_url}/club/{c['club_token']}"
+        c["mensaje"] = (
+            f"¡Hola, {nombre_primero}! Te dejo tu estado de cuenta del Club de referidos: tus puntos, "
+            f"tus recomendaciones y lo que podés canjear 👉 {c['link']}. Si respondés la encuesta, sumás 150 puntos más."
+        )
+
+    return {"contactos": contactos, "periodo": periodo}
+
+
+@app.route("/club/envio_mes/<int:cid>/marcar", methods=["POST"])
+@login_required
+def club_marcar_enviado(cid):
+    agente_key = session.get("agente_key", "")
+    periodo = datetime.date.today().strftime("%Y-%m")
+    r = _req.post(
+        f"{SUPABASE_URL}/rest/v1/club_envios_mes",
+        headers={**_supa_hdrs(), "Prefer": "resolution=merge-duplicates,return=minimal"},
+        params={"on_conflict": "contacto_id,periodo"},
+        json={"contacto_id": cid, "agente": agente_key, "periodo": periodo}, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True}
+
+
+# ── Página pública del contacto (sin login) ──────────────────────────────
+
+@app.route("/club/<token>")
+def club_pagina_publica(token):
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+        params={"club_token": f"eq.{token}", "select": "*"}, timeout=10,
+    )
+    contacto = (r.json() or [None])[0] if r.ok else None
+    if not contacto or not contacto.get("club_activo"):
+        return render_template("club_no_encontrado.html"), 404
+
+    agente_key = contacto["agente"]
+    agente = obtener_agentes().get(agente_key, {})
+    color = agente.get("club_color_primario") or "#E0633A"
+    acc2 = _club_soft_tint(color)
+    acc_dark = _club_lighten_hex(color, 0.70)
+    acc2_dark = _club_lighten_hex(color, 0.16, saturacion_min=0.30)
+
+    saldo = _club_saldo(contacto["id"])
+
+    hoy = datetime.date.today()
+    inicio_mes = hoy.replace(day=1).isoformat()
+    rm = _req.get(
+        f"{SUPABASE_URL}/rest/v1/movimientos_puntos", headers=_supa_hdrs(),
+        params={"contacto_id": f"eq.{contacto['id']}", "fecha": f"gte.{inicio_mes}", "select": "puntos"}, timeout=10,
+    )
+    sumados_mes = sum(f["puntos"] for f in rm.json()) if rm.ok else 0
+
+    rr = _req.get(
+        f"{SUPABASE_URL}/rest/v1/recomendaciones", headers=_supa_hdrs(),
+        params={"contacto_que_recomienda_id": f"eq.{contacto['id']}", "select": "*", "order": "fecha.desc"}, timeout=10,
+    )
+    recos_raw = rr.json() if rr.ok else []
+    recom_ids = [x["id"] for x in recos_raw]
+    puntos_por_reco = {}
+    if recom_ids:
+        rmv = _req.get(
+            f"{SUPABASE_URL}/rest/v1/movimientos_puntos", headers=_supa_hdrs(),
+            params={
+                "referencia_id": f"in.({','.join(str(i) for i in recom_ids)})",
+                "motivo": "in.(recomendacion_recibida,recomendacion_avanza,recomendacion_operacion)",
+                "select": "referencia_id,puntos",
+            }, timeout=10,
+        )
+        if rmv.ok:
+            for f in rmv.json():
+                puntos_por_reco[f["referencia_id"]] = puntos_por_reco.get(f["referencia_id"], 0) + f["puntos"]
+    rec_contacto_ids = [x["contacto_recomendado_id"] for x in recos_raw]
+    nombres_recomendados = {}
+    if rec_contacto_ids:
+        rc = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in rec_contacto_ids)})", "select": "id,nombre"}, timeout=10,
+        )
+        if rc.ok:
+            nombres_recomendados = {c["id"]: c["nombre"] for c in rc.json()}
+
+    recomendaciones = []
+    for x in recos_raw:
+        nombre_completo = nombres_recomendados.get(x["contacto_recomendado_id"]) or "Alguien"
+        partes = nombre_completo.split(" ")
+        # Privacidad (spec 4 y 9): solo nombre de pila + inicial del apellido.
+        nombre_mostrado = partes[0] + (f" {partes[1][0]}." if len(partes) > 1 and partes[1] else "")
+        recomendaciones.append({
+            "fecha": (x.get("fecha") or "")[:10],
+            "nombre": nombre_mostrado,
+            "estado": CLUB_ESTADO_LABEL.get(x["estado"], x["estado"]),
+            "puntos": puntos_por_reco.get(x["id"], 0),
+        })
+
+    rb = _req.get(
+        f"{SUPABASE_URL}/rest/v1/beneficios", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "activo": "eq.true", "select": "*", "order": "costo_puntos.asc"}, timeout=10,
+    )
+    beneficios = [{"id": b["id"], "nombre": b["nombre"], "costo": b["costo_puntos"]} for b in (rb.json() if rb.ok else [])]
+
+    periodo_actual = hoy.strftime("%Y-%m")
+    rre = _req.get(
+        f"{SUPABASE_URL}/rest/v1/respuestas_encuesta", headers=_supa_hdrs(),
+        params={"contacto_id": f"eq.{contacto['id']}", "periodo": f"eq.{periodo_actual}", "select": "id", "limit": "1"}, timeout=10,
+    )
+    ya_respondio = bool(rre.ok and rre.json())
+
+    digits_agente = re.sub(r"\D", "", agente.get("club_telefono") or "")
+
+    datos = {
+        "agente": agente.get("nombre") or agente_key,
+        "agenteCorto": (agente.get("nombre") or agente_key).split(" ")[0],
+        "cargo": agente.get("oficina") or "",
+        "contactoAgente": agente.get("club_telefono") or agente.get("email") or "",
+        "whatsapp": ("549" + digits_agente) if digits_agente else "",
+        "contacto": (contacto.get("nombre") or "").split(" ")[0] or "vos",
+        "periodo": f"{CLUB_MESES[hoy.month - 1].capitalize()} de {hoy.year}",
+        "saldo": saldo,
+        "sumados": sumados_mes,
+        "recomendaciones": recomendaciones,
+        "beneficios": beneficios,
+        "yaRespondio": ya_respondio,
+    }
+    return render_template(
+        "club_publico.html", datos_json=json.dumps(datos, ensure_ascii=False), token=token,
+        color=color, acc2=acc2, acc_dark=acc_dark, acc2_dark=acc2_dark,
+    )
+
+
+@app.route("/club/<token>/encuesta", methods=["POST"])
+def club_enviar_encuesta(token):
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+        params={"club_token": f"eq.{token}", "select": "id,agente,club_activo"}, timeout=10,
+    )
+    contacto = (r.json() or [None])[0] if r.ok else None
+    if not contacto or not contacto.get("club_activo"):
+        return {"error": "No encontrado"}, 404
+
+    data = request.get_json(silent=True) or {}
+    atencion = data.get("atencion")
+    mudanza = data.get("mudanza")
+    conoce = data.get("conoce")
+    recomienda_a = (data.get("recomienda_a") or "").strip() or None
+    if atencion not in (1, 2, 3, 4, 5) or mudanza not in ("si", "tal_vez", "no") or conoce not in ("si", "no"):
+        return {"error": "Respuestas inválidas"}, 400
+
+    # Freno simple anti-doble-click/abuso (spec: "con límite de envíos").
+    rprev = _req.get(
+        f"{SUPABASE_URL}/rest/v1/respuestas_encuesta", headers=_supa_hdrs(),
+        params={"contacto_id": f"eq.{contacto['id']}", "select": "created_at", "order": "created_at.desc", "limit": "1"}, timeout=10,
+    )
+    if rprev.ok and rprev.json():
+        try:
+            dt = datetime.datetime.fromisoformat(rprev.json()[0]["created_at"].replace("Z", "+00:00"))
+            if (datetime.datetime.now(datetime.timezone.utc) - dt).total_seconds() < 10:
+                return {"error": "Ya se registró tu respuesta — esperá unos segundos."}, 429
+        except Exception:
+            pass
+
+    periodo = datetime.date.today().strftime("%Y-%m")
+    rmes = _req.get(
+        f"{SUPABASE_URL}/rest/v1/respuestas_encuesta", headers=_supa_hdrs(),
+        params={"contacto_id": f"eq.{contacto['id']}", "periodo": f"eq.{periodo}", "select": "id", "limit": "1"}, timeout=10,
+    )
+    ya_este_mes = bool(rmes.ok and rmes.json())
+    puntos = 0 if ya_este_mes else CLUB_PUNTOS_ENCUESTA
+
+    fila = {
+        "contacto_id": contacto["id"], "agente": contacto["agente"], "periodo": periodo,
+        "respuestas": {"atencion": atencion, "mudanza": mudanza, "conoce": conoce},
+        "recomienda_a": recomienda_a, "puntos_otorgados": puntos,
+    }
+    rins = _req.post(f"{SUPABASE_URL}/rest/v1/respuestas_encuesta", headers={**_supa_hdrs(), "Prefer": "return=representation"}, json=fila, timeout=10)
+    if not rins.ok:
+        return {"error": rins.text}, 500
+    respuesta = rins.json()[0]
+    if puntos:
+        _club_registrar_movimiento(contacto["id"], contacto["agente"], puntos, "encuesta", respuesta["id"])
+
+    return {"ok": True, "puntos_otorgados": puntos, "ya_habia_respondido": ya_este_mes}
+
+
+@app.route("/club/<token>/canjear", methods=["POST"])
+def club_canjear(token):
+    r = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+        params={"club_token": f"eq.{token}", "select": "id,agente,club_activo"}, timeout=10,
+    )
+    contacto = (r.json() or [None])[0] if r.ok else None
+    if not contacto or not contacto.get("club_activo"):
+        return {"error": "No encontrado"}, 404
+
+    data = request.get_json(silent=True) or {}
+    beneficio_id = data.get("beneficio_id")
+    if not beneficio_id:
+        return {"error": "Falta el beneficio"}, 400
+    rb = _req.get(
+        f"{SUPABASE_URL}/rest/v1/beneficios", headers=_supa_hdrs(),
+        params={"id": f"eq.{beneficio_id}", "agente": f"eq.{contacto['agente']}", "activo": "eq.true", "select": "*"}, timeout=10,
+    )
+    beneficio = (rb.json() or [None])[0] if rb.ok else None
+    if not beneficio:
+        return {"error": "Ese beneficio ya no está disponible"}, 404
+    if _club_saldo(contacto["id"]) < beneficio["costo_puntos"]:
+        return {"error": "Todavía no te alcanzan los puntos"}, 400
+
+    rc = _req.post(
+        f"{SUPABASE_URL}/rest/v1/canjes", headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        json={"contacto_id": contacto["id"], "beneficio_id": beneficio_id, "agente": contacto["agente"], "estado": "pedido"}, timeout=10,
+    )
+    if not rc.ok:
+        return {"error": rc.text}, 500
+    return {"ok": True}
+
+
+@app.route("/club/<token>/baja", methods=["POST"])
+def club_baja(token):
+    r = _req.patch(
+        f"{SUPABASE_URL}/rest/v1/contactos", headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"club_token": f"eq.{token}"}, json={"club_activo": False}, timeout=10,
+    )
+    if not r.ok:
+        return {"error": r.text}, 500
+    return {"ok": True}
 
 
 _SUPA_INJECT = r"""
