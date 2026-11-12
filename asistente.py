@@ -2205,7 +2205,11 @@ def club_enviar_encuesta(token):
     if atencion not in (1, 2, 3, 4, 5) or mudanza not in ("si", "tal_vez", "no") or conoce not in ("si", "no"):
         return {"error": "Respuestas inválidas"}, 400
 
-    # Freno simple anti-doble-click/abuso (spec: "con límite de envíos").
+    # Freno anti-doble-click (no "anti reintento legítimo"): la spec pide
+    # "un límite de envíos para evitar abusos", pero el criterio 3 exige que
+    # una segunda respuesta REAL en el mismo mes se guarde igual (solo sin
+    # puntos) — por eso esto es corto, solo para el doble-tap accidental,
+    # no para bloquear un reenvío a los pocos minutos.
     rprev = _req.get(
         f"{SUPABASE_URL}/rest/v1/respuestas_encuesta", headers=_supa_hdrs(),
         params={"contacto_id": f"eq.{contacto['id']}", "select": "created_at", "order": "created_at.desc", "limit": "1"}, timeout=10,
@@ -2213,7 +2217,7 @@ def club_enviar_encuesta(token):
     if rprev.ok and rprev.json():
         try:
             dt = datetime.datetime.fromisoformat(rprev.json()[0]["created_at"].replace("Z", "+00:00"))
-            if (datetime.datetime.now(datetime.timezone.utc) - dt).total_seconds() < 10:
+            if (datetime.datetime.now(datetime.timezone.utc) - dt).total_seconds() < 3:
                 return {"error": "Ya se registró tu respuesta — esperá unos segundos."}, 429
         except Exception:
             pass
