@@ -1646,6 +1646,11 @@ CLUB_PUNTOS_RECOMENDACION_RECIBIDA  = 100
 CLUB_PUNTOS_RECOMENDACION_AVANZA    = 200   # una sola vez, al llegar a reunión/visita/tasación
 CLUB_PUNTOS_RECOMENDACION_OPERACION = 1000
 CLUB_PUNTOS_ENCUESTA                = 150
+# Bonus inmediato por dejar un dato de contacto real del referido (no espera
+# validación del agente, a diferencia del +200 de "avanza" — acá alcanza con
+# que el dato objetivamente exista). Se suman entre sí si deja los dos.
+CLUB_PUNTOS_REFERIDO_TELEFONO = 50
+CLUB_PUNTOS_REFERIDO_EMAIL    = 25
 
 CLUB_ESTADOS_RECOMENDACION = ("recibida", "contactada", "reunion", "visita", "tasacion", "operacion", "descartada")
 CLUB_ESTADOS_AVANZA = ("reunion", "visita", "tasacion")
@@ -2201,9 +2206,17 @@ def club_enviar_encuesta(token):
     atencion = data.get("atencion")
     mudanza = data.get("mudanza")
     conoce = data.get("conoce")
-    recomienda_a = (data.get("recomienda_a") or "").strip() or None
+    referido_nombre = (data.get("referido_nombre") or "").strip() or None
+    referido_telefono = (data.get("referido_telefono") or "").strip() or None
+    referido_email = (data.get("referido_email") or "").strip() or None
     if atencion not in (1, 2, 3, 4, 5) or mudanza not in ("si", "tal_vez", "no") or conoce not in ("si", "no"):
         return {"error": "Respuestas inválidas"}, 400
+    # Para que cuente como referido hace falta un dato de contacto real —
+    # un nombre solo no alcanza (no se puede validar ni contactar a nadie).
+    # El frontend ya exige esto antes de habilitar "Enviar", esto es el
+    # respaldo del lado del servidor.
+    if referido_nombre and not (referido_telefono or referido_email):
+        referido_nombre = None
 
     # Freno anti-doble-click (no "anti reintento legítimo"): la spec pide
     # "un límite de envíos para evitar abusos", pero el criterio 3 exige que
@@ -2228,19 +2241,33 @@ def club_enviar_encuesta(token):
         params={"contacto_id": f"eq.{contacto['id']}", "periodo": f"eq.{periodo}", "select": "id", "limit": "1"}, timeout=10,
     )
     ya_este_mes = bool(rmes.ok and rmes.json())
-    puntos = 0 if ya_este_mes else CLUB_PUNTOS_ENCUESTA
+
+    bonus_referido = 0
+    if referido_nombre and not ya_este_mes:
+        if referido_telefono:
+            bonus_referido += CLUB_PUNTOS_REFERIDO_TELEFONO
+        if referido_email:
+            bonus_referido += CLUB_PUNTOS_REFERIDO_EMAIL
+
+    puntos_encuesta = 0 if ya_este_mes else CLUB_PUNTOS_ENCUESTA
+    puntos = puntos_encuesta + bonus_referido
 
     fila = {
         "contacto_id": contacto["id"], "agente": contacto["agente"], "periodo": periodo,
-        "respuestas": {"atencion": atencion, "mudanza": mudanza, "conoce": conoce},
-        "recomienda_a": recomienda_a, "puntos_otorgados": puntos,
+        "respuestas": {
+            "atencion": atencion, "mudanza": mudanza, "conoce": conoce,
+            "referido_telefono": referido_telefono, "referido_email": referido_email,
+        },
+        "recomienda_a": referido_nombre, "puntos_otorgados": puntos,
     }
     rins = _req.post(f"{SUPABASE_URL}/rest/v1/respuestas_encuesta", headers={**_supa_hdrs(), "Prefer": "return=representation"}, json=fila, timeout=10)
     if not rins.ok:
         return {"error": rins.text}, 500
     respuesta = rins.json()[0]
-    if puntos:
-        _club_registrar_movimiento(contacto["id"], contacto["agente"], puntos, "encuesta", respuesta["id"])
+    if puntos_encuesta:
+        _club_registrar_movimiento(contacto["id"], contacto["agente"], puntos_encuesta, "encuesta", respuesta["id"])
+    if bonus_referido:
+        _club_registrar_movimiento(contacto["id"], contacto["agente"], bonus_referido, "encuesta_bonus_referido", respuesta["id"])
 
     return {"ok": True, "puntos_otorgados": puntos, "ya_habia_respondido": ya_este_mes}
 

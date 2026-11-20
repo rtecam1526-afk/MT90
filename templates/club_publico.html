@@ -83,7 +83,13 @@ input[type=text]{width:100%;min-height:44px;padding:10px 12px;border-radius:12px
   <div class="q"><p>1. ¿Cómo calificarías la atención que recibiste?</p><div class="opts" data-q="atencion"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div></div>
   <div class="q"><p>2. ¿Pensás mudarte en el próximo año?</p><div class="opts" data-q="mudanza"><button data-v="si">Sí</button><button data-v="tal_vez">Tal vez</button><button data-v="no">No por ahora</button></div></div>
   <div class="q"><p>3. ¿Conocés a alguien que quiera vender, comprar o alquilar?</p><div class="opts" data-q="conoce"><button data-v="si">Sí</button><button data-v="no">No por ahora</button></div></div>
-  <div class="q" id="refBox" style="display:none"><p>¿A quién? (opcional, +200 puntos cuando lo validemos)</p><input type="text" id="ref" placeholder="Nombre y, si querés, su teléfono"></div>
+  <div class="q" id="refBox" style="display:none">
+    <p>¿A quién? (opcional — para que cuente necesitamos su teléfono o su mail)</p>
+    <input type="text" id="refNombre" placeholder="Nombre">
+    <input type="text" id="refTelefono" placeholder="Teléfono (+50 puntos)" style="margin-top:8px">
+    <input type="text" id="refEmail" placeholder="Mail (+25 puntos)" style="margin-top:8px">
+    <div id="refAviso" style="display:none;color:var(--amb);font-size:13px;font-weight:600;margin-top:6px">Para que sume puntos, dejanos su teléfono o su mail.</div>
+  </div>
   <button class="send" id="send" disabled>Enviar respuestas</button>
   <div class="done" id="done"></div>
   <button class="wabackup" id="waBtn">Avisale por WhatsApp también</button>
@@ -147,6 +153,17 @@ if (D.yaRespondio) {
   $('#encCard').innerHTML = '<h2 style="font-size:20px">Encuesta del mes</h2><div style="color:var(--mut);font-size:14px;margin-top:8px">Ya respondiste la encuesta de este mes — ¡gracias! Te esperamos el mes que viene.</div>';
 } else {
   const ans = {};
+  function refSinContacto() {
+    const nombre = $('#refNombre').value.trim();
+    const tel = $('#refTelefono').value.trim();
+    const mail = $('#refEmail').value.trim();
+    return !!nombre && !tel && !mail;
+  }
+  function actualizarSend() {
+    const sinContacto = refSinContacto();
+    $('#refAviso').style.display = sinContacto ? 'block' : 'none';
+    $('#send').disabled = !(ans.atencion && ans.mudanza && ans.conoce) || sinContacto;
+  }
   document.querySelectorAll('.opts').forEach(g=>g.querySelectorAll('button').forEach(b=>{
     b.setAttribute('aria-pressed','false');
     b.addEventListener('click', ()=>{
@@ -154,23 +171,29 @@ if (D.yaRespondio) {
       b.setAttribute('aria-pressed','true');
       ans[g.dataset.q] = b.dataset.v;
       $('#refBox').style.display = ans.conoce==='si' ? 'block' : 'none';
-      $('#send').disabled = !(ans.atencion && ans.mudanza && ans.conoce);
+      actualizarSend();
     });
   }));
+  ['refNombre','refTelefono','refEmail'].forEach(id => $('#'+id).addEventListener('input', actualizarSend));
   $('#send').addEventListener('click', async ()=>{
-    const ref = $('#ref').value.trim();
+    const refNombre = $('#refNombre').value.trim();
+    const refTelefono = $('#refTelefono').value.trim();
+    const refEmail = $('#refEmail').value.trim();
     $('#send').disabled = true; $('#send').textContent = 'Enviando…';
     try {
       const r = await fetch(`/club/${TOKEN}/encuesta`, {
         method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({atencion: parseInt(ans.atencion,10), mudanza: ans.mudanza, conoce: ans.conoce, recomienda_a: ref || null}),
+        body: JSON.stringify({
+          atencion: parseInt(ans.atencion,10), mudanza: ans.mudanza, conoce: ans.conoce,
+          referido_nombre: refNombre || null, referido_telefono: refTelefono || null, referido_email: refEmail || null,
+        }),
       });
       if (!r.ok) throw new Error((await r.json()).error || 'Error');
       const body = await r.json();
       const done = $('#done'); done.style.display='block';
       done.textContent = body.puntos_otorgados > 0 ? `¡Gracias! Sumaste +${fmt(body.puntos_otorgados)} puntos.` : '¡Gracias por responder de nuevo!';
       $('#send').style.display = 'none';
-      const waTxt = `Encuesta del Club de referidos · ${D.contacto} · ${D.periodo}\n1. Atención: ${ans.atencion}/5\n2. ¿Se muda en el próximo año?: ${ans.mudanza}\n3. ¿Conoce a alguien?: ${ans.conoce}${ref?'\nRecomienda a: '+ref:''}`;
+      const waTxt = `Encuesta del Club de referidos · ${D.contacto} · ${D.periodo}\n1. Atención: ${ans.atencion}/5\n2. ¿Se muda en el próximo año?: ${ans.mudanza}\n3. ¿Conoce a alguien?: ${ans.conoce}${refNombre?'\nRecomienda a: '+refNombre+(refTelefono?' · '+refTelefono:'')+(refEmail?' · '+refEmail:''):''}`;
       const waBtn = $('#waBtn'); waBtn.style.display = 'block';
       waBtn.addEventListener('click', ()=>{ window.open(`https://wa.me/${D.whatsapp}?text=`+encodeURIComponent(waTxt), '_blank'); });
     } catch(e) {
