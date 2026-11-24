@@ -1889,7 +1889,11 @@ def club_regenerar_token(cid):
 def club_get_perfil():
     agente_key = session.get("agente_key", "")
     ag = obtener_agentes().get(agente_key, {})
-    return {"color": ag.get("club_color_primario") or "#E0633A", "telefono": ag.get("club_telefono") or ""}
+    return {
+        "color": ag.get("club_color_primario") or "#E0633A",
+        "telefono": ag.get("club_telefono") or "",
+        "nombre_club": ag.get("club_nombre") or "",
+    }
 
 
 @app.route("/club/perfil", methods=["PUT"])
@@ -1905,6 +1909,8 @@ def club_set_perfil():
         cambios["club_color_primario"] = color or None
     if "telefono" in data:
         cambios["club_telefono"] = (data.get("telefono") or "").strip() or None
+    if "nombre_club" in data:
+        cambios["club_nombre"] = (data.get("nombre_club") or "").strip() or None
     if not cambios:
         return {"error": "Nada para actualizar"}, 400
     r = _req.patch(
@@ -2264,6 +2270,7 @@ def club_pagina_publica(token):
     datos = {
         "agente": agente.get("nombre") or agente_key,
         "agenteCorto": (agente.get("nombre") or agente_key).split(" ")[0],
+        "nombreClub": agente.get("club_nombre") or None,
         "cargo": agente.get("oficina") or "",
         "contactoAgente": agente.get("club_telefono") or agente.get("email") or "",
         "whatsapp": ("549" + digits_agente) if digits_agente else "",

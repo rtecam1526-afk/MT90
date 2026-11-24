@@ -102,7 +102,7 @@ const TOKEN = {{ token|tojson }};
 const D = {{ datos_json|safe }};
 const $=s=>document.querySelector(s); const fmt=n=>n.toLocaleString('es-AR');
 
-$('#club').textContent='Club de referidos · '+D.agente;
+$('#club').textContent = D.nombreClub ? D.nombreClub : ('Club de referidos · ' + D.agente);
 $('#hola').textContent='Hola, '+D.contacto;
 $('#per').textContent='Tu estado de cuenta · '+D.periodo;
 $('#saldo').textContent=fmt(D.saldo); $('#mes').textContent=(D.sumados>=0?'+':'')+fmt(D.sumados); $('#refs').textContent=D.recomendaciones.length;

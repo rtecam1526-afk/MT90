@@ -52,7 +52,7 @@ function ClubBienvenidaModal({ info, onClose }) {
         <h2>¡{(info.nombre || "").split(" ")[0] || "Listo"} ya está en el Club!</h2>
         <p className="aj-tip">Ya tiene 100 puntos de bienvenida. Avisale:</p>
         <div className="dsection">
-          <div className="dmsg">{info.mensaje}</div>
+          <div className="dmsg" style={{ whiteSpace: "pre-line" }}>{info.mensaje}</div>
           <div className="dmsg-actions">
             <button className={"dmsg-btn" + (copiado ? " copied" : "")} onClick={copiar}>{copiado ? "Copiado" : "Copiar"}</button>
             <button className="dmsg-btn" onClick={abrirWhatsapp}>Abrir chat</button>
@@ -75,11 +75,15 @@ function ClubInscripcion() {
   const [copiadoId, setCopiadoId] = useStateCL(null);
   const [undo, setUndo] = useStateCL(null);
   const [bienvenida, setBienvenida] = useStateCL(null);
+  const [nombreClub, setNombreClub] = useStateCL("Club de referidos");
 
   function cargar() {
     window.CRM_API.get("/club/contactos").then((r) => setContactos(r.contactos || [])).catch(() => setContactos([]));
   }
-  useEffectCL(cargar, []);
+  useEffectCL(() => {
+    cargar();
+    window.CRM_API.get("/club/perfil").then((r) => setNombreClub(r.nombre_club || "Club de referidos")).catch(() => {});
+  }, []);
 
   const filtrados = (contactos || []).filter((c) => !q.trim() || (c.nombre || "").toLowerCase().includes(q.toLowerCase()));
   const seleccionados = Object.keys(seleccion).filter((k) => seleccion[k]).map(Number);
@@ -97,7 +101,8 @@ function ClubInscripcion() {
         const c = (contactos || []).find((x) => x.id === cid) || {};
         const primer = (c.nombre || "").split(" ")[0] || "¡Hola!";
         const link = window.location.origin + "/club/" + r.club_token;
-        const mensaje = `¡Hola ${primer}! Te sumé al Club de referidos 🎉 Ya tenés 100 puntos de bienvenida. Recomendá, respondé la encuestita del mes y canjeá premios con tus puntos. Mirá tu cuenta acá: ${link}`;
+        const agenteNombre = window._AGENTE_NOMBRE || "";
+        const mensaje = `¡Hola, ${primer}! Soy ${agenteNombre}.\nArmé el ${nombreClub} para agradecer a la gente que me acompaña, y ya tenés 100 puntos de regalo.\n\nCómo funciona: sumás puntos y los cambiás por regalos.\n\nPara empezar, respondé la encuesta de 1 minuto que está en tu página y sumás 150 puntos más 👇\n${link}`;
         setBienvenida({ nombre: c.nombre, telefono: c.telefono, mensaje });
       } else {
         setUndo({ texto: "Contacto inscripto", onDeshacer: () => desactivar(cid, true) });
@@ -432,18 +437,21 @@ function ClubEnvio() {
 function ClubPerfil() {
   const [color, setColor] = useStateCL("#E0633A");
   const [telefono, setTelefono] = useStateCL("");
+  const [nombreClub, setNombreClub] = useStateCL("");
   const [guardando, setGuardando] = useStateCL(false);
   const [msg, setMsg] = useStateCL("");
 
   useEffectCL(() => {
-    window.CRM_API.get("/club/perfil").then((r) => { setColor(r.color || "#E0633A"); setTelefono(r.telefono || ""); }).catch(() => {});
+    window.CRM_API.get("/club/perfil").then((r) => {
+      setColor(r.color || "#E0633A"); setTelefono(r.telefono || ""); setNombreClub(r.nombre_club || "");
+    }).catch(() => {});
   }, []);
 
   async function guardar() {
     setGuardando(true);
     setMsg("");
     try {
-      await window.CRM_API.put("/club/perfil", { color, telefono: telefono.trim() });
+      await window.CRM_API.put("/club/perfil", { color, telefono: telefono.trim(), nombre_club: nombreClub.trim() });
       setMsg("Guardado.");
     } catch (e) { setMsg("Error: " + e.message); }
     setGuardando(false);
@@ -451,6 +459,10 @@ function ClubPerfil() {
 
   return (
     <div className="fade-in" style={{ maxWidth: 360 }}>
+      <div className="club-field">
+        <label>Nombre de tu Club <span className="opt">· opcional, ej. "Club Diciembre Team Lugo"</span></label>
+        <input className="club-input" value={nombreClub} onChange={(e) => setNombreClub(e.target.value)} placeholder="Club de referidos" />
+      </div>
       <div className="club-field">
         <label>Color de tu página pública</label>
         <input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ width: 80, height: 48, padding: 2, borderRadius: 10, border: "1.5px solid var(--line-strong)" }} />
