@@ -61,6 +61,7 @@ function App() {
   const [syncing, setSyncing] = useStateA(false);
   const [lastSync, setLastSync] = useStateA("Cargando…");
   const [revision, setRevision] = useStateA(false);
+  const [operadorSelectorOpen, setOperadorSelectorOpen] = useStateA(false);
 
   const esViernes = new Date().getDay() === 5;
   const [cierreCerrado, setCierreCerrado] = useStateA(false);
@@ -179,6 +180,7 @@ function App() {
 
   return (
     <div className="app-root">
+      {window.OperadorBanner && <OperadorBanner />}
       <header className="topbar">
         <div className="brand">
           <span className="m">MT90</span>
@@ -235,7 +237,7 @@ function App() {
           <button className={"icon-btn" + (menuMas ? " active" : "") + (syncing ? " spin" : "")} onClick={() => setMenuMas(v => !v)}>
             {syncing ? <Icon.sync /> : <Icon.more />}
           </button>
-          {menuMas && <MenuMas lastSync={lastSync} onSync={doSync} onIA={() => { setTab("agente"); setMenuMas(false); }} onLogro={() => { setLogroOpen(true); setMenuMas(false); }} onSemaforo={() => { setTab("semaforo"); setMenuMas(false); }} onEvolucion={() => { setTab("evolucion"); setMenuMas(false); }} onAjustes={() => { setAjustes(true); setMenuMas(false); }} onClose={() => setMenuMas(false)} />}
+          {menuMas && <MenuMas lastSync={lastSync} onSync={doSync} onIA={() => { setTab("agente"); setMenuMas(false); }} onLogro={() => { setLogroOpen(true); setMenuMas(false); }} onSemaforo={() => { setTab("semaforo"); setMenuMas(false); }} onEvolucion={() => { setTab("evolucion"); setMenuMas(false); }} onOperador={() => { setOperadorSelectorOpen(true); setMenuMas(false); }} onAjustes={() => { setAjustes(true); setMenuMas(false); }} onClose={() => setMenuMas(false)} />}
         </div>
         <button className="btn-add" onClick={() => setModal(true)}><Icon.plus /> Contacto</button>
       </header>
@@ -244,6 +246,7 @@ function App() {
         {tab === "hoy" && verCierre && (
           <CierreSemana data={data} onVerSemana={() => { setTab("semana"); setCierreCerrado(true); }} onClose={() => setCierreCerrado(true)} />
         )}
+        {tab === "hoy" && window.HoyTareas && <HoyTareas />}
         {tab === "hoy" && window.MetasRecordatorio && <MetasRecordatorio />}
         {tab === "hoy" && hoyView}
         {tab === "semana" && (
@@ -301,6 +304,7 @@ function App() {
       {buscar && <BuscarOverlay data={data} onOpen={openDetalle} onClose={() => setBuscar(false)} />}
       {ajustes && <AjustesModal data={data} onClose={() => setAjustes(false)} />}
       {revision && <RevisionGuiada data={data} onCerrar={() => { setRevision(false); loadContacts(); }} />}
+      {operadorSelectorOpen && window.OperadorSelector && <OperadorSelector onClose={() => setOperadorSelectorOpen(false)} />}
 
       <div className={"focus-toast" + (toast ? " show" : "")}>
         <Icon.wa /> {toast || ""}

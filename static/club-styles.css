@@ -1,0 +1,85 @@
+/* Club de referidos — pantallas rediseñadas mobile-first (botones de
+   48px+, una fila con scroll para los sub-tabs, deshacer en vez de
+   confirmar, pantallas vacías que enseñan). Clases propias (club-*), no
+   se tocan las que usan Dueño Vende/Visitas. */
+
+.club-subtabs {
+  display: flex; gap: 8px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  margin-bottom: 18px; padding-bottom: 2px;
+  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+}
+.club-subtabs::-webkit-scrollbar { display: none; }
+.club-subtab {
+  flex-shrink: 0; white-space: nowrap; min-height: 48px; padding: 0 18px;
+  border-radius: 999px; border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--muted);
+  font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
+  display: flex; align-items: center;
+}
+.club-subtab.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.club-btn {
+  min-height: 48px; padding: 0 22px; border-radius: 14px; border: none;
+  background: var(--primary); color: #fff; font-family: inherit; font-weight: 700; font-size: 16px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.club-btn:disabled { opacity: .5; cursor: default; }
+.club-btn-secundario {
+  min-height: 48px; padding: 0 20px; border-radius: 14px; border: 1.5px solid var(--line-strong);
+  background: var(--surface); color: var(--ink); font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
+}
+.club-btn-peligro { color: #dc2626; border-color: #fecaca; }
+.club-btn-chip {
+  min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1.5px solid var(--line-strong);
+  background: var(--surface); color: var(--muted); font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+}
+.club-btn-chip.on { border-color: var(--whatsapp, #17B892); color: var(--whatsapp, #17B892); background: #E4F5EE; }
+
+.club-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 10px;
+}
+.club-row-main { flex: 1; min-width: 160px; }
+.club-row-title { font-weight: 700; font-size: 16px; }
+.club-row-sub { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.club-row-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.club-vacio {
+  text-align: center; padding: 36px 20px; background: var(--surface); border: 1.5px dashed var(--line-strong); border-radius: 16px;
+}
+.club-vacio p { color: var(--muted); font-size: 15px; margin: 0 0 14px; line-height: 1.5; }
+
+.club-undo {
+  position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  background: var(--ink); color: #fff; padding: 14px 20px; border-radius: 999px; display: flex; align-items: center; gap: 14px;
+  font-size: 15px; font-weight: 600; box-shadow: var(--shadow-lg); z-index: 90; white-space: nowrap; max-width: calc(100vw - 32px);
+}
+.club-undo button { background: transparent; border: none; color: #FF9F7D; font-weight: 800; font-family: inherit; font-size: 15px; cursor: pointer; flex-shrink: 0; }
+
+.club-banner-operador {
+  position: sticky; top: 0; z-index: 95; background: #2A2530; color: #fff; text-align: center;
+  padding: 10px 16px; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+}
+.club-banner-operador button {
+  background: rgba(255,255,255,.15); border: none; color: #fff; padding: 8px 16px; border-radius: 999px;
+  font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer; min-height: 36px;
+}
+
+.club-field { margin-bottom: 18px; }
+.club-field label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.club-field .opt { font-weight: 400; color: var(--muted); font-size: 13px; }
+.club-field input, .club-field select, .club-field textarea {
+  width: 100%; min-height: 48px; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line-strong);
+  font-family: inherit; font-size: 16px; background: var(--surface); color: var(--ink); box-sizing: border-box;
+}
+
+.club-tarea-lista { display: flex; flex-direction: column; gap: 12px; margin-bottom: 22px; }
+
+.club-input {
+  width: 100%; min-height: 48px; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line-strong);
+  font-family: inherit; font-size: 16px; background: var(--surface); color: var(--ink); box-sizing: border-box;
+}
+.club-estado-select {
+  min-height: 48px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--line-strong);
+  font-family: inherit; font-size: 15px; background: var(--surface); color: var(--ink);
+}
