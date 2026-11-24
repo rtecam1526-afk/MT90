@@ -1695,6 +1695,32 @@ def _club_ya_otorgado(referencia_id, motivo):
     return bool(r.ok and r.json())
 
 
+def _club_vincular_o_crear_contacto_referido(agente_key, nombre, telefono, email):
+    """Para un referido que llega con datos de contacto desde la encuesta:
+    si ya existe un contacto del agente con ese teléfono o mail, lo
+    reutiliza (no duplica); si no, crea uno nuevo mínimo. Nunca le manda
+    nada — solo queda cargado para que el agente lo trabaje."""
+    if telefono:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"agente": f"eq.{agente_key}", "telefono": f"eq.{telefono}", "select": "id", "limit": "1"}, timeout=10,
+        )
+        if r.ok and r.json():
+            return r.json()[0]["id"]
+    if email:
+        r = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"agente": f"eq.{agente_key}", "email": f"eq.{email}", "select": "id", "limit": "1"}, timeout=10,
+        )
+        if r.ok and r.json():
+            return r.json()[0]["id"]
+    r = _req.post(
+        f"{SUPABASE_URL}/rest/v1/contactos", headers={**_supa_hdrs(), "Prefer": "return=representation"},
+        json={"agente": agente_key, "nombre": nombre, "cliente": nombre, "telefono": telefono or "", "email": email}, timeout=10,
+    )
+    return r.json()[0]["id"] if r.ok and r.json() else None
+
+
 def _club_soft_tint(hex_color):
     """Mismo blend que softTint() en crm-app.jsx (acercar al blanco ~86%)
     — para el fondo clarito del acento en modo claro (--acc2)."""
@@ -1760,8 +1786,17 @@ def club_listar_contactos():
 @app.route("/club/contactos/<int:cid>/activar", methods=["POST"])
 @login_required
 def club_activar_contacto(cid):
+    """Re-inscribir a alguien que ya estaba (ej. "Deshacer" después de
+    sacarlo) reutiliza el mismo link — si tuviera que generar uno nuevo
+    cada vez, invalidaría un link que ya pudo haberse compartido."""
     agente_key = session.get("agente_key", "")
-    token = _club_generar_token()
+    rprev = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+        params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}", "select": "club_token"}, timeout=10,
+    )
+    if not rprev.ok or not rprev.json():
+        return {"error": "No encontrado"}, 404
+    token = rprev.json()[0].get("club_token") or _club_generar_token()
     r = _req.patch(
         f"{SUPABASE_URL}/rest/v1/contactos",
         headers={**_supa_hdrs(), "Prefer": "return=representation"},
@@ -1782,11 +1817,16 @@ def club_activar_lote():
     ids = data.get("ids") or []
     hechos = 0
     for cid in ids:
+        rprev = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}", "select": "club_token"}, timeout=10,
+        )
+        token = (rprev.json()[0].get("club_token") if rprev.ok and rprev.json() else None) or _club_generar_token()
         r = _req.patch(
             f"{SUPABASE_URL}/rest/v1/contactos",
             headers={**_supa_hdrs(), "Prefer": "return=minimal"},
             params={"id": f"eq.{cid}", "agente": f"eq.{agente_key}"},
-            json={"club_activo": True, "club_fecha_alta": datetime.datetime.now().isoformat(), "club_token": _club_generar_token()},
+            json={"club_activo": True, "club_fecha_alta": datetime.datetime.now().isoformat(), "club_token": token},
             timeout=10,
         )
         if r.ok:
@@ -1980,6 +2020,12 @@ def club_editar_recomendacion(rid):
         params={"id": f"eq.{rid}"}, json={"estado": nuevo_estado}, timeout=10,
     )
     quien = reco["contacto_que_recomienda_id"]
+    # Las que vienen de la encuesta nacen "por validar" (validada=False) y no
+    # suman nada — ni esto ni la "recibida" — hasta que el agente/operador
+    # las valide (ver /club/recomendaciones/<id>/validar). Las cargadas a
+    # mano por el agente ya nacen validadas, como antes.
+    if not reco.get("validada", True):
+        return {"ok": True, "sin_puntos": "todavía no está validada"}
     # Los puntos de "avanza" y "operación" se otorgan una sola vez cada uno,
     # sin importar cuántas veces cambie de estado entre medio (ej. de visita
     # a tasación sigue siendo "avanza", no suma dos veces).
@@ -1989,6 +2035,27 @@ def club_editar_recomendacion(rid):
         if not _club_ya_otorgado(rid, "recomendacion_avanza"):
             _club_registrar_movimiento(quien, agente_key, CLUB_PUNTOS_RECOMENDACION_AVANZA, "recomendacion_avanza", rid)
         _club_registrar_movimiento(quien, agente_key, CLUB_PUNTOS_RECOMENDACION_OPERACION, "recomendacion_operacion", rid)
+    return {"ok": True}
+
+
+@app.route("/club/recomendaciones/<int:rid>/validar", methods=["POST"])
+@login_required
+def club_validar_recomendacion(rid):
+    agente_key = session.get("agente_key", "")
+    rr = _req.get(
+        f"{SUPABASE_URL}/rest/v1/recomendaciones", headers=_supa_hdrs(),
+        params={"id": f"eq.{rid}", "agente": f"eq.{agente_key}", "select": "*"}, timeout=10,
+    )
+    if not rr.ok or not rr.json():
+        return {"error": "No encontrada"}, 404
+    reco = rr.json()[0]
+    if reco.get("validada"):
+        return {"ok": True, "ya_validada": True}
+    _req.patch(
+        f"{SUPABASE_URL}/rest/v1/recomendaciones", headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+        params={"id": f"eq.{rid}"}, json={"validada": True}, timeout=10,
+    )
+    _club_registrar_movimiento(reco["contacto_que_recomienda_id"], agente_key, CLUB_PUNTOS_RECOMENDACION_RECIBIDA, "recomendacion_recibida", rid)
     return {"ok": True}
 
 
@@ -2056,15 +2123,18 @@ def club_envio_mes():
     respondieron = {x["contacto_id"] for x in (rresp.json() if rresp.ok else [])}
 
     base_url = request.url_root.rstrip("/")
+    # En modo operador, el mensaje se presenta en tercera persona — lo manda
+    # otra persona del equipo, no el agente (spec sección 6).
+    operando_como = obtener_agentes().get(agente_key, {}).get("nombre") if session.get("operador_real_key") else None
     for c in contactos:
         c["enviado"] = c["id"] in enviados
         c["fecha_envio"] = enviados.get(c["id"])
         c["respondio"] = c["id"] in respondieron
         nombre_primero = (c.get("nombre") or "").split(" ")[0] or "vos"
         c["link"] = f"{base_url}/club/{c['club_token']}"
+        intro = f"¡Hola, {nombre_primero}! Te escribo de parte de {operando_como}:" if operando_como else f"¡Hola, {nombre_primero}! Te dejo tu estado de cuenta del Club de referidos:"
         c["mensaje"] = (
-            f"¡Hola, {nombre_primero}! Te dejo tu estado de cuenta del Club de referidos: tus puntos, "
-            f"tus recomendaciones y lo que podés canjear 👉 {c['link']}. Si respondés la encuesta, sumás 150 puntos más."
+            f"{intro} tus puntos, tus recomendaciones y lo que podés canjear 👉 {c['link']}. Si respondés la encuesta, sumás 150 puntos más."
         )
 
     return {"contactos": contactos, "periodo": periodo}
@@ -2269,6 +2339,22 @@ def club_enviar_encuesta(token):
     if bonus_referido:
         _club_registrar_movimiento(contacto["id"], contacto["agente"], bonus_referido, "encuesta_bonus_referido", respuesta["id"])
 
+    # Referido con dato de contacto real -> se crea (o vincula) el contacto y
+    # la Recomendación queda cargada "por validar". No suma los puntos de
+    # "recibida" todavía — eso pasa recién cuando el agente/operador valida
+    # (ver /club/recomendaciones/<id>/validar) — y nunca se le avisa nada a
+    # la persona recomendada, solo queda anotada para que el agente la llame.
+    if referido_nombre and not ya_este_mes:
+        recomendado_id = _club_vincular_o_crear_contacto_referido(contacto["agente"], referido_nombre, referido_telefono, referido_email)
+        if recomendado_id and recomendado_id != contacto["id"]:
+            _req.post(
+                f"{SUPABASE_URL}/rest/v1/recomendaciones", headers={**_supa_hdrs(), "Prefer": "return=minimal"},
+                json={
+                    "contacto_que_recomienda_id": contacto["id"], "contacto_recomendado_id": recomendado_id,
+                    "agente": contacto["agente"], "estado": "recibida", "origen": "encuesta", "validada": False,
+                }, timeout=10,
+            )
+
     return {"ok": True, "puntos_otorgados": puntos, "ya_habia_respondido": ya_este_mes}
 
 
@@ -2314,6 +2400,185 @@ def club_baja(token):
     if not r.ok:
         return {"error": r.text}, 500
     return {"ok": True}
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  MODO OPERADOR
+# ══════════════════════════════════════════════════════════════════════
+# Mientras se opera, session["agente_key"] pasa a ser el del agente
+# OPERADO — así todas las rutas que ya existen (Club, Dueño Vende, Visitas,
+# Campañas, etc.) siguen funcionando sin tocarlas. La identidad real queda
+# guardada aparte en session["operador_real_key"] para la franja de arriba
+# y para poder volver. Nunca se confía en lo que mande el cliente: los
+# permisos (es_operador / acepta_operador) se revalidan acá adentro contra
+# la base cada vez.
+
+@app.route("/operador/estado", methods=["GET"])
+@login_required
+def operador_estado():
+    real_key = session.get("operador_real_key")
+    if real_key:
+        ag_operado = obtener_agentes().get(session.get("agente_key", ""), {})
+        ag_real = obtener_agentes().get(real_key, {})
+        return {
+            "operando": True,
+            "agente_operado": ag_operado.get("nombre") or session.get("agente_key"),
+            "operador_nombre": ag_real.get("nombre") or real_key,
+            "puede_operar": bool(ag_real.get("es_operador")),
+        }
+    ag = obtener_agentes().get(session.get("agente_key", ""), {})
+    opciones = []
+    if ag.get("es_operador"):
+        opciones = [
+            {"key": k, "nombre": v.get("nombre") or k}
+            for k, v in obtener_agentes(forzar=True).items()
+            if v.get("acepta_operador") and k != session.get("agente_key")
+        ]
+    return {"operando": False, "puede_operar": bool(ag.get("es_operador")), "opciones": opciones}
+
+
+@app.route("/operador/entrar", methods=["POST"])
+@login_required
+def operador_entrar():
+    if session.get("operador_real_key"):
+        return {"error": "Ya estás operando — salí primero para cambiar de agente."}, 400
+    data = request.get_json(silent=True) or {}
+    destino = (data.get("agente_key") or "").strip()
+    agentes = obtener_agentes(forzar=True)  # fresco: no confiar en cache para un chequeo de permisos
+    yo = agentes.get(session.get("agente_key", ""), {})
+    if not yo.get("es_operador"):
+        return {"error": "No tenés permiso para operar por otros agentes"}, 403
+    destino_ag = agentes.get(destino)
+    if not destino_ag or not destino_ag.get("acepta_operador"):
+        return {"error": "Ese agente no está habilitado para que operen por él"}, 403
+
+    real_key = session["agente_key"]
+    session["operador_real_key"] = real_key
+    session["agente_key"] = destino
+    print(f"[operador] INICIO · {real_key} empieza a operar por {destino} · {datetime.datetime.now().isoformat()}")
+    return {"ok": True, "agente_operado": destino_ag.get("nombre") or destino}
+
+
+@app.route("/operador/salir", methods=["POST"])
+@login_required
+def operador_salir():
+    real_key = session.get("operador_real_key")
+    if not real_key:
+        return {"error": "No estás operando por nadie"}, 400
+    operado_key = session.get("agente_key", "")
+    session["agente_key"] = real_key
+    session.pop("operador_real_key", None)
+    print(f"[operador] FIN · {real_key} termina de operar por {operado_key} · {datetime.datetime.now().isoformat()}")
+    return {"ok": True}
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  "HOY" MÍNIMA — solo las 4 tareas pedidas (sección 4 de la spec de UX)
+# ══════════════════════════════════════════════════════════════════════
+
+@app.route("/hoy/tareas", methods=["GET"])
+@login_required
+def hoy_tareas():
+    agente_key = session.get("agente_key", "")
+
+    # 1. Contactos que piensan mudarse (respondieron "sí" o "tal vez" en la
+    # encuesta del club en algún momento — se queda con la más reciente de
+    # cada contacto, no duplica si respondió varias veces).
+    rmud = _req.get(
+        f"{SUPABASE_URL}/rest/v1/respuestas_encuesta", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "select": "contacto_id,respuestas,fecha", "order": "fecha.desc"}, timeout=15,
+    )
+    vistos, mudanza_ids = set(), []
+    for r in (rmud.json() if rmud.ok else []):
+        cid = r["contacto_id"]
+        if cid in vistos:
+            continue
+        vistos.add(cid)
+        if (r.get("respuestas") or {}).get("mudanza") in ("si", "tal_vez"):
+            mudanza_ids.append(cid)
+    mudanza = []
+    if mudanza_ids:
+        rc = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in mudanza_ids)})", "select": "id,nombre,telefono"}, timeout=15,
+        )
+        mudanza = rc.json() if rc.ok else []
+
+    # 2. Recomendaciones por validar
+    rrec = _req.get(
+        f"{SUPABASE_URL}/rest/v1/recomendaciones", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "validada": "eq.false", "select": "*", "order": "fecha.desc"}, timeout=15,
+    )
+    recos = rrec.json() if rrec.ok else []
+    ids_reco = sorted({x for r_ in recos for x in (r_["contacto_que_recomienda_id"], r_["contacto_recomendado_id"])})
+    nombres_reco = {}
+    if ids_reco:
+        rc2 = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in ids_reco)})", "select": "id,nombre"}, timeout=15,
+        )
+        if rc2.ok:
+            nombres_reco = {c["id"]: c["nombre"] for c in rc2.json()}
+    for r_ in recos:
+        r_["_recomienda"] = nombres_reco.get(r_["contacto_que_recomienda_id"])
+        r_["_recomendado"] = nombres_reco.get(r_["contacto_recomendado_id"])
+
+    # 3. Canjes por entregar
+    rcanj = _req.get(
+        f"{SUPABASE_URL}/rest/v1/canjes", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "estado": "eq.pedido", "select": "*", "order": "fecha_pedido.desc"}, timeout=15,
+    )
+    canjes = rcanj.json() if rcanj.ok else []
+    ids_cont = sorted({c["contacto_id"] for c in canjes})
+    ids_ben = sorted({c["beneficio_id"] for c in canjes})
+    cont_por_id, nombres_ben = {}, {}
+    if ids_cont:
+        rc3 = _req.get(
+            f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in ids_cont)})", "select": "id,nombre,telefono"}, timeout=15,
+        )
+        if rc3.ok:
+            cont_por_id = {c["id"]: c for c in rc3.json()}
+    if ids_ben:
+        rb = _req.get(
+            f"{SUPABASE_URL}/rest/v1/beneficios", headers=_supa_hdrs(),
+            params={"id": f"in.({','.join(str(i) for i in ids_ben)})", "select": "id,nombre"}, timeout=15,
+        )
+        if rb.ok:
+            nombres_ben = {b["id"]: b["nombre"] for b in rb.json()}
+    for c in canjes:
+        cont = cont_por_id.get(c["contacto_id"]) or {}
+        c["_contacto"] = cont.get("nombre")
+        c["_contacto_telefono"] = cont.get("telefono")
+        c["_beneficio"] = nombres_ben.get(c["beneficio_id"])
+
+    # 4. Envíos del mes pendientes
+    periodo = datetime.date.today().strftime("%Y-%m")
+    ract = _req.get(
+        f"{SUPABASE_URL}/rest/v1/contactos", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "club_activo": "eq.true", "select": "id,nombre,telefono,club_token"}, timeout=15,
+    )
+    activos = ract.json() if ract.ok else []
+    renv = _req.get(
+        f"{SUPABASE_URL}/rest/v1/club_envios_mes", headers=_supa_hdrs(),
+        params={"agente": f"eq.{agente_key}", "periodo": f"eq.{periodo}", "select": "contacto_id"}, timeout=15,
+    )
+    enviados_ids = {e["contacto_id"] for e in (renv.json() if renv.ok else [])}
+    pendientes_envio = [c for c in activos if c["id"] not in enviados_ids]
+    base_url = request.url_root.rstrip("/")
+    operando_como = obtener_agentes().get(agente_key, {}).get("nombre") if session.get("operador_real_key") else None
+    for c in pendientes_envio:
+        nombre_primero = (c.get("nombre") or "").split(" ")[0] or "vos"
+        c["link"] = f"{base_url}/club/{c['club_token']}"
+        intro = f"¡Hola, {nombre_primero}! Te escribo de parte de {operando_como}:" if operando_como else f"¡Hola, {nombre_primero}!"
+        c["mensaje"] = f"{intro} Te dejo tu estado de cuenta del Club de referidos: tus puntos, tus recomendaciones y lo que podés canjear 👉 {c['link']}. Si respondés la encuesta, sumás 150 puntos más."
+
+    return {
+        "mudanza": mudanza,
+        "recomendaciones_por_validar": recos,
+        "canjes_por_entregar": canjes,
+        "envios_pendientes": pendientes_envio,
+    }
 
 
 _SUPA_INJECT = r"""

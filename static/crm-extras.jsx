@@ -54,11 +54,15 @@ function BuscarOverlay({ data, onOpen, onClose }) {
 }
 
 /* ---------- Menú "Más" ---------- */
-function MenuMas({ lastSync, onSync, onIA, onLogro, onSemaforo, onEvolucion, onAjustes, onClose }) {
+function MenuMas({ lastSync, onSync, onIA, onLogro, onSemaforo, onEvolucion, onOperador, onAjustes, onClose }) {
   const ref = useRefE(null);
+  const [puedeOperar, setPuedeOperar] = useStateE(false);
   useEffectE(() => {
     function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) onClose(); }
     document.addEventListener("mousedown", onDoc);
+    if (window.CRM_API) {
+      window.CRM_API.get("/operador/estado").then((r) => setPuedeOperar(!!(r.puede_operar && !r.operando))).catch(() => {});
+    }
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
@@ -84,6 +88,12 @@ function MenuMas({ lastSync, onSync, onIA, onLogro, onSemaforo, onEvolucion, onA
         <span className="mm-ic">📈</span>
         <span className="mm-tx"><b>Mi evolución</b><small>Métricas de tu cartera</small></span>
       </button>
+      {puedeOperar && (
+        <button className="mm-item" onClick={() => { onClose(); onOperador(); }}>
+          <span className="mm-ic">🧑‍💼</span>
+          <span className="mm-tx"><b>Operar como…</b><small>Entrar como otro agente</small></span>
+        </button>
+      )}
       <div className="mm-divider"></div>
       <button className="mm-item" onClick={() => { onClose(); onAjustes(); }}>
         <span className="mm-ic"><Icon.gear /></span>
