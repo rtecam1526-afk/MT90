@@ -33,6 +33,39 @@ function UndoToast({ texto, onDeshacer, onFin }) {
   );
 }
 
+/* ── Mensaje de bienvenida (listo para enviar, no se manda solo) ──────── */
+function ClubBienvenidaModal({ info, onClose }) {
+  const [copiado, setCopiado] = useStateCL(false);
+  function copiar() {
+    navigator.clipboard && navigator.clipboard.writeText(info.mensaje);
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 1600);
+  }
+  function abrirWhatsapp() {
+    const digits = (info.telefono || "").replace(/\D/g, "");
+    window.open("https://wa.me/" + (digits ? "549" + digits : "") + "?text=" + encodeURIComponent(info.mensaje), "mt90_club_bienvenida");
+  }
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-kicker">Club de referidos</div>
+        <h2>¡{(info.nombre || "").split(" ")[0] || "Listo"} ya está en el Club!</h2>
+        <p className="aj-tip">Ya tiene 100 puntos de bienvenida. Avisale:</p>
+        <div className="dsection">
+          <div className="dmsg">{info.mensaje}</div>
+          <div className="dmsg-actions">
+            <button className={"dmsg-btn" + (copiado ? " copied" : "")} onClick={copiar}>{copiado ? "Copiado" : "Copiar"}</button>
+            <button className="dmsg-btn" onClick={abrirWhatsapp}>Abrir chat</button>
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="club-btn" onClick={onClose}>Listo</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Inscripción al club ──────────────────────────────────────────────── */
 function ClubInscripcion() {
   const [contactos, setContactos] = useStateCL(null);
@@ -41,6 +74,7 @@ function ClubInscripcion() {
   const [cargando, setCargando] = useStateCL(null);
   const [copiadoId, setCopiadoId] = useStateCL(null);
   const [undo, setUndo] = useStateCL(null);
+  const [bienvenida, setBienvenida] = useStateCL(null);
 
   function cargar() {
     window.CRM_API.get("/club/contactos").then((r) => setContactos(r.contactos || [])).catch(() => setContactos([]));
@@ -53,9 +87,21 @@ function ClubInscripcion() {
   async function activar(cid, silencioso) {
     setCargando(cid);
     try {
-      await window.CRM_API.post(`/club/contactos/${cid}/activar`, {});
+      const r = await window.CRM_API.post(`/club/contactos/${cid}/activar`, {});
       cargar();
-      if (!silencioso) setUndo({ texto: "Contacto inscripto", onDeshacer: () => desactivar(cid, true) });
+      if (silencioso) {
+        setCargando(null);
+        return;
+      }
+      if (r.bienvenida_otorgada) {
+        const c = (contactos || []).find((x) => x.id === cid) || {};
+        const primer = (c.nombre || "").split(" ")[0] || "¡Hola!";
+        const link = window.location.origin + "/club/" + r.club_token;
+        const mensaje = `¡Hola ${primer}! Te sumé al Club de referidos 🎉 Ya tenés 100 puntos de bienvenida. Recomendá, respondé la encuestita del mes y canjeá premios con tus puntos. Mirá tu cuenta acá: ${link}`;
+        setBienvenida({ nombre: c.nombre, telefono: c.telefono, mensaje });
+      } else {
+        setUndo({ texto: "Contacto inscripto", onDeshacer: () => desactivar(cid, true) });
+      }
     } catch (e) { alert(e.message); }
     setCargando(null);
   }
@@ -122,6 +168,7 @@ function ClubInscripcion() {
         </div>
       ))}
       {undo && <UndoToast texto={undo.texto} onDeshacer={undo.onDeshacer} onFin={() => setUndo(null)} />}
+      {bienvenida && <ClubBienvenidaModal info={bienvenida} onClose={() => setBienvenida(null)} />}
     </div>
   );
 }

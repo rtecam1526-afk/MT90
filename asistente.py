@@ -1651,6 +1651,7 @@ CLUB_PUNTOS_ENCUESTA                = 150
 # que el dato objetivamente exista). Se suman entre sí si deja los dos.
 CLUB_PUNTOS_REFERIDO_TELEFONO = 50
 CLUB_PUNTOS_REFERIDO_EMAIL    = 25
+CLUB_PUNTOS_BIENVENIDA        = 100  # una sola vez por contacto, al inscribirlo por primera vez
 
 CLUB_ESTADOS_RECOMENDACION = ("recibida", "contactada", "reunion", "visita", "tasacion", "operacion", "descartada")
 CLUB_ESTADOS_AVANZA = ("reunion", "visita", "tasacion")
@@ -1806,7 +1807,19 @@ def club_activar_contacto(cid):
     )
     if not r.ok or not r.json():
         return {"error": r.text or "No encontrado"}, 500
-    return {"ok": True, "club_token": r.json()[0]["club_token"]}
+
+    # Bienvenida: una sola vez por contacto, aunque lo saquen y lo vuelvan a
+    # inscribir después (no se regala dos veces por ida y vuelta).
+    rb = _req.get(
+        f"{SUPABASE_URL}/rest/v1/movimientos_puntos", headers=_supa_hdrs(),
+        params={"contacto_id": f"eq.{cid}", "motivo": "eq.bienvenida_club", "select": "id", "limit": "1"}, timeout=10,
+    )
+    bienvenida_otorgada = False
+    if not (rb.ok and rb.json()):
+        _club_registrar_movimiento(cid, agente_key, CLUB_PUNTOS_BIENVENIDA, "bienvenida_club")
+        bienvenida_otorgada = True
+
+    return {"ok": True, "club_token": r.json()[0]["club_token"], "bienvenida_otorgada": bienvenida_otorgada}
 
 
 @app.route("/club/contactos/activar_lote", methods=["POST"])
@@ -1831,6 +1844,12 @@ def club_activar_lote():
         )
         if r.ok:
             hechos += 1
+            rb = _req.get(
+                f"{SUPABASE_URL}/rest/v1/movimientos_puntos", headers=_supa_hdrs(),
+                params={"contacto_id": f"eq.{cid}", "motivo": "eq.bienvenida_club", "select": "id", "limit": "1"}, timeout=10,
+            )
+            if not (rb.ok and rb.json()):
+                _club_registrar_movimiento(cid, agente_key, CLUB_PUNTOS_BIENVENIDA, "bienvenida_club")
     return {"ok": True, "hechos": hechos, "total": len(ids)}
 
 
