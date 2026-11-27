@@ -2147,6 +2147,17 @@ def club_envio_mes():
     )
     respondieron = {x["contacto_id"] for x in (rresp.json() if rresp.ok else [])}
 
+    saldos = {}
+    ids = [c["id"] for c in contactos]
+    if ids:
+        rsaldo = _req.get(
+            f"{SUPABASE_URL}/rest/v1/movimientos_puntos", headers=_supa_hdrs(),
+            params={"contacto_id": f"in.({','.join(str(i) for i in ids)})", "select": "contacto_id,puntos"}, timeout=15,
+        )
+        for m in (rsaldo.json() if rsaldo.ok else []):
+            saldos[m["contacto_id"]] = saldos.get(m["contacto_id"], 0) + m["puntos"]
+
+    nombre_club = obtener_agentes().get(agente_key, {}).get("club_nombre") or "Club de referidos"
     base_url = request.url_root.rstrip("/")
     # En modo operador, el mensaje se presenta en tercera persona — lo manda
     # otra persona del equipo, no el agente (spec sección 6).
@@ -2157,9 +2168,12 @@ def club_envio_mes():
         c["respondio"] = c["id"] in respondieron
         nombre_primero = (c.get("nombre") or "").split(" ")[0] or "vos"
         c["link"] = f"{base_url}/club/{c['club_token']}"
-        intro = f"¡Hola, {nombre_primero}! Te escribo de parte de {operando_como}:" if operando_como else f"¡Hola, {nombre_primero}! Te dejo tu estado de cuenta del Club de referidos:"
+        puntos = saldos.get(c["id"], 0)
+        intro = f"¡Hola, {nombre_primero}! Te escribo de parte de {operando_como}:" if operando_como else f"¡Hola, {nombre_primero}!"
         c["mensaje"] = (
-            f"{intro} tus puntos, tus recomendaciones y lo que podés canjear 👉 {c['link']}. Si respondés la encuesta, sumás 150 puntos más."
+            f"{intro} este diciembre el {nombre_club} entrega regalos antes de las Fiestas 🎄 "
+            f"Ya tenés {puntos} puntos, y los podés cambiar por premios. Cupos limitados, hasta el 22/12. "
+            f"Entrá acá 👉 {c['link']}"
         )
 
     return {"contactos": contactos, "periodo": periodo}
