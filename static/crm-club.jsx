@@ -292,6 +292,10 @@ function ClubBeneficios() {
   const [costo, setCosto] = useStateCL("");
   const [guardando, setGuardando] = useStateCL(false);
   const [undo, setUndo] = useStateCL(null);
+  const [editandoId, setEditandoId] = useStateCL(null);
+  const [editCosto, setEditCosto] = useStateCL("");
+  const [editStock, setEditStock] = useStateCL("");
+  const [guardandoEdit, setGuardandoEdit] = useStateCL(false);
 
   function cargar() {
     window.CRM_API.get("/club/beneficios").then((r) => setBeneficios(r.beneficios || [])).catch(() => setBeneficios([]));
@@ -314,6 +318,21 @@ function ClubBeneficios() {
       cargar();
       if (!silencioso) setUndo({ texto: activo ? "Beneficio activado" : "Beneficio desactivado", onDeshacer: () => setActivo(b, !activo, true) });
     } catch (e) {}
+  }
+  function abrirEdicion(b) {
+    setEditandoId(b.id);
+    setEditCosto(String(b.costo_puntos));
+    setEditStock(b.stock == null ? "" : String(b.stock));
+  }
+  async function guardarEdicion(id) {
+    if (!editCosto) return;
+    setGuardandoEdit(true);
+    try {
+      await window.CRM_API.put(`/club/beneficios/${id}`, { costo_puntos: parseInt(editCosto, 10), stock: editStock ? parseInt(editStock, 10) : null });
+      setEditandoId(null);
+      cargar();
+    } catch (e) { alert(e.message); }
+    setGuardandoEdit(false);
   }
 
   if (beneficios !== null && beneficios.length === 0 && !abierto) {
@@ -338,15 +357,30 @@ function ClubBeneficios() {
       )}
       {beneficios === null && <p className="tq-muted">Cargando…</p>}
       {beneficios && beneficios.map((b) => (
-        <div className="club-row" key={b.id}>
-          <div className="club-row-main">
+        editandoId === b.id ? (
+          <div className="club-row" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }} key={b.id}>
             <div className="club-row-title">{b.nombre}</div>
-            <div className="club-row-sub">{b.costo_puntos} puntos{b.descripcion ? " · " + b.descripcion : ""}</div>
+            <input className="club-input" type="number" value={editCosto} onChange={(e) => setEditCosto(e.target.value)} placeholder="Costo en puntos" />
+            <input className="club-input" type="number" value={editStock} onChange={(e) => setEditStock(e.target.value)} placeholder="Stock (vacío = sin límite)" />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="club-btn" disabled={guardandoEdit || !editCosto} onClick={() => guardarEdicion(b.id)}>{guardandoEdit ? "Guardando…" : "Guardar"}</button>
+              <button className="club-btn-secundario" onClick={() => setEditandoId(null)}>Cancelar</button>
+            </div>
           </div>
-          <div className="club-row-actions">
-            <button className={"club-btn-chip" + (b.activo ? " on" : "")} onClick={() => setActivo(b, !b.activo)}>{b.activo ? "Activo" : "Inactivo"}</button>
+        ) : (
+          <div className="club-row" key={b.id}>
+            <div className="club-row-main">
+              <div className="club-row-title">{b.nombre}</div>
+              <div className="club-row-sub">
+                {b.costo_puntos} puntos{b.descripcion ? " · " + b.descripcion : ""}{b.stock != null ? ` · stock: ${b.stock}` : ""}
+              </div>
+            </div>
+            <div className="club-row-actions">
+              <button className="club-btn-secundario" onClick={() => abrirEdicion(b)}>Editar</button>
+              <button className={"club-btn-chip" + (b.activo ? " on" : "")} onClick={() => setActivo(b, !b.activo)}>{b.activo ? "Activo" : "Inactivo"}</button>
+            </div>
           </div>
-        </div>
+        )
       ))}
       {undo && <UndoToast texto={undo.texto} onDeshacer={undo.onDeshacer} onFin={() => setUndo(null)} />}
     </div>
@@ -434,16 +468,21 @@ function ClubEnvio() {
 }
 
 /* ── Mi perfil (color + teléfono para la página pública) ─────────────── */
+const CLUB_MENSAJE_ENVIO_DEFECTO =
+  "¡Hola, {nombre}! este diciembre el {club} entrega regalos antes de las Fiestas 🎄 Ya tenés {puntos} puntos, y los podés cambiar por premios. Cupos limitados, hasta el 22/12. Entrá acá 👉 {link}";
+
 function ClubPerfil() {
   const [color, setColor] = useStateCL("#E0633A");
   const [telefono, setTelefono] = useStateCL("");
   const [nombreClub, setNombreClub] = useStateCL("");
+  const [mensajeEnvio, setMensajeEnvio] = useStateCL("");
   const [guardando, setGuardando] = useStateCL(false);
   const [msg, setMsg] = useStateCL("");
 
   useEffectCL(() => {
     window.CRM_API.get("/club/perfil").then((r) => {
       setColor(r.color || "#E0633A"); setTelefono(r.telefono || ""); setNombreClub(r.nombre_club || "");
+      setMensajeEnvio(r.mensaje_envio || CLUB_MENSAJE_ENVIO_DEFECTO);
     }).catch(() => {});
   }, []);
 
@@ -451,7 +490,7 @@ function ClubPerfil() {
     setGuardando(true);
     setMsg("");
     try {
-      await window.CRM_API.put("/club/perfil", { color, telefono: telefono.trim(), nombre_club: nombreClub.trim() });
+      await window.CRM_API.put("/club/perfil", { color, telefono: telefono.trim(), nombre_club: nombreClub.trim(), mensaje_envio: mensajeEnvio.trim() });
       setMsg("Guardado.");
     } catch (e) { setMsg("Error: " + e.message); }
     setGuardando(false);
@@ -470,6 +509,10 @@ function ClubPerfil() {
       <div className="club-field">
         <label>Tu WhatsApp <span className="opt">· para el botón de respaldo en la encuesta</span></label>
         <input className="club-input" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="11 5555 5555" />
+      </div>
+      <div className="club-field">
+        <label>Mensaje de "Envío del mes" <span className="opt">· usá {"{nombre}"}, {"{puntos}"}, {"{club}"} y {"{link}"}, se completan solos</span></label>
+        <textarea className="club-input" rows={5} value={mensajeEnvio} onChange={(e) => setMensajeEnvio(e.target.value)} placeholder={CLUB_MENSAJE_ENVIO_DEFECTO} />
       </div>
       <button className="club-btn" disabled={guardando} onClick={guardar}>{guardando ? "Guardando…" : "Guardar"}</button>
       {msg && <p className="tq-muted" style={{ marginTop: 8 }}>{msg}</p>}

@@ -1893,6 +1893,7 @@ def club_get_perfil():
         "color": ag.get("club_color_primario") or "#E0633A",
         "telefono": ag.get("club_telefono") or "",
         "nombre_club": ag.get("club_nombre") or "",
+        "mensaje_envio": ag.get("club_mensaje_envio") or "",
     }
 
 
@@ -1911,6 +1912,8 @@ def club_set_perfil():
         cambios["club_telefono"] = (data.get("telefono") or "").strip() or None
     if "nombre_club" in data:
         cambios["club_nombre"] = (data.get("nombre_club") or "").strip() or None
+    if "mensaje_envio" in data:
+        cambios["club_mensaje_envio"] = (data.get("mensaje_envio") or "").strip() or None
     if not cambios:
         return {"error": "Nada para actualizar"}, 400
     r = _req.patch(
@@ -2157,11 +2160,13 @@ def club_envio_mes():
         for m in (rsaldo.json() if rsaldo.ok else []):
             saldos[m["contacto_id"]] = saldos.get(m["contacto_id"], 0) + m["puntos"]
 
-    nombre_club = obtener_agentes().get(agente_key, {}).get("club_nombre") or "Club de referidos"
+    agente_info = obtener_agentes().get(agente_key, {})
+    nombre_club = agente_info.get("club_nombre") or "Club de referidos"
+    plantilla = agente_info.get("club_mensaje_envio")
     base_url = request.url_root.rstrip("/")
     # En modo operador, el mensaje se presenta en tercera persona — lo manda
     # otra persona del equipo, no el agente (spec sección 6).
-    operando_como = obtener_agentes().get(agente_key, {}).get("nombre") if session.get("operador_real_key") else None
+    operando_como = agente_info.get("nombre") if session.get("operador_real_key") else None
     for c in contactos:
         c["enviado"] = c["id"] in enviados
         c["fecha_envio"] = enviados.get(c["id"])
@@ -2169,12 +2174,19 @@ def club_envio_mes():
         nombre_primero = (c.get("nombre") or "").split(" ")[0] or "vos"
         c["link"] = f"{base_url}/club/{c['club_token']}"
         puntos = saldos.get(c["id"], 0)
-        intro = f"¡Hola, {nombre_primero}! Te escribo de parte de {operando_como}:" if operando_como else f"¡Hola, {nombre_primero}!"
-        c["mensaje"] = (
-            f"{intro} este diciembre el {nombre_club} entrega regalos antes de las Fiestas 🎄 "
-            f"Ya tenés {puntos} puntos, y los podés cambiar por premios. Cupos limitados, hasta el 22/12. "
-            f"Entrá acá 👉 {c['link']}"
-        )
+        if plantilla:
+            cuerpo = (
+                plantilla.replace("{nombre}", nombre_primero).replace("{puntos}", str(puntos))
+                .replace("{club}", nombre_club).replace("{link}", c["link"])
+            )
+            c["mensaje"] = f"Te escribo de parte de {operando_como}: {cuerpo}" if operando_como else cuerpo
+        else:
+            intro = f"¡Hola, {nombre_primero}! Te escribo de parte de {operando_como}:" if operando_como else f"¡Hola, {nombre_primero}!"
+            c["mensaje"] = (
+                f"{intro} este diciembre el {nombre_club} entrega regalos antes de las Fiestas 🎄 "
+                f"Ya tenés {puntos} puntos, y los podés cambiar por premios. Cupos limitados, hasta el 22/12. "
+                f"Entrá acá 👉 {c['link']}"
+            )
 
     return {"contactos": contactos, "periodo": periodo}
 
